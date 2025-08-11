@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  check:
+    strategy:
+      fail-fast: true
+
+    name: Foundry project
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_FACTORY_SALT: "0x0000000000000000000000000000000000000000000000000000000000000000"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Show Forge version
+        run: |
+          forge --version
+
+      - name: Install Node.js and Prettier
+        run: |
+          curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
+          sudo apt-get install -y nodejs
+          npm install --save-dev prettier prettier-plugin-solidity
+
+      - name: Run Prettier Check
+        run: |
+          npx prettier --check --plugin=prettier-plugin-solidity 'src/**/*.sol' 'test/**/*.sol'
+
+      - name: Run Forge build
+        run: |
+          forge build --sizes
+        id: build
+
+      - name: Run Forge tests
+        run: |
+          forge test -vvv
+        id: test
