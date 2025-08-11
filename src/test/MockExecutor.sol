@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.26;
 
 import {IWalletCore} from "../interfaces/IWalletCore.sol";
 import {IStorage} from "../interfaces/IStorage.sol";

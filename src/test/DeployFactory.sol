@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.26;
 
 // EIP-2740 deploy factory to mimic the methods
 contract DeployFactory {
