@@ -20,6 +20,7 @@ https://book.getfoundry.sh/
 
 ### dependencies
 forge install OpenZeppelin/openzeppelin-contracts@v5.4.0 
+forge install eth-infinitism/account-abstraction@v0.8.0
 forge install vectorized/solady@v0.1.24
 
 ### Build
