@@ -1,25 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.23;
 
 library Errors {
     // Storage related
-    error InvalidExecutor();
-    error InvalidSession();
-    error InvalidSessionId();
-    error InvalidOwner();
+    error InvalidNonce(uint192 key, uint64 expected, uint64 actual);
+    error ExpiryPassed(uint256 expiry);
 
     // Account related
     error NotFromSelf();
 
     // Call related
     error CallFailed(uint256 index, uint256 originalLength, bytes returnData);
+    error NonAdminSelfCall();
 
     // ValidationLogic related
     error InvalidValidator(address validator);
     error InvalidValidatorImpl(address validatorImpl);
-    error InvalidValidatorData();
     error ValidatorAlreadyExists();
-    error NotEnoughGas();
+    error InvalidMerkleProof();
 
     // ECDSAValidator related
     error InvalidSignature();
@@ -35,5 +33,4 @@ library Errors {
         uint256 totalGas,
         bytes errorData
     );
-    error NoncompliantValidator();
 }

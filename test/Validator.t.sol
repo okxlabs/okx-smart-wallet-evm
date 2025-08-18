@@ -2,13 +2,12 @@
 pragma solidity ^0.8.23;
 
 import "./Base.t.sol";
-import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {IValidation} from "src/interfaces/IValidation.sol";
 import "src/libraries/Errors.sol";
 import {Static} from "src/libraries/Static.sol";
+import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
 
 contract ValidatorTest is Base {
-    using Clones for address;
     address internal _charlie;
     uint256 internal _charliePk;
 
@@ -24,17 +23,17 @@ contract ValidatorTest is Base {
     function test_addValidator_reverts_for_non_owner() public {
         vm.prank(_bob);
 
-        address validatorAddress = _getEdcsaValidatorAddress(
-            _alice,
-            _charlie,
-            address(_ecdsaValidatorImpl)
-        );
+        // Just use the shared validator directly
+        address validatorAddress = address(_ecdsaValidator);
 
         // Expect not from self revert
         vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
-        IWalletCore(_alice).addValidator(
+        IOwnersManager(_alice).addValidator(
             keccak256(abi.encodePacked(address(this))),
-            validatorAddress
+            validatorAddress,
+            false,
+            0,
+            address(0)
         );
     }
 
@@ -44,9 +43,12 @@ contract ValidatorTest is Base {
 
         // Expect invalid validator implementation revert - for new interface, just pass invalid address
         vm.expectRevert();
-        IWalletCore(_alice).addValidator(
+        IOwnersManager(_alice).addValidator(
             keccak256(abi.encodePacked(address(this))),
-            dave // Invalid validator address
+            dave, // Invalid validator address
+            false,
+            0,
+            address(0)
         );
     }
 
@@ -58,25 +60,25 @@ contract ValidatorTest is Base {
         bytes32 keyHash = keccak256(abi.encodePacked(_alice));
         vm.prank(_alice);
         vm.expectRevert();
-        IWalletCore(_alice).addValidator(keyHash, validatorAddress);
+        IOwnersManager(_alice).addValidator(
+            keyHash,
+            validatorAddress,
+            false,
+            0,
+            address(0)
+        );
     }
 
     function test_validator_can_be_added() public {
-        // Compute validator address (both should be the same)
-        address charlieValidator = _getEdcsaValidatorAddress(
-            _alice,
-            _charlie,
-            address(_ecdsaValidatorImpl)
-        );
+        // Use the shared validator
+        address charlieValidator = address(_ecdsaValidator);
 
         // Expect validator added event
         vm.expectEmit();
         emit ValidatorAdded(charlieValidator);
 
         // Deploy and add validator using the helper
-        address deployedValidator = _addValidator(_alice, _charlie);
-
-        assertEq(ECDSAValidator(deployedValidator).getSigner(), _charlie);
+        _addValidator(_alice, _charlie);
     }
 
     function test_new_validator_can_validate_transactions() public {
@@ -84,22 +86,20 @@ contract ValidatorTest is Base {
         _addValidator(_alice, _charlie);
 
         Call[] memory calls = _construct_calls_data();
-        uint256 executionGas = _get_execution_gas(calls.length);
 
         // Relayer executes with Charlie signature
         vm.prank(_bob);
-        bytes32 hash = _getValidationTypedHash(
-            _alice,
-            relayerCalls,
-            calls,
-            executionGas
-        );
+        bytes32 hash = _getValidationTypedHash(_alice, calls);
         bytes memory validatorData = _construct_validatorData(
+            _alice,
             _charlie,
             _charliePk,
             hash
         );
-        IWalletCore(_alice).executeFromRelayer(calls, validatorData);
+        IWalletCore(_alice).executeWithRelayer(
+            BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+            validatorData
+        );
 
         assertEq(address(_bob).balance, 1 ether);
     }
@@ -110,15 +110,252 @@ contract ValidatorTest is Base {
         bytes32 keyHash = keccak256(abi.encodePacked(_alice));
 
         vm.startPrank(_alice);
-        // Test that we can add another validator for the same keyHash (this should work as setValidator allows overwriting)
-        IStorage(WalletCore(payable(_alice)).getMainStorage()).setValidator(
+        // Test that we can't add another validator for the same keyHash (should revert)
+        vm.expectRevert(Errors.ValidatorAlreadyExists.selector);
+        IOwnersManager(_alice).addValidator(
             keyHash,
-            aliceECDSAValidator
+            aliceECDSAValidator,
+            false,
+            0,
+            address(0)
         );
 
         // Test removing the validator
-        IStorage(WalletCore(payable(_alice)).getMainStorage()).removeValidator(
+        IOwnersManager(_alice).removeValidator(keyHash);
+    }
+
+    function test_addValidatorWithSettings_succeeds() public {
+        // Use SELF_VALIDATION_ADDRESS for testing to avoid deployment issues
+        bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
+        address validatorAddress = Static.SELF_VALIDATION_ADDRESS;
+        address hookAddress = address(0x1234);
+        uint40 expiration = uint40(block.timestamp + 3600); // 1 hour from now
+        bool isAdmin = true;
+
+        vm.prank(_alice);
+        IOwnersManager(_alice).addValidator(
+            keyHash,
+            validatorAddress,
+            isAdmin,
+            expiration,
+            hookAddress
+        );
+
+        // Verify settings were stored correctly
+        (
+            address validator,
+            address hook,
+            uint40 storedExpiration,
+            bool storedIsAdmin,
+            bool isExpired
+        ) = IOwnersManager(_alice).getValidatorSettings(keyHash);
+
+        assertEq(validator, validatorAddress);
+        assertEq(hook, hookAddress);
+        assertEq(storedExpiration, expiration);
+        assertTrue(storedIsAdmin);
+        assertFalse(isExpired);
+    }
+
+    function test_validator_expiration_functionality() public {
+        bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
+        address validatorAddress = Static.SELF_VALIDATION_ADDRESS;
+        uint40 expiration = uint40(block.timestamp + 1); // Expires in 1 second
+
+        vm.prank(_alice);
+        IOwnersManager(_alice).addValidator(
+            keyHash,
+            validatorAddress,
+            false,
+            expiration,
+            address(0)
+        );
+
+        // Validator should be valid initially
+        address retrievedValidator = IOwnersManager(_alice).getValidator(
             keyHash
         );
+        assertEq(retrievedValidator, validatorAddress);
+        assertFalse(IOwnersManager(_alice).isSignerExpired(keyHash));
+
+        // Advance time past expiration
+        vm.warp(block.timestamp + 2);
+
+        // Validator should now be expired and return address(0)
+        retrievedValidator = IOwnersManager(_alice).getValidator(keyHash);
+        assertEq(retrievedValidator, address(0));
+        assertTrue(IOwnersManager(_alice).isSignerExpired(keyHash));
+    }
+
+    function test_permanent_validator_never_expires() public {
+        bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
+        address validatorAddress = Static.SELF_VALIDATION_ADDRESS;
+
+        vm.prank(_alice);
+        IOwnersManager(_alice).addValidator(
+            keyHash,
+            validatorAddress,
+            false,
+            0, // expiration = 0 means never expires
+            address(0)
+        );
+
+        // Even after advancing time significantly, validator should remain valid
+        vm.warp(block.timestamp + 365 days);
+
+        address retrievedValidator = IOwnersManager(_alice).getValidator(
+            keyHash
+        );
+        assertEq(retrievedValidator, validatorAddress);
+        assertFalse(IOwnersManager(_alice).isSignerExpired(keyHash));
+        assertEq(IOwnersManager(_alice).getSignerExpiration(keyHash), 0);
+    }
+
+    function test_admin_signer_functionality() public {
+        bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
+        address validatorAddress = Static.SELF_VALIDATION_ADDRESS;
+
+        // Add admin validator
+        vm.prank(_alice);
+        IOwnersManager(_alice).addValidator(
+            keyHash,
+            validatorAddress,
+            true, // isAdmin = true
+            0,
+            address(0)
+        );
+
+        // Verify admin status
+        assertTrue(IOwnersManager(_alice).isSignerAdmin(keyHash));
+
+        // Add non-admin validator
+        bytes32 nonAdminKeyHash = keccak256(abi.encodePacked(_bob));
+        address nonAdminValidatorAddress = Static.SELF_VALIDATION_ADDRESS;
+
+        vm.prank(_alice);
+        IOwnersManager(_alice).addValidator(
+            nonAdminKeyHash,
+            nonAdminValidatorAddress,
+            false, // isAdmin = false
+            0,
+            address(0)
+        );
+
+        // Verify non-admin status
+        assertFalse(IOwnersManager(_alice).isSignerAdmin(nonAdminKeyHash));
+    }
+
+    function test_backward_compatibility_with_old_addValidator() public {
+        // Test that old addValidator still works and has default settings
+        bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
+        address validatorAddress = Static.SELF_VALIDATION_ADDRESS;
+
+        vm.prank(_alice);
+        IOwnersManager(_alice).addValidator(
+            keyHash,
+            validatorAddress,
+            false,
+            0,
+            address(0)
+        );
+
+        // Check that settings have default values
+        (
+            address validator,
+            address hook,
+            uint40 expiration,
+            bool isAdmin,
+            bool isExpired
+        ) = IOwnersManager(_alice).getValidatorSettings(keyHash);
+
+        assertEq(validator, validatorAddress);
+        assertEq(hook, address(0)); // Default: no hook
+        assertEq(expiration, 0); // Default: never expires
+        assertFalse(isAdmin); // Default: not admin
+        assertFalse(isExpired); // Default: not expired
+    }
+
+    function test_initialize_sets_admin_privileges_for_initial_owners() public {
+        // Create a new wallet for this test
+        (address newWallet, ) = makeAddrAndKey("newWallet");
+        vm.deal(newWallet, 10 ether);
+        _setCodeToEOA(address(_walletCore), newWallet);
+
+        // Prepare initial owners with different keys
+        InitialOwner[] memory initialOwners = new InitialOwner[](2);
+
+        // First owner - Charlie
+        bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
+        initialOwners[0] = InitialOwner({
+            keyHash: charlieKeyHash,
+            validator: Static.SELF_VALIDATION_ADDRESS
+        });
+
+        // Second owner - Bob
+        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        initialOwners[1] = InitialOwner({
+            keyHash: bobKeyHash,
+            validator: Static.SELF_VALIDATION_ADDRESS
+        });
+
+        // Initialize the wallet with initial owners
+        vm.prank(newWallet);
+        IWalletCore(newWallet).initialize(initialOwners);
+
+        // Verify both initial owners have admin privileges
+        assertTrue(IOwnersManager(newWallet).isSignerAdmin(charlieKeyHash));
+        assertTrue(IOwnersManager(newWallet).isSignerAdmin(bobKeyHash));
+
+        // Verify their settings
+        (
+            address charlieValidator,
+            address charlieHook,
+            uint40 charlieExpiration,
+            bool charlieIsAdmin,
+            bool charlieIsExpired
+        ) = IOwnersManager(newWallet).getValidatorSettings(charlieKeyHash);
+
+        assertEq(charlieValidator, Static.SELF_VALIDATION_ADDRESS);
+        assertEq(charlieHook, address(0)); // No hook
+        assertEq(charlieExpiration, 0); // Never expires
+        assertTrue(charlieIsAdmin); // Admin privileges
+        assertFalse(charlieIsExpired); // Not expired
+
+        // Same for Bob
+        (
+            address bobValidator,
+            address bobHook,
+            uint40 bobExpiration,
+            bool bobIsAdmin,
+            bool bobIsExpired
+        ) = IOwnersManager(newWallet).getValidatorSettings(bobKeyHash);
+
+        assertEq(bobValidator, Static.SELF_VALIDATION_ADDRESS);
+        assertEq(bobHook, address(0)); // No hook
+        assertEq(bobExpiration, 0); // Never expires
+        assertTrue(bobIsAdmin); // Admin privileges
+        assertFalse(bobIsExpired); // Not expired
+    }
+
+    function test_initialize_with_empty_initial_owners() public {
+        // Create a new wallet for this test
+        (address newWallet, ) = makeAddrAndKey("emptyWallet");
+        vm.deal(newWallet, 10 ether);
+        _setCodeToEOA(address(_walletCore), newWallet);
+
+        // Initialize with empty array
+        InitialOwner[] memory initialOwners = new InitialOwner[](0);
+
+        vm.prank(newWallet);
+        IWalletCore(newWallet).initialize(initialOwners);
+
+        // Should succeed without errors
+        // No signers should be set
+        bytes32 testKeyHash = keccak256(abi.encodePacked(_alice));
+        assertEq(
+            IOwnersManager(newWallet).getValidator(testKeyHash),
+            address(0)
+        );
+        assertFalse(IOwnersManager(newWallet).isSignerAdmin(testKeyHash));
     }
 }

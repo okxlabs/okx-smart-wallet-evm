@@ -763,22 +763,23 @@ contract SimulationTest is Base {
     //     );
     // }
 
-    function test_simulate_executeWithRelayer() public {
+    function test_simulate_executeFromRelayer() public {
         uint256 callSize = 3;
 
         Call[] memory calls = _construct_usdc_batchcall(callSize);
         bytes memory validatorData = _construct_signature(
             _alice,
             _alicePk,
-            relayerCalls,
-            calls,
-            0
+            calls
         );
 
         vm.prank(relayer);
         uint256 gasStart = gasleft();
         try
-            IWalletCore(_alice).simulateExecuteFromRelayer(calls, validatorData)
+            IWalletCore(_alice).simulateExecuteWithRelayer(
+                BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+                validatorData
+            )
         {
             revert("should not reach here");
         } catch (bytes memory simulationResult) {

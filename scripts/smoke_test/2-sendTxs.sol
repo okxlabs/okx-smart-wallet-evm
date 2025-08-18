@@ -21,7 +21,7 @@ contract SendTxs is Script {
         calls[0] = Call({target: receiver, value: 0.00001 ether, data: ""});
         // calls[1] = Call({target: receiver, value: 0.00002 ether, data: ""});
 
-        IWalletCore(sender).executeFromSelf(calls);
+        IWalletCore(sender).execute(calls);
 
         console.log("Completed ExecuteFromSelf script");
         vm.stopBroadcast();

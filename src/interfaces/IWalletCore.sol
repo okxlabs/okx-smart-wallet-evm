@@ -1,42 +1,29 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.23;
 
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-import {IStorage} from "./IStorage.sol";
-import {Call, Session} from "src/Types.sol";
+import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 
 interface IWalletCore is IERC165 {
     // EVENTS
     event StorageInitialized();
     event StorageCreated(address storageAddress);
 
-    function initialize() external returns (address storageAddress);
+    function initialize(InitialOwner[] calldata initialOwners) external;
 
-    function executeFromSelf(Call[] calldata calls) external;
+    function execute(Call[] calldata calls) external;
 
-    function executeFromRelayer(
-        Call[] calldata calls,
+    function executeWithRelayer(
+        BatchedCall calldata batchedCall,
         bytes calldata validatorData
     ) external;
 
-    function simulateExecuteFromRelayer(
-        Call[] calldata calls,
+    function simulateExecuteWithRelayer(
+        BatchedCall calldata batchedCall,
         bytes calldata validatorData
     ) external;
-
-    function executeFromExecutor(
-        Call[] calldata calls,
-        Session calldata session
-    ) external;
-
-    function addValidator(bytes32 keyHash, address validator) external;
-
-    function getMainStorage() external view returns (IStorage);
-
     function isValidSignature(
         bytes32 hash,
         bytes calldata signature
     ) external view returns (bytes4);
-
-    function getNonce() external view returns (uint256);
 }

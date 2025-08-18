@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import "lib/forge-std/src/Script.sol";
 import {DeployInitHelper} from "./DeployInitHelper.sol";
 import {DeployFactory} from "src/test/DeployFactory.sol";
-import {Storage} from "src/Storage.sol";
+import {OwnersManager} from "src/OwnersManager.sol";
 import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
 import {WalletCore} from "src/WalletCore.sol";
 

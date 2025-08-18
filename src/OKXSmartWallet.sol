@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.26;
+pragma solidity =0.8.23;
 
 import {ISmartWallet} from "./interfaces/ISmartWallet.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 import {Initializable} from "solady/utils/Initializable.sol";
-import {ERC4337Account, PackedUserOperation} from "./ERC4337Account.sol";
+import {ERC4337Account} from "./ERC4337Account.sol";
+import {PackedUserOperation} from "./Types4337.sol";
 
 contract OKXSmartWallet is ISmartWallet, ERC4337Account, UUPSUpgradeable,  Initializable {
 

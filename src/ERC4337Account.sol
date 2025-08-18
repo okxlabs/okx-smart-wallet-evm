@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.26;
+pragma solidity =0.8.23;
 
-import {IERC4337Account, PackedUserOperation} from "./interfaces/IERC4337Account.sol";
+import {IERC4337AccountLocal} from "./interfaces/IERC4337AccountLocal.sol";
+import {PackedUserOperation} from "./Types4337.sol";
 
-abstract contract ERC4337Account is IERC4337Account {
+abstract contract ERC4337Account is IERC4337AccountLocal {
 
     /// @notice Modifier to ensure the caller is the EntryPoint
     modifier onlyEntryPoint() {

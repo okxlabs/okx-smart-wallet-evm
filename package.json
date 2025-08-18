@@ -1,8 +1,7 @@
 {
-  "name": "7702-eoa-implementation",
+  "name": "okx-smart-wallet",
   "version": "1.0.0",
   "main": "index.js",
-  "author": "lv.min <lv.min@okg.com>",
   "license": "GPL-3.0",
   "scripts": {
     "prettier:sol": "prettier --write --plugin=prettier-plugin-solidity 'src/**/*.sol' 'test/**/*.sol'",
@@ -22,6 +21,7 @@
   ],
   "dependencies": {
     "@openzeppelin/contracts": "^5.2.0",
+    "ethereumjs-util": "^7.1.5",
     "prettier": "^3.1.0",
     "prettier-plugin-solidity": "^1.2.0",
     "solhint": "^4.1.1"
@@ -39,6 +39,8 @@
     "@types/mocha": "^10.0.10",
     "chai": "^4.5.0",
     "cloc": "^2.4.0-cloc",
+    "ec-pem": "^0.18.0",
+    "ethers": "^6.15.0",
     "hardhat": "^2.22.10",
     "hardhat-gas-reporter": "^2.2.2",
     "solidity-coverage": "^0.8.14",
