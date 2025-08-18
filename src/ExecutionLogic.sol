@@ -1,32 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.26;
+pragma solidity 0.8.23;
 
 import {Call} from "./Types.sol";
 import {Errors} from "./libraries/Errors.sol";
+import {IHook} from "./interfaces/IHook.sol";
 
 abstract contract ExecutionLogic {
     uint256 private constant MAX_RETURNDATA_SIZE = 256; // Good enough for common customised error
-    bytes32 internal constant CALL_FAILED_SIG =
-        0x87f204386a7d80c14e78762706337960641c21547d00eccbe257c651645d237e; //keccak256("CallFailed(uint256,uint256,bytes)")
-
-    /**
-     * @dev Modifier to make a function callable by the account itself or EOA address under 7702
-     */
-    modifier onlySelf() {
-        if (msg.sender != address(this)) revert Errors.NotFromSelf();
-        _;
-    }
-
-    /**
-     * @notice Executes multiple contract calls in a single transaction
-     * @dev Reverts if any of the calls fail
-     * @param calls Array of Call structs containing destination address, value, and calldata
-     */
-    function _batchCall(Call[] calldata calls) internal {
-        for (uint256 i; i < calls.length; i++) {
-            _call(calls, i);
-        }
-    }
 
     /**
      * @notice Executes a call at given index
@@ -34,7 +14,7 @@ abstract contract ExecutionLogic {
      * @param calls Array of Call structs containing destination address, value, and calldata
      * @param index index number for the call
      */
-    function _call(Call[] calldata calls, uint256 index) private {
+    function _call(Call[] calldata calls, uint256 index) internal {
         address target = calls[index].target;
         uint256 value = calls[index].value;
         bytes calldata data = calls[index].data;
@@ -85,9 +65,5 @@ abstract contract ExecutionLogic {
                 revert(ptr, totalSize)
             }
         }
-    }
-
-    function batchCall(Call[] calldata calls) external onlySelf {
-        _batchCall(calls);
     }
 }

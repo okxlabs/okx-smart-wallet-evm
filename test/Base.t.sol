@@ -3,23 +3,20 @@ pragma solidity ^0.8.23;
 
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
-import {IStorage} from "src/interfaces/IStorage.sol";
+import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
+import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {IWalletCore} from "src/interfaces/IWalletCore.sol";
 import {IValidation} from "src/interfaces/IValidation.sol";
 import {IValidator} from "src/interfaces/IValidator.sol";
 import {ValidationLogic} from "src/ValidationLogic.sol";
 import {WalletCore} from "src/WalletCore.sol";
 import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
-import {Call} from "src/Types.sol";
+import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 import {Errors} from "src/libraries/Errors.sol";
 import {DeployInitHelper, DeployFactory} from "scripts/DeployInitHelper.sol";
 import {ERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Static} from "src/libraries/Static.sol";
-import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
-
 contract Base is Test {
-    using Clones for address;
-
     string public constant NAME = "wallet-core";
     string public constant VERSION = "1.0.0";
 
@@ -27,8 +24,7 @@ contract Base is Test {
     uint256 internal _alicePk;
     address internal _bob;
     uint256 internal _bobPk;
-    IStorage internal _storageImpl;
-    ECDSAValidator internal _ecdsaValidatorImpl;
+    ECDSAValidator internal _ecdsaValidator; // Shared validator instance
     WalletCore internal _walletCore;
     DeployFactory public deployFactory;
     address internal relayer;
@@ -45,8 +41,12 @@ contract Base is Test {
         deployFactory = new DeployFactory();
         bytes32 deployFactorySalt = vm.envBytes32("DEPLOY_FACTORY_SALT");
 
-        (_storageImpl, _ecdsaValidatorImpl, _walletCore) = DeployInitHelper
-            .deployContracts(deployFactory, deployFactorySalt, NAME, VERSION);
+        (_ecdsaValidator, _walletCore) = DeployInitHelper.deployContracts(
+            deployFactory,
+            deployFactorySalt,
+            NAME,
+            VERSION
+        );
 
         _setCodeToEOA(address(_walletCore), _alice);
 
@@ -54,18 +54,10 @@ contract Base is Test {
 
         // Alice initializes the account
         vm.prank(_alice);
-        IWalletCore(_alice).initialize();
+        // Initialize with empty owners array to allow tests to add validators as needed
+        InitialOwner[] memory initialOwners = new InitialOwner[](0);
+        IWalletCore(_alice).initialize(initialOwners);
         vm.stopPrank();
-    }
-
-    function _getEdcsaValidatorAddress(
-        address eoa,
-        address signer,
-        address validatorImpl
-    ) internal view returns (address) {
-        bytes memory initCode = abi.encode(signer);
-        return
-            IValidation(eoa).computeValidatorAddress(validatorImpl, initCode);
     }
 
     function _setCodeToEOA(address contractCode, address eoa) internal {
@@ -76,32 +68,18 @@ contract Base is Test {
     function _construct_signature(
         address account,
         uint256 signerPk,
-        Call[] memory _relayerCalls,
-        Call[] memory calls,
-        uint256 executionGas
+        Call[] memory calls
     ) public view returns (bytes memory) {
-        bytes32 hash = _getValidationTypedHash(
-            account,
-            _relayerCalls,
-            calls,
-            executionGas
-        );
+        bytes32 hash = _getValidationTypedHash(account, calls);
         return _signHash(signerPk, hash);
     }
 
     function _construct_signature(
         uint256 nonce,
         uint256 signerPk,
-        Call[] memory _relayerCalls,
-        Call[] memory calls,
-        uint256 executionGas
+        Call[] memory calls
     ) public view returns (bytes memory) {
-        bytes32 hash = _getValidationTypedHash(
-            nonce,
-            executionGas,
-            _relayerCalls,
-            calls
-        );
+        bytes32 hash = _getValidationTypedHash(nonce, calls);
         return _signHash(signerPk, hash);
     }
 
@@ -109,17 +87,9 @@ contract Base is Test {
         uint256 nonce,
         address account,
         uint256 signerPk,
-        Call[] memory _relayerCalls,
-        Call[] memory calls,
-        uint256 executionGas
+        Call[] memory calls
     ) public view returns (bytes memory) {
-        bytes32 hash = _getValidationTypedHashWithNonce(
-            account,
-            nonce,
-            executionGas,
-            _relayerCalls,
-            calls
-        );
+        bytes32 hash = _getValidationTypedHashWithNonce(account, nonce, calls);
         return _signHash(signerPk, hash);
     }
 
@@ -147,37 +117,39 @@ contract Base is Test {
     }
 
     function _getNonce(address account) internal view returns (uint256) {
-        return
-            IStorage(WalletCore(payable(account)).getMainStorage()).getNonce();
+        return uint256(INonceManager(account).getNonce(uint192(0)));
     }
 
     function _getValidationTypedHash(
         uint256 nonce,
-        uint256 executionGas,
-        Call[] memory _relayerCalls,
         Call[] memory calls
     ) internal view returns (bytes32) {
-        return ValidationLogic(_alice).getValidationTypedHash(nonce, calls);
+        return
+            ValidationLogic(_alice).getValidationTypedHash(
+                BatchedCall({calls: calls, nonce: nonce, expiry: 0})
+            );
     }
 
     function _getValidationTypedHash(
         address account,
-        Call[] memory _relayerCalls,
-        Call[] memory calls,
-        uint256 executionGas
+        Call[] memory calls
     ) internal view returns (bytes32) {
         uint256 nonce = _getNonce(account);
-        return ValidationLogic(account).getValidationTypedHash(nonce, calls);
+        return
+            ValidationLogic(account).getValidationTypedHash(
+                BatchedCall({calls: calls, nonce: nonce, expiry: 0})
+            );
     }
 
     function _getValidationTypedHashWithNonce(
         address account,
         uint256 nonce,
-        uint256 executionGas,
-        Call[] memory _relayerCalls,
         Call[] memory calls
     ) internal view returns (bytes32) {
-        return ValidationLogic(account).getValidationTypedHash(nonce, calls);
+        return
+            ValidationLogic(account).getValidationTypedHash(
+                BatchedCall({calls: calls, nonce: nonce, expiry: 0})
+            );
     }
 
     function _signHash(
@@ -189,64 +161,38 @@ contract Base is Test {
     }
 
     function _addValidator(address signer) internal returns (address) {
-        // Validator signer
-        bytes memory initCode = abi.encode(signer);
+        // Use the signer's address as the keyHash for testing
+        bytes32 keyHash = keccak256(abi.encodePacked(signer));
 
-        // Compute validator address
-        address validatorAddress = _getEdcsaValidatorAddress(
-            signer,
-            signer,
-            address(_ecdsaValidatorImpl)
+        vm.prank(signer);
+        IOwnersManager(signer).addValidator(
+            keyHash,
+            address(_ecdsaValidator),
+            false,
+            0,
+            address(0)
         );
 
-        // Add validator with keyHash (use signer address as keyHash for testing)
-        bytes32 keyHash = keccak256(abi.encodePacked(signer));
-        vm.startPrank(signer);
-
-        // Deploy the validator using Clones if it doesn't exist yet
-        if (validatorAddress.code.length == 0) {
-            address(_ecdsaValidatorImpl).cloneDeterministicWithImmutableArgs(
-                initCode,
-                Static.VALIDATOR_SALT
-            );
-        }
-
-        IWalletCore(signer).addValidator(keyHash, validatorAddress);
-        vm.stopPrank();
-
-        return validatorAddress;
+        return address(_ecdsaValidator);
     }
 
     function _addValidator(
         address account,
         address signer
     ) internal returns (address) {
-        // Validator signer
-        bytes memory initCode = abi.encode(signer);
+        // Use the signer's address as the keyHash for testing
+        bytes32 keyHash = keccak256(abi.encodePacked(signer));
 
-        // Compute validator address
-        address validatorAddress = _getEdcsaValidatorAddress(
-            account,
-            signer,
-            address(_ecdsaValidatorImpl)
+        vm.prank(account);
+        IOwnersManager(account).addValidator(
+            keyHash,
+            address(_ecdsaValidator),
+            false,
+            0,
+            address(0)
         );
 
-        // Add validator with keyHash (use signer address as keyHash for testing)
-        bytes32 keyHash = keccak256(abi.encodePacked(signer));
-        vm.startPrank(account);
-
-        // Deploy the validator using Clones if it doesn't exist yet
-        if (validatorAddress.code.length == 0) {
-            address(_ecdsaValidatorImpl).cloneDeterministicWithImmutableArgs(
-                initCode,
-                Static.VALIDATOR_SALT
-            );
-        }
-
-        IWalletCore(account).addValidator(keyHash, validatorAddress);
-        vm.stopPrank();
-
-        return validatorAddress;
+        return address(_ecdsaValidator);
     }
 
     function _construct_relayer_call(
@@ -274,9 +220,29 @@ contract Base is Test {
     }
 
     function _construct_validatorData(
+        address /* wallet */,
         address signer,
         uint256 privateKey,
         bytes32 hash
+    ) internal pure returns (bytes memory) {
+        bytes32 keyHash = keccak256(abi.encodePacked(signer));
+        bytes memory signature = _construct_signature(privateKey, hash);
+        return abi.encodePacked(keyHash, signature);
+    }
+
+    function _construct_validatorData(
+        address signer,
+        uint256 privateKey,
+        bytes32 hash
+    ) internal pure returns (bytes memory) {
+        return _construct_validatorData(signer, signer, privateKey, hash);
+    }
+
+    function _construct_validatorData(
+        address signer,
+        uint256 privateKey,
+        bytes32 hash,
+        uint64 /* nonce */
     ) internal pure returns (bytes memory) {
         bytes32 keyHash = keccak256(abi.encodePacked(signer));
         bytes memory signature = _construct_signature(privateKey, hash);

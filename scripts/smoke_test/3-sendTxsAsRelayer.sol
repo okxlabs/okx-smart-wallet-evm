@@ -3,7 +3,7 @@ pragma solidity ^0.8.12;
 
 import "lib/forge-std/src/Script.sol";
 import "src/WalletCore.sol";
-import "src/interfaces/IStorage.sol";
+import "src/interfaces/IOwnersManager.sol";
 import "src/ValidationLogic.sol";
 import "src/Types.sol";
 
@@ -24,7 +24,7 @@ contract SendTxsAsRelayer is Script {
         calls[0] = Call({target: receiver, value: 0.00001 ether, data: ""});
         // calls[1] = Call({target: receiver, value: 0.00002 ether, data: ""});
 
-        uint256 nonce = IStorage(WalletCore(sender).getMainStorage())
+        uint256 nonce = IOwnersManager(WalletCore(sender).getMainStorage())
             .getNonce();
         bytes32 hash = ValidationLogic(sender).getValidationTypedHash(
             nonce,

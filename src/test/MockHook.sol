@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.26;
+pragma solidity ^0.8.23;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Call} from "../Types.sol";
@@ -11,13 +11,12 @@ contract MockHook is IHook {
 
     function preCheck(
         Call[] calldata calls,
-        bytes calldata hookData,
         address // executor
     ) external payable returns (bytes memory preCheckRet) {
-        (address token, uint256 maxTotalAmount) = abi.decode(
-            hookData,
-            (address, uint256)
-        );
+        // For mock purposes, we'll use hardcoded values or extract from first call
+        // In real implementation, these would come from storage or other sources
+        address token = calls.length > 0 ? calls[0].target : address(0);
+        uint256 maxTotalAmount = 100 ether; // Hardcoded limit for testing
 
         uint256 initialBalance = IERC20(token).balanceOf(msg.sender);
         uint256 totalAmount = 0;
@@ -47,7 +46,6 @@ contract MockHook is IHook {
 
     function postCheck(
         bytes calldata preHookRet,
-        bytes calldata, // hookData
         address // executor
     ) external payable {
         (address token, uint256 initialBalance, uint256 totalAmount) = abi

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.26;
+pragma solidity =0.8.23;
 
 interface IERC7201 {
     /// @notice Returns the namespace and version of the contract

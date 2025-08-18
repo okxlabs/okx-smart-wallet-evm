@@ -4,13 +4,13 @@ pragma solidity ^0.8.23;
 import "./Base.t.sol";
 
 contract ValidationTest is Base {
-    event NonceConsumed(uint256 nonce);
+    event NonceConsumed(uint192 key, uint64 nonce);
 
     function setUp() public override {
         super.setUp();
     }
 
-    function test_executeWithRelayer_reverts_for_default_validator_invalid_signer()
+    function test_executeFromRelayer_reverts_for_default_validator_invalid_signer()
         public
     {
         // Register validator first so we can test signature validation
@@ -18,7 +18,7 @@ contract ValidationTest is Base {
 
         Call[] memory calls = _construct_calls_data();
 
-        bytes32 hash = _getValidationTypedHash(_alice, relayerCalls, calls, 0);
+        bytes32 hash = _getValidationTypedHash(_alice, calls);
         bytes memory validatorData = _construct_validatorData(
             _alice,
             _bobPk, // Wrong private key for invalid signature test
@@ -29,20 +29,18 @@ contract ValidationTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidSignature.selector)
         );
-        IWalletCore(_alice).executeFromRelayer(calls, validatorData);
+        IWalletCore(_alice).executeWithRelayer(
+            BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+            validatorData
+        );
         assertEq(address(_bob).balance, 0 ether);
     }
 
-    function test_executeWithRelayer_reverts_for_invalid_signature() public {
+    function test_executeFromRelayer_reverts_for_invalid_signature() public {
         Call[] memory calls = _construct_calls_data();
         _addValidator(_alice);
 
-        bytes32 hash = _getValidationTypedHash(
-            _alice,
-            emptyRelayerCalls,
-            calls,
-            0
-        );
+        bytes32 hash = _getValidationTypedHash(_alice, calls);
         bytes memory validatorData = _construct_validatorData(
             _alice,
             _bobPk, // Wrong private key for invalid signature test
@@ -53,15 +51,18 @@ contract ValidationTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidSignature.selector)
         );
-        IWalletCore(_alice).executeFromRelayer(calls, validatorData);
+        IWalletCore(_alice).executeWithRelayer(
+            BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+            validatorData
+        );
 
         assertEq(address(_bob).balance, 0 ether);
     }
 
-    function test_executeWithRelayer_reverts_for_invalid_nonce() public {
+    function test_executeFromRelayer_reverts_for_invalid_nonce() public {
         Call[] memory calls = _construct_calls_data();
 
-        bytes32 hash = _getValidationTypedHash(_alice, relayerCalls, calls, 0);
+        bytes32 hash = _getValidationTypedHash(_alice, calls);
         bytes memory validatorData = _construct_validatorData(
             _alice,
             _alicePk,
@@ -72,28 +73,23 @@ contract ValidationTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidValidator.selector, address(0))
         );
-        IWalletCore(_alice).executeFromRelayer(calls, validatorData);
+        IWalletCore(_alice).executeWithRelayer(
+            BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+            validatorData
+        );
 
         assertEq(address(_bob).balance, 0 ether);
     }
 
-    function test_executeWithRelayer_reverts_for_removed_validator() public {
+    function test_executeFromRelayer_reverts_for_removed_validator() public {
         Call[] memory calls = _construct_calls_data();
         _addValidator(_alice);
 
-        IStorage storageContract = IStorage(
-            WalletCore(payable(_alice)).getMainStorage()
-        );
         vm.prank(_alice);
         bytes32 keyHash = keccak256(abi.encodePacked(_alice));
-        storageContract.removeValidator(keyHash);
+        IOwnersManager(_alice).removeValidator(keyHash);
 
-        bytes32 hash = _getValidationTypedHash(
-            _alice,
-            emptyRelayerCalls,
-            calls,
-            0
-        );
+        bytes32 hash = _getValidationTypedHash(_alice, calls);
         bytes memory validatorData = _construct_validatorData(
             _alice,
             _alicePk,
@@ -104,35 +100,35 @@ contract ValidationTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidValidator.selector, address(0))
         );
-        IWalletCore(_alice).executeFromRelayer(calls, validatorData);
+        IWalletCore(_alice).executeWithRelayer(
+            BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+            validatorData
+        );
 
         assertEq(address(_bob).balance, 0 ether);
     }
 
-    function test_executeWithRelayer_emits_nonce_consumed() public {
+    function test_executeFromRelayer_emits_nonce_consumed() public {
         // Register validator first
         _addValidator(_alice);
 
         vm.prank(_alice);
         uint256 nonce = _getNonce(_alice);
         Call[] memory calls = _construct_calls_data();
-        uint256 executionGas = _get_execution_gas(calls.length);
 
         vm.expectEmit();
-        emit NonceConsumed(nonce);
+        emit NonceConsumed(uint192(0), uint64(nonce));
 
-        bytes32 hash = _getValidationTypedHash(
-            _alice,
-            emptyRelayerCalls,
-            calls,
-            executionGas
-        );
+        bytes32 hash = _getValidationTypedHash(_alice, calls);
         bytes memory validatorData = _construct_validatorData(
             _alice,
             _alicePk,
             hash
         );
-        IWalletCore(_alice).executeFromRelayer(calls, validatorData);
+        IWalletCore(_alice).executeWithRelayer(
+            BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+            validatorData
+        );
 
         assertEq(address(_bob).balance, 1 ether);
     }
@@ -155,9 +151,7 @@ contract ValidationTest is Base {
         // Remove validator
         vm.startPrank(_alice);
         bytes32 keyHash = keccak256(abi.encodePacked(_alice));
-        IStorage(WalletCore(payable(_alice)).getMainStorage()).removeValidator(
-            keyHash
-        );
+        IOwnersManager(_alice).removeValidator(keyHash);
         vm.stopPrank();
 
         bytes32 hash = keccak256("test");

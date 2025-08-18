@@ -1,74 +1,146 @@
-## OKX Smart Wallet
-the unified account
+# Wallet Core - EIP-7702 Smart Contract Wallet
 
-## Foundry
+A modular and secure implementation of EIP-7702 smart contract wallet with multiple execution types and advanced security features.
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+## Overview
 
-Foundry consists of:
+This implementation provides a flexible smart contract wallet that supports:
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+- EIP-7702 Type 4 initialization
+- Three distinct execution types
+- Advanced security features including replay protection and batched transactions
+- Modular architecture with separate storage and execution logic
 
-## Documentation
+## Core Features
 
-https://book.getfoundry.sh/
+### 1. Set Code & Initialize
+
+The wallet setup involves two main steps:
+
+1. **Set Code**:
+
+   - Submits an EIP-7702 Type 4 transaction
+   - Assigns smart contract code to an EOA (Externally Owned Address)
+   - Transforms the EOA into a smart contract wallet
+
+2. **Initialize Contract**:
+   - Calls the `initialize` function in Wallet Core
+   - Sets up proper configuration and state
+   - Creates and links Core Storage for nonce management
+
+### 2. Execution Types
+
+#### Type 1: Execute From Self
+
+- Direct execution from the wallet itself
+- Uses `executeFromSelf` function
+- Verifies transaction through self-check
+- Supports batched transactions via `_batchCall`
+- Most gas-efficient execution type
+
+#### Type 2: Execute From Relayer
+
+1. **Validator Setup**:
+   - User adds validator to wallet core
+   - Validator signs transaction off-chain with nonce
+2. **Execution Flow**:
+   - User provides off-chain signature
+   - Relayer submits transaction via `executeWithValidation`
+   - Core Storage manages nonce for replay protection
+   - ECDSA validation ensures signature authenticity
+
+#### Type 3: Execute From Executor
+
+1. **Session-Based Execution**:
+
+   - No pre-encoded calls needed
+   - Uses hook-based validation (`preHook` and `postHook`)
+   - Single signature authorizes entire session
+
+2. **Session Parameters**:
+   - `session_id`
+   - `validAfter`
+   - `validUntil`
+   - `executor`
+   - `validator`
+   - `preCheck`
+   - `postCheck`
+   - `signature`
+
+## Architecture
+
+The implementation follows a modular design:
+
+- `WalletCore`: Main contract handling execution logic
+- `Core Storage`: Manages nonces and validation states
+- `ExecutionLogic`: Handles different execution types
+- `ValidationLogic`: Manages signature and session validation
+- `ExecutorLogic`: Implements session-based execution with hooks
+- `FallbackHandler`: Provides token receiving capabilities
+
+## Deployed Contracts
+
+### Ethereum Mainnet
+
+| Contract    | Address                                      |
+| ----------- | -------------------------------------------- |
+| WalletCore  | `0x80296FF8D1ED46f8e3C7992664D13B833504c2Bb` |
+| CoreStorage | `0x7DAF91DFe55FcAb363416A6E3bceb3Da34ff1d30` |
+
+### Sepolia Testnet
+
+| Contract    | Address                                      |
+| ----------- | -------------------------------------------- |
+| WalletCore  | `0x80296FF8D1ED46f8e3C7992664D13B833504c2Bb` |
+| CoreStorage | `0x7DAF91DFe55FcAb363416A6E3bceb3Da34ff1d30` |
 
 ## Usage
 
-### dependencies
-forge install OpenZeppelin/openzeppelin-contracts@v5.4.0 
-forge install eth-infinitism/account-abstraction@v0.8.0
-forge install vectorized/solady@v0.1.24
+### 1. Set Code & Initialize Wallet
 
-### Build
+Deploy and initialize your ERC-7702 wallet:
 
-```shell
-$ forge build
+```bash
+npx hardhat run scripts/smoke_test/1-setCodeAndInitialize.ts --network <NETWORK>
 ```
 
-### Test
+This script:
 
-```shell
-$ forge test
+- Sets up the EOA as a smart contract wallet
+- Initializes core storage and configuration
+
+### 2. Execute Direct Transactions
+
+Send transactions directly from the wallet:
+
+```bash
+forge script scripts/smoke_test/2-sendTxs.sol --rpc-url <RPC_URL> --broadcast
 ```
 
-### Format
+This demonstrates:
 
-```shell
-$ forge fmt
+- Self-executed transactions
+- Batch call functionality
+- Direct interaction with external contracts
+
+### 3. Execute via Relayer
+
+Send transactions through a relayer:
+
+```bash
+forge script scripts/smoke_test/3-sendTxsAsRelayer.sol --rpc-url <RPC_URL> --broadcast
 ```
 
-### Gas Snapshots
+This shows:
 
-```shell
-$ forge snapshot
-```
+- Relayer-based transaction execution
+- Signature validation
+- Nonce management
+- Gas-efficient transaction batching
 
-### Anvil
+## Security Considerations
 
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+- All execution types include proper validation
+- Nonce management prevents replay attacks
+- Session-based execution can be revoked
+- Hook-based validation provides additional security layers
