@@ -3,7 +3,6 @@ pragma solidity 0.8.23;
 
 import {Call} from "./Types.sol";
 import {Errors} from "./libraries/Errors.sol";
-import {IHook} from "./interfaces/IHook.sol";
 
 abstract contract ExecutionLogic {
     uint256 private constant MAX_RETURNDATA_SIZE = 256; // Good enough for common customised error
@@ -64,6 +63,66 @@ abstract contract ExecutionLogic {
                 // revert error blob
                 revert(ptr, totalSize)
             }
+        }
+    }
+
+    /// @notice try to call a function
+    /// @param _call: the call data
+    function _callWithRevert(Call calldata _call) internal {
+        address target = _call.target;
+        uint256 value = _call.value;
+        bytes calldata data = _call.data;
+
+        assembly {
+            let ptr := mload(0x40)
+            calldatacopy(ptr, data.offset, data.length)
+
+            let success := call(
+                gas(),
+                target,
+                value,
+                ptr,
+                data.length,
+                0, // no output ptr
+                0 // no output len
+            )
+
+            // manually revert truncated data
+            if iszero(success) {
+                let len := returndatasize()
+                if gt(len, MAX_RETURNDATA_SIZE) {
+                   len := MAX_RETURNDATA_SIZE
+                }
+                returndatacopy(ptr, 0x00, len)
+                revert(ptr, len)
+            }
+        }
+    }
+
+
+    function _tryCall(
+        Call calldata _call
+    ) internal returns (bool success, bytes memory result) {
+        address target = _call.target;
+        uint256 value = _call.value;
+        bytes calldata data = _call.data;
+        /// @solidity memory-safe-assembly
+        assembly {
+            result := mload(0x40)
+            calldatacopy(result, data.offset, data.length)
+            success := call(
+                gas(),
+                target,
+                value,
+                result,
+                data.length,
+                codesize(),
+                0x00
+            )
+            mstore(result, returndatasize()) // Store the length.
+            let o := add(result, 0x20)
+            returndatacopy(o, 0x00, returndatasize()) // Copy the returndata.
+            mstore(0x40, add(o, returndatasize())) // Allocate the memory.
         }
     }
 }
