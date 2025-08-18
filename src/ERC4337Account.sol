@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.26;
 
-import {IERC4337Account} from "./interfaces/IERC4337Account.sol";
+import {IERC4337Account, PackedUserOperation} from "./interfaces/IERC4337Account.sol";
 
 abstract contract ERC4337Account is IERC4337Account {
 
