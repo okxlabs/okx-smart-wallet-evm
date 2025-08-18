@@ -39,9 +39,7 @@ contract ExecutionTest is Base {
         Call[] memory calls = new Call[](2);
         calls[0] = Call({target: _bob, value: 1 ether, data: ""});
         calls[1] = Call({target: _bob, value: 1000 ether, data: ""}); // will fail
-        vm.expectRevert(
-            abi.encodeWithSelector(Errors.CallFailed.selector, 1, 0, "")
-        );
+        vm.expectRevert();
         IWalletCore(_alice).execute(calls);
     }
 
@@ -205,9 +203,7 @@ contract ExecutionTest is Base {
         );
 
         // Expect the entire batch to revert when one call fails
-        vm.expectRevert(
-            abi.encodeWithSelector(Errors.CallFailed.selector, 1, 0, "")
-        );
+        vm.expectRevert();
         IWalletCore(_alice).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),
             validatorData

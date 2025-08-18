@@ -261,7 +261,7 @@ contract WalletCore is
             if (calls[i].target == address(this) && !_isAdmin(settings)) {
                 revert Errors.NonAdminSelfCall();
             }
-            _call(calls, i);
+            _callWithRevert(calls[i]);
         }
 
         if (hookAddress != address(0)) {
