@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.23;
+pragma solidity ^0.8.29;
 
 import {P256} from "@openzeppelin/contracts/utils/cryptography/P256.sol";
 import {MerkleProofProcessor} from "./MerkleProofProcessor.sol";

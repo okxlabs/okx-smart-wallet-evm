@@ -73,11 +73,11 @@ abstract contract ExecutionLogic {
     }
 
     /// @notice try to call a function
-    /// @param _call: the call data
-    function _callWithRevert(Call calldata _call) internal {
-        address target = _call.target;
-        uint256 value = _call.value;
-        bytes calldata data = _call.data;
+    /// @param call: the call data
+    function _callWithRevert(Call calldata call) internal {
+        address target = call.target;
+        uint256 value = call.value;
+        bytes calldata data = call.data;
 
         assembly {
             let ptr := mload(0x40)
@@ -106,11 +106,11 @@ abstract contract ExecutionLogic {
     }
 
     function _tryCall(
-        Call calldata _call
+        Call calldata call
     ) internal returns (bool success, bytes memory result) {
-        address target = _call.target;
-        uint256 value = _call.value;
-        bytes calldata data = _call.data;
+        address target = call.target;
+        uint256 value = call.value;
+        bytes calldata data = call.data;
         /// @solidity memory-safe-assembly
         assembly {
             result := mload(0x40)

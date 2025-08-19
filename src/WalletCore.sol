@@ -299,8 +299,8 @@ contract WalletCore is
         _payPrefund(missingAccountFunds);
 
         bytes32 keyHash = bytes32(userOp.signature[0:32]);
-        address validator = getValidator(keyHash);
-        validateValidatorAndExpiry(validator, type(uint256).max);
+        address validator = getVerifiedValidator(keyHash);
+        if (validator == address(0)) return SIG_VALIDATION_FAILED;
 
         if(!_validateSignature(validator, keyHash, userOpHash, userOp.signature[32:])) return SIG_VALIDATION_FAILED;
         return validationData;
