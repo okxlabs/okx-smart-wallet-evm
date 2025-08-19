@@ -88,7 +88,6 @@ contract ValidatorTest is Base {
         Call[] memory calls = _construct_calls_data();
 
         // Relayer executes with Charlie signature
-        vm.prank(_bob);
         bytes32 hash = _getValidationTypedHash(_alice, calls);
         bytes memory validatorData = _construct_validatorData(
             _alice,
@@ -96,6 +95,10 @@ contract ValidatorTest is Base {
             _charliePk,
             hash
         );
+
+        vm.prank(_bob);
+        vm.expectEmit(true, true, true, true);
+        emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
         IWalletCore(_alice).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),
             validatorData

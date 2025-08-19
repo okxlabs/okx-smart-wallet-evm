@@ -34,6 +34,12 @@ contract Base is Test {
     Call[] internal relayerCalls;
     Call[] internal emptyRelayerCalls;
 
+    event ExecuteSuccessEvent(
+        bytes32 indexed callHash,
+        address sender,
+        uint256 nonce
+    );
+
     function setUp() public virtual {
         (_alice, _alicePk) = makeAddrAndKey("alice");
         (_bob, _bobPk) = makeAddrAndKey("bob");

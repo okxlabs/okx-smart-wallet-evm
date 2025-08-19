@@ -5,6 +5,12 @@ import {Call} from "./Types.sol";
 import {Errors} from "./libraries/Errors.sol";
 
 abstract contract ExecutionLogic {
+    event ExecuteSuccessEvent(
+        bytes32 indexed callHash,
+        address sender,
+        uint256 nonce
+    );
+
     uint256 private constant MAX_RETURNDATA_SIZE = 256; // Good enough for common customised error
 
     /**
@@ -91,14 +97,13 @@ abstract contract ExecutionLogic {
             if iszero(success) {
                 let len := returndatasize()
                 if gt(len, MAX_RETURNDATA_SIZE) {
-                   len := MAX_RETURNDATA_SIZE
+                    len := MAX_RETURNDATA_SIZE
                 }
                 returndatacopy(ptr, 0x00, len)
                 revert(ptr, len)
             }
         }
     }
-
 
     function _tryCall(
         Call calldata _call

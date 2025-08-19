@@ -132,6 +132,12 @@ contract WalletCore is
         if (!isValid) revert Errors.InvalidSignature();
 
         _batchCall(batchedCall.calls, keyHash);
+
+        emit ExecuteSuccessEvent(
+            keccak256(abi.encode(batchedCall.calls)),
+            msg.sender,
+            batchedCall.nonce
+        );
     }
 
     /**
@@ -308,11 +314,11 @@ contract WalletCore is
             // Use _validateSignature with calldata signature directly
             address validator = getValidator(keyHash);
             if (validator == address(0)) return INVALID_VALUE;
-            
+
             // Get validator settings to check expiry (for consistency with executeWithRelayer)
             uint256 settings = _getSettings(keyHash);
             uint256 expiry = _getExpiration(settings);
-            
+
             // Validate validator and expiry using unified validation logic
             if (validator == address(0) || isExpired(expiry)) {
                 return INVALID_VALUE;
