@@ -5,13 +5,11 @@ import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 import {IValidation} from "./interfaces/IValidation.sol";
-import {IOwnersManager} from "./interfaces/IOwnersManager.sol";
 import {IValidator} from "./interfaces/IValidator.sol";
 import {ECDSAValidatorLib} from "./libraries/ECDSAValidatorLib.sol";
 import {PasskeyValidatorLib} from "./libraries/PasskeyValidatorLib.sol";
 
 import {Call, BatchedCall} from "./Types.sol";
-import {Errors} from "./libraries/Errors.sol";
 import {Static} from "./libraries/Static.sol";
 
 abstract contract ValidationLogic is IValidation {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.29;
 
-import {PackedUserOperation} from "../Types4337.sol";
+import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 
 interface IERC4337AccountLocal {
     /// @notice The error emitted when the caller is not the EntryPoint

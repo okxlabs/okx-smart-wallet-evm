@@ -5,7 +5,7 @@ import {ISmartWallet} from "./interfaces/ISmartWallet.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 import {Initializable} from "solady/utils/Initializable.sol";
 import {ERC4337Account} from "./ERC4337Account.sol";
-import {PackedUserOperation} from "./Types4337.sol";
+import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 
 contract OKXSmartWallet is
     ISmartWallet,

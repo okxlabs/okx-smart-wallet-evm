@@ -3,7 +3,6 @@ pragma solidity ^0.8.29;
 
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {IWalletCore} from "./interfaces/IWalletCore.sol";
-import {IOwnersManager} from "./interfaces/IOwnersManager.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
 import {OwnersManager} from "./OwnersManager.sol";
@@ -14,10 +13,8 @@ import {FallbackHandler} from "./FallbackHandler.sol";
 import {Call, BatchedCall, InitialOwner} from "./Types.sol";
 import {Errors} from "./libraries/Errors.sol";
 import {GasEstimateUtil} from "./libraries/GasEstimateUtil.sol";
-import {IValidator} from "./interfaces/IValidator.sol";
 import {Static} from "./libraries/Static.sol";
 import {IHook} from "./interfaces/IHook.sol";
-import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {ERC4337Account, PackedUserOperation} from "./ERC4337Account.sol";
 

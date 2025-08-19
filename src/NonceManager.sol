@@ -2,7 +2,6 @@
 pragma solidity ^0.8.29;
 
 import {INonceManager} from "./interfaces/INonceManager.sol";
-import {Errors} from "./libraries/Errors.sol";
 
 /**
  * @title NonceManager

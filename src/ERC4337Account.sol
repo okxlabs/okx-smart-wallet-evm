@@ -2,7 +2,7 @@
 pragma solidity ^0.8.29;
 
 import {IERC4337AccountLocal} from "./interfaces/IERC4337AccountLocal.sol";
-import {PackedUserOperation} from "./Types4337.sol";
+import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 
 abstract contract ERC4337Account is IERC4337AccountLocal {
     /// @notice Modifier to ensure the caller is the EntryPoint
