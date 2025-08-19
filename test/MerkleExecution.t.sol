@@ -260,6 +260,8 @@ contract MerkleExecutionTest is Base {
 
         // Execute with merkle validation
         vm.prank(_bob); // Bob is the relayer
+        vm.expectEmit(true, true, true, true);
+        emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
         IWalletCore(_alice).executeWithRelayer(batchedCall, validatorData);
 
         // Verify execution succeeded
@@ -373,6 +375,8 @@ contract MerkleExecutionTest is Base {
 
         // First execution should succeed
         vm.prank(_bob);
+        vm.expectEmit(true, true, true, true);
+        emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
         IWalletCore(_alice).executeWithRelayer(batchedCall, validatorData);
 
         // Second execution with same nonce should fail
@@ -470,6 +474,8 @@ contract MerkleExecutionTest is Base {
         );
 
         vm.prank(_bob);
+        vm.expectEmit(true, true, true, true);
+        emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
         IWalletCore(_alice).executeWithRelayer(batchedCall, validatorData);
 
         assertEq(address(_bob).balance, 1 ether);

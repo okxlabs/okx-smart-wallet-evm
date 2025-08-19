@@ -4,7 +4,6 @@ pragma solidity ^0.8.23;
 import "./Base.t.sol";
 import "src/libraries/Errors.sol";
 import {MockERC20} from "src/test/MockERC20.sol";
-
 import "forge-std/console.sol";
 
 contract ExecutionTest is Base {
@@ -47,7 +46,6 @@ contract ExecutionTest is Base {
         // Register validator first
         _addValidator(_alice);
 
-        vm.prank(_alice);
         Call[] memory calls = _construct_calls_data();
         bytes32 hash = _getValidationTypedHash(_alice, calls);
         bytes memory validatorData = _construct_validatorData(
@@ -56,15 +54,13 @@ contract ExecutionTest is Base {
             hash
         );
 
-        uint256 gasStart = gasleft();
-
+        vm.prank(_alice);
+        vm.expectEmit(true, true, true, true);
+        emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _alice, 0);
         IWalletCore(_alice).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),
             validatorData
         );
-
-        uint256 gasEnd = gasleft();
-        console.log("gas used", gasStart - gasEnd);
 
         assertEq(address(_bob).balance, 1 ether);
     }
@@ -73,7 +69,6 @@ contract ExecutionTest is Base {
         // Register validator first
         _addValidator(_alice);
 
-        vm.prank(_bob);
         Call[] memory calls = _construct_calls_data();
         bytes32 hash = _getValidationTypedHash(_alice, calls);
         bytes memory validatorData = _construct_validatorData(
@@ -84,6 +79,9 @@ contract ExecutionTest is Base {
 
         uint256 gasStart = gasleft();
 
+        vm.prank(_bob);
+        vm.expectEmit(true, true, true, true);
+        emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
         IWalletCore(_alice).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),
             validatorData
@@ -110,13 +108,16 @@ contract ExecutionTest is Base {
 
         Call[] memory calls = _construct_calls_data();
 
-        vm.prank(_alice);
         bytes32 hash = _getValidationTypedHash(charlie, calls);
         bytes memory validatorData = _construct_validatorData(
             charlie,
             charliePk,
             hash
         );
+
+        vm.prank(_alice);
+        vm.expectEmit(true, true, true, true);
+        emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _alice, 0);
         IWalletCore(charlie).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),
             validatorData
@@ -159,7 +160,6 @@ contract ExecutionTest is Base {
         // Register validator first
         _addValidator(_alice);
 
-        vm.prank(_alice);
         Call[] memory calls = new Call[](2);
         // Include payment to relayer as part of the batch
         calls[0] = _construct_erc20_transfer_call(
@@ -175,6 +175,9 @@ contract ExecutionTest is Base {
             _alicePk,
             hash
         );
+        vm.prank(_bob);
+        vm.expectEmit(true, true, true, true);
+        emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
         IWalletCore(_alice).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),
             validatorData
@@ -217,7 +220,6 @@ contract ExecutionTest is Base {
         // Register validator first
         _addValidator(_alice);
 
-        vm.prank(_bob);
         Call[] memory calls = new Call[](1);
         // calls[0] = Call({target: _bob, value: 1 ether, data: ""});
         calls[0] = _construct_erc20_transfer_call(
@@ -232,6 +234,10 @@ contract ExecutionTest is Base {
             _alicePk,
             hash
         );
+
+        vm.prank(_bob);
+        vm.expectEmit(true, true, true, true);
+        emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
         IWalletCore(_alice).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),
             validatorData

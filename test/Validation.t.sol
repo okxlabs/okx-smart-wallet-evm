@@ -125,6 +125,10 @@ contract ValidationTest is Base {
             _alicePk,
             hash
         );
+
+        vm.prank(_alice);
+        vm.expectEmit(true, true, true, true);
+        emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _alice, 0);
         IWalletCore(_alice).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),
             validatorData
