@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.23;
+pragma solidity ^0.8.29;
 
 /// @title GasEstimateUtil
 /// @notice Library to provide helper functions for simualtion and gas calculation
