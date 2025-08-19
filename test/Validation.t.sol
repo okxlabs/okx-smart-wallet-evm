@@ -69,9 +69,10 @@ contract ValidationTest is Base {
             hash
         );
 
+        bytes32 keyHash = keccak256(abi.encodePacked(_alice));
         vm.prank(_bob);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidValidator.selector, address(0))
+            abi.encodeWithSelector(Errors.InvalidKeyHash.selector, keyHash)
         );
         IWalletCore(_alice).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),
@@ -98,7 +99,7 @@ contract ValidationTest is Base {
 
         vm.prank(_alice);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidValidator.selector, address(0))
+            abi.encodeWithSelector(Errors.InvalidKeyHash.selector, keyHash)
         );
         IWalletCore(_alice).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),

@@ -17,4 +17,3 @@ struct InitialOwner {
     bytes32 keyHash;
     address validator;
 }
-

@@ -16,38 +16,21 @@ abstract contract NonceManager is INonceManager {
     // ============ Nonce Management ============
     /**
      * @notice Validates the provided nonce matches the stored value and increments it
-     * @dev Reverts if nonce doesn't match. Internal use only.
+     * @dev Returns true if nonce is valid, false otherwise. Always updates nonce and emits event.
      * @param fullNonce The full nonce containing nonceKey (upper 192 bits) and expectedNonce (lower 64 bits)
+     * @return bool True if nonce validation passed, false if nonce was invalid
      */
-    function validateAndUpdateNonce(uint256 fullNonce) internal {
+    function validateAndUpdateNonce(uint256 fullNonce) internal returns (bool) {
         uint192 key = uint192(fullNonce >> 64);
         uint64 expectedNonce = uint64(fullNonce);
+        uint64 currentNonce = _nonces[key];
 
-        if (_nonces[key] != expectedNonce) {
-            revert Errors.InvalidNonce(key, expectedNonce, _nonces[key]);
-        }
         unchecked {
             _nonces[key]++;
             emit NonceConsumed(key, expectedNonce);
         }
-    }
 
-    /**
-     * @notice Simulates nonce validation and update without reverting
-     * @dev Used for gas estimation in simulateRelayerExecution. Continues execution even with invalid nonce. Internal use only.
-     * @param fullNonce The full nonce containing nonceKey (upper 192 bits) and expectedNonce (lower 64 bits)
-     */
-    function simulateValidateAndUpdateNonce(uint256 fullNonce) internal {
-        uint192 key = uint192(fullNonce >> 64);
-        uint64 expectedNonce = uint64(fullNonce);
-
-        if (_nonces[key] != expectedNonce) {
-            // Continue simulation
-        }
-        unchecked {
-            _nonces[key]++;
-            emit NonceConsumed(key, expectedNonce);
-        }
+        return currentNonce == expectedNonce;
     }
 
     /**

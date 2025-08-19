@@ -12,5 +12,6 @@ contract ERC7201 is IERC7201 {
 
     /// @notice The calculated storage root of the contract according to ERC7201
     /// equivalent to keccak256(abi.encode(uint256(keccak256("OKX.SmartWallet.1.0.0")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 public constant CUSTOM_STORAGE_ROOT = 0x02a90b95e07536939d6b1617e9cf25c8d725ec1c5c4c03ccc00770cd202e6e00;
+    bytes32 public constant CUSTOM_STORAGE_ROOT =
+        0x02a90b95e07536939d6b1617e9cf25c8d725ec1c5c4c03ccc00770cd202e6e00;
 }

@@ -321,7 +321,10 @@ contract MerkleExecutionTest is Base {
 
         vm.prank(_bob);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidValidator.selector, address(0))
+            abi.encodeWithSelector(
+                Errors.InvalidKeyHash.selector,
+                keccak256(abi.encodePacked(eve))
+            )
         );
         IWalletCore(_alice).executeWithRelayer(batchedCall, validatorData);
     }
@@ -349,12 +352,7 @@ contract MerkleExecutionTest is Base {
 
         vm.prank(_bob);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                Errors.InvalidNonce.selector,
-                nonceKey,
-                wrongNonce,
-                _getNonce(_alice)
-            )
+            abi.encodeWithSelector(Errors.InvalidNonce.selector, nonce)
         );
         IWalletCore(_alice).executeWithRelayer(
             invalidNonceBatchedCall,
@@ -384,9 +382,7 @@ contract MerkleExecutionTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(
                 Errors.InvalidNonce.selector,
-                uint192(0),
-                uint64(_getNonce(_alice) - 1), // Use the old nonce that was already consumed
-                _getNonce(_alice) // Current nonce after increment
+                batchedCall.nonce
             )
         );
         IWalletCore(_alice).executeWithRelayer(batchedCall, validatorData);

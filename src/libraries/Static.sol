@@ -8,14 +8,11 @@ import {IValidator} from "../interfaces/IValidator.sol";
 
 /// @notice A library to store constant values that are used across the WalletCore contracts
 library Static {
-    /**
-     * @notice new storage should have a different salt
-     */
-    bytes32 public constant STORAGE_SALT =
-        keccak256(abi.encodePacked("storage"));
+    // Validator addresses for built-in validators
+    address public constant ECDSA_VALIDATOR_ADDRESS = address(1);
+    address public constant PASSKEY_VALIDATOR_ADDRESS = address(2);
 
-    bytes32 public constant VALIDATOR_SALT =
-        keccak256(abi.encodePacked("validator"));
-
-    address public constant SELF_VALIDATION_ADDRESS = address(1);
+    // EIP-1271 signature validation return values
+    bytes4 public constant MAGIC_VALUE = 0x1626ba7e;
+    bytes4 public constant INVALID_VALUE = 0xffffffff;
 }

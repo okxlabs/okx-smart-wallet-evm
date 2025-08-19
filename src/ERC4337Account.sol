@@ -5,7 +5,6 @@ import {IERC4337AccountLocal} from "./interfaces/IERC4337AccountLocal.sol";
 import {PackedUserOperation} from "./Types4337.sol";
 
 abstract contract ERC4337Account is IERC4337AccountLocal {
-
     /// @notice Modifier to ensure the caller is the EntryPoint
     modifier onlyEntryPoint() {
         if (msg.sender != entryPoint()) revert NotEntryPoint();
@@ -28,13 +27,11 @@ abstract contract ERC4337Account is IERC4337AccountLocal {
      */
     function _payPrefund(uint256 missingAccountFunds) internal virtual {
         if (missingAccountFunds != 0) {
-            (bool success,) = payable(msg.sender).call{
-                    value: missingAccountFunds
-                }("");
+            (bool success, ) = payable(msg.sender).call{
+                value: missingAccountFunds
+            }("");
             (success);
             // Ignore failure (its EntryPoint's job to verify, not account.)
         }
     }
-    
-    
 }

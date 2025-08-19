@@ -4,13 +4,12 @@ pragma solidity ^0.8.29;
 import {PackedUserOperation} from "../Types4337.sol";
 
 interface IERC4337AccountLocal {
-
     /// @notice The error emitted when the caller is not the EntryPoint
     error NotEntryPoint();
 
     /// @notice Returns the EntryPoint address
     function entryPoint() external view returns (address);
-    
+
     /**
      * Validate user's signature and nonce
      * the entryPoint will make the call to the recipient only if this validation call returns successfully.

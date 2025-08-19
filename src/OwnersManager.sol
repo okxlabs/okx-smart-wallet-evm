@@ -77,6 +77,31 @@ abstract contract OwnersManager is IOwnersManager {
         return validator;
     }
 
+    /**
+     * @notice Get the verified validator address for a given keyHash with EIP-7702 support
+     * @dev Returns built-in ECDSA validator (address(1)) for self-signing when no validator installed
+     * @param keyHash The public key hash to look up
+     * @return The validator address to use for validation
+     */
+    function getVerifiedValidator(
+        bytes32 keyHash
+    ) public view returns (address) {
+        address validator = _ownerValidators[keyHash];
+
+        // Check if validator exists and is not expired
+        if (validator != address(0)) {
+            uint256 settings = _ownerSettings[keyHash];
+            if (settings != 0 && _isExpired(settings)) {
+                validator = address(0); // Expired validator
+            }
+        } else if (keyHash == keccak256(abi.encode(address(this)))) {
+            // EIP-7702: Default to ECDSA for self-signing
+            return Static.ECDSA_VALIDATOR_ADDRESS;
+        }
+
+        return validator;
+    }
+
     // ============ Settings Management ============
 
     // Bit layout for settings (following Calibur's layout)
@@ -284,9 +309,10 @@ abstract contract OwnersManager is IOwnersManager {
             revert Errors.ValidatorAlreadyExists();
         }
 
-        // Allow SELF_VALIDATION_ADDRESS, but check other addresses have contract code
+        // Allow built-in validator addresses (1 and 2), but check other addresses have contract code
         if (
-            validator != Static.SELF_VALIDATION_ADDRESS &&
+            validator != Static.ECDSA_VALIDATOR_ADDRESS &&
+            validator != Static.PASSKEY_VALIDATOR_ADDRESS &&
             validator.code.length == 0
         ) {
             revert Errors.InvalidValidatorImpl(validator);

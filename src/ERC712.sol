@@ -7,18 +7,15 @@ import {EIP712} from "solady/utils/EIP712.sol";
 
 /// @title EIP712
 contract ERC712 is EIP712 {
-
-
-    function hashTypedData(bytes32 structHash) external view virtual returns (bytes32 digest) {
+    function hashTypedData(
+        bytes32 structHash
+    ) external view virtual returns (bytes32 digest) {
         return _hashTypedData(structHash);
     }
 
-    function hashTypedDataSansChainId(bytes32 structHash)
-        external
-        view
-        virtual
-        returns (bytes32 digest)
-    {
+    function hashTypedDataSansChainId(
+        bytes32 structHash
+    ) external view virtual returns (bytes32 digest) {
         return _hashTypedDataSansChainId(structHash);
     }
 

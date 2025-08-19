@@ -6,6 +6,9 @@ interface IOwnersManager {
     event ValidatorAdded(address validator);
     event ValidatorRemoved(bytes32 keyHash);
     function getValidator(bytes32 keyHash) external view returns (address);
+    function getVerifiedValidator(
+        bytes32 keyHash
+    ) external view returns (address);
 
     // Validator enumeration functions
     function getValidatorCount() external view returns (uint256);

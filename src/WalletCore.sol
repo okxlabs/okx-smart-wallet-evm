@@ -116,24 +116,28 @@ contract WalletCore is
         BatchedCall calldata batchedCall,
         bytes calldata validatorData
     ) external {
-        // Extract keyHash from validatorData
+        // Check transaction expiry
+        if (isExpired(batchedCall.expiry))
+            revert Errors.ExpiryPassed(batchedCall.expiry);
+
+        // Validate and update nonce
+        if (!validateAndUpdateNonce(batchedCall.nonce))
+            revert Errors.InvalidNonce(batchedCall.nonce);
+
+        // Extract keyHash and validate validator
         bytes32 keyHash = bytes32(validatorData[:32]);
+        address validator = getVerifiedValidator(keyHash);
+        if (validator == address(0)) revert Errors.InvalidKeyHash(keyHash);
 
-        address validator = getValidator(keyHash);
-        validateValidatorAndExpiry(validator, batchedCall.expiry);
-
-        // Validate and update nonce using new single-parameter function
-        validateAndUpdateNonce(batchedCall.nonce);
-
-        bytes32 typedDataHash = getValidationTypedHash(batchedCall);
-
-        bool isValid = _validateSignature(
-            validator,
-            keyHash,
-            typedDataHash,
-            validatorData[32:]
-        );
-        if (!isValid) revert Errors.InvalidSignature();
+        // Validate signature
+        if (
+            !_validateSignature(
+                validator,
+                keyHash,
+                getValidationTypedHash(batchedCall),
+                validatorData[32:]
+            )
+        ) revert Errors.InvalidSignature();
 
         _batchCall(batchedCall.calls, keyHash);
 
@@ -221,36 +225,37 @@ contract WalletCore is
         BatchedCall calldata batchedCall,
         bytes calldata validatorData
     ) external {
-        // Extract keyHash from validatorData
-        bytes32 keyHash = bytes32(validatorData[:32]);
-
-        address validator = getValidator(keyHash);
-        // For simulation
-        if (validator == address(0)) {
-            // return false;
-        }
-
-        // For simulation
+        // Check transaction expiry
         if (isExpired(batchedCall.expiry)) {
-            // revert Errors.DeadlineExpired();
+            // revert Errors.ExpiryPassed(batchedCall.expiry);
         }
 
-        // Use simulation version that returns bool instead of reverting
-        // This allows gas estimation to continue even with invalid nonce
-        simulateValidateAndUpdateNonce(batchedCall.nonce);
+        // Validate and update nonce
+        if (!validateAndUpdateNonce(batchedCall.nonce)) {
+            // revert Errors.InvalidNonce(batchedCall.nonce);
+        }
 
-        bytes32 typedDataHash = getValidationTypedHash(batchedCall);
+        // Extract keyHash and validate validator
+        bytes32 keyHash = bytes32(validatorData[:32]);
+        address validator = getVerifiedValidator(keyHash);
+        if (validator == address(0)) {
+            // revert Errors.InvalidKeyHash(keyHash);
+        }
 
-        // Continue with validation and execution regardless of nonce validity
-        // This ensures complete gas estimation for the entire transaction
-        bool isValid = _simulateValidateSignature(
-            validator,
-            keyHash,
-            typedDataHash,
-            validatorData[32:]
-        );
-        if (!isValid) revert Errors.InvalidSignature();
+        // Validate signature
+        if (
+            !_validateSignature(
+                validator,
+                keyHash,
+                getValidationTypedHash(batchedCall),
+                validatorData[32:]
+            )
+        ) {
+            // revert Errors.InvalidSignature();
+        }
+
         _batchCall(batchedCall.calls, keyHash);
+        revert ("");
     }
 
     /**
@@ -306,7 +311,7 @@ contract WalletCore is
      *      2. >65 bytes: abi.encode(keyHash, signature) for validator-based validation
      * @param _hash The hash of the data to be validated
      * @param signature The signature to be validated
-     * @return bytes4 Returns MAGIC_VALUE (0x1626ba7e) if valid, INVALID_VALUE (0xffffffff) if invalid
+     * @return bytes4 Returns Static.MAGIC_VALUE (0x1626ba7e) if valid, Static.INVALID_VALUE (0xffffffff) if invalid
      */
     function isValidSignature(
         bytes32 _hash,
@@ -322,7 +327,7 @@ contract WalletCore is
             bytes32 digest = keccak256(abi.encodePacked("\x19\x01", boundHash));
 
             (address recovered, , ) = ECDSA.tryRecover(digest, signature);
-            if (recovered == address(this)) return MAGIC_VALUE;
+            if (recovered == address(this)) return Static.MAGIC_VALUE;
         }
 
         // Extract keyHash and signature from the input
@@ -336,24 +341,15 @@ contract WalletCore is
             bytes32 digest = keccak256(abi.encodePacked("\x19\x01", boundHash));
 
             // Use _validateSignature with calldata signature directly
-            address validator = getValidator(keyHash);
-            if (validator == address(0)) return INVALID_VALUE;
-
-            // Get validator settings to check expiry (for consistency with executeWithRelayer)
-            uint256 settings = _getSettings(keyHash);
-            uint256 expiry = _getExpiration(settings);
-
-            // Validate validator and expiry using unified validation logic
-            if (validator == address(0) || isExpired(expiry)) {
-                return INVALID_VALUE;
-            }
+            address validator = getVerifiedValidator(keyHash);
+            if (validator == address(0)) return Static.INVALID_VALUE;
 
             return
                 _validateSignature(validator, keyHash, digest, signature[32:])
-                    ? MAGIC_VALUE
-                    : INVALID_VALUE;
+                    ? Static.MAGIC_VALUE
+                    : Static.INVALID_VALUE;
         }
-        return INVALID_VALUE;
+        return Static.INVALID_VALUE;
     }
 
     /**

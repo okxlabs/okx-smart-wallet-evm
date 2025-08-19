@@ -30,7 +30,6 @@ contract Base is Test {
     address internal relayer;
     uint256 internal relayerPk;
     address internal validator;
-    bytes32 constant _STORAGE_SALT = Static.STORAGE_SALT;
     Call[] internal relayerCalls;
     Call[] internal emptyRelayerCalls;
 

@@ -130,7 +130,7 @@ contract ValidatorTest is Base {
     function test_addValidatorWithSettings_succeeds() public {
         // Use SELF_VALIDATION_ADDRESS for testing to avoid deployment issues
         bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
-        address validatorAddress = Static.SELF_VALIDATION_ADDRESS;
+        address validatorAddress = Static.ECDSA_VALIDATOR_ADDRESS;
         address hookAddress = address(0x1234);
         uint40 expiration = uint40(block.timestamp + 3600); // 1 hour from now
         bool isAdmin = true;
@@ -162,7 +162,7 @@ contract ValidatorTest is Base {
 
     function test_validator_expiration_functionality() public {
         bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
-        address validatorAddress = Static.SELF_VALIDATION_ADDRESS;
+        address validatorAddress = Static.ECDSA_VALIDATOR_ADDRESS;
         uint40 expiration = uint40(block.timestamp + 1); // Expires in 1 second
 
         vm.prank(_alice);
@@ -192,7 +192,7 @@ contract ValidatorTest is Base {
 
     function test_permanent_validator_never_expires() public {
         bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
-        address validatorAddress = Static.SELF_VALIDATION_ADDRESS;
+        address validatorAddress = Static.ECDSA_VALIDATOR_ADDRESS;
 
         vm.prank(_alice);
         IOwnersManager(_alice).addValidator(
@@ -216,7 +216,7 @@ contract ValidatorTest is Base {
 
     function test_admin_signer_functionality() public {
         bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
-        address validatorAddress = Static.SELF_VALIDATION_ADDRESS;
+        address validatorAddress = Static.ECDSA_VALIDATOR_ADDRESS;
 
         // Add admin validator
         vm.prank(_alice);
@@ -233,7 +233,7 @@ contract ValidatorTest is Base {
 
         // Add non-admin validator
         bytes32 nonAdminKeyHash = keccak256(abi.encodePacked(_bob));
-        address nonAdminValidatorAddress = Static.SELF_VALIDATION_ADDRESS;
+        address nonAdminValidatorAddress = Static.ECDSA_VALIDATOR_ADDRESS;
 
         vm.prank(_alice);
         IOwnersManager(_alice).addValidator(
@@ -251,7 +251,7 @@ contract ValidatorTest is Base {
     function test_backward_compatibility_with_old_addValidator() public {
         // Test that old addValidator still works and has default settings
         bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
-        address validatorAddress = Static.SELF_VALIDATION_ADDRESS;
+        address validatorAddress = Static.ECDSA_VALIDATOR_ADDRESS;
 
         vm.prank(_alice);
         IOwnersManager(_alice).addValidator(
@@ -291,14 +291,14 @@ contract ValidatorTest is Base {
         bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
         initialOwners[0] = InitialOwner({
             keyHash: charlieKeyHash,
-            validator: Static.SELF_VALIDATION_ADDRESS
+            validator: Static.ECDSA_VALIDATOR_ADDRESS
         });
 
         // Second owner - Bob
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         initialOwners[1] = InitialOwner({
             keyHash: bobKeyHash,
-            validator: Static.SELF_VALIDATION_ADDRESS
+            validator: Static.ECDSA_VALIDATOR_ADDRESS
         });
 
         // Initialize the wallet with initial owners
@@ -318,7 +318,7 @@ contract ValidatorTest is Base {
             bool charlieIsExpired
         ) = IOwnersManager(newWallet).getValidatorSettings(charlieKeyHash);
 
-        assertEq(charlieValidator, Static.SELF_VALIDATION_ADDRESS);
+        assertEq(charlieValidator, Static.ECDSA_VALIDATOR_ADDRESS);
         assertEq(charlieHook, address(0)); // No hook
         assertEq(charlieExpiration, 0); // Never expires
         assertTrue(charlieIsAdmin); // Admin privileges
@@ -333,7 +333,7 @@ contract ValidatorTest is Base {
             bool bobIsExpired
         ) = IOwnersManager(newWallet).getValidatorSettings(bobKeyHash);
 
-        assertEq(bobValidator, Static.SELF_VALIDATION_ADDRESS);
+        assertEq(bobValidator, Static.ECDSA_VALIDATOR_ADDRESS);
         assertEq(bobHook, address(0)); // No hook
         assertEq(bobExpiration, 0); // Never expires
         assertTrue(bobIsAdmin); // Admin privileges

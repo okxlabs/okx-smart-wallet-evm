@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.29;
 
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IValidator} from "../interfaces/IValidator.sol";
-import {MerkleProofProcessor} from "../libraries/MerkleProofProcessor.sol";
+import {ECDSAValidatorLib} from "../libraries/ECDSAValidatorLib.sol";
 
+/**
+ * @title ECDSAValidator
+ * @notice Validator contract for ECDSA signature validation
+ * @dev Implements IValidator interface using ECDSAValidatorLib for actual validation logic
+ */
 contract ECDSAValidator is IValidator {
-    using ECDSA for bytes32;
-
     /**
      * @notice Validates a signature by checking if the recovered signer's hash matches keyHash
-     * @dev Uses ECDSA recovery to verify the signature matches the message hash
+     * @dev Delegates validation to ECDSAValidatorLib
      * @param keyHash The hash of the expected public key/address
      * @param messageHash The hash of the message being validated
      * @param validatorData The ECDSA signature to verify
@@ -21,20 +23,11 @@ contract ECDSAValidator is IValidator {
         bytes32 messageHash,
         bytes calldata validatorData
     ) external pure returns (bool) {
-        // Process Merkle proofs if present (ECDSA signatures are 65 bytes)
-        (
-            bytes32 processedMessageHash,
-            bytes memory signature
-        ) = MerkleProofProcessor.processWithMerkleProof(
-                validatorData,
+        return
+            ECDSAValidatorLib.validateSignature(
+                keyHash,
                 messageHash,
-                65 // Standard ECDSA signature length
+                validatorData
             );
-
-        // Recover signer and verify against keyHash
-        (address recoveredSigner, , ) = processedMessageHash.tryRecover(
-            signature
-        );
-        return keccak256(abi.encodePacked(recoveredSigner)) == keyHash;
     }
 }

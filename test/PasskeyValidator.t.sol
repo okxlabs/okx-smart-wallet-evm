@@ -9,6 +9,7 @@ import {IWalletCore} from "src/interfaces/IWalletCore.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
 import {ValidationLogic} from "src/ValidationLogic.sol";
 import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
+import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {P256} from "@openzeppelin/contracts/utils/cryptography/P256.sol";
 
 contract PasskeyValidatorTest is Base {
@@ -91,8 +92,8 @@ contract PasskeyValidatorTest is Base {
         bytes32 messageHash = SIGNED_MESSAGE_HASH;
 
         // Create simplified PasskeySignature struct
-        PasskeyValidator.PasskeySignature
-            memory passkeySignature = PasskeyValidator.PasskeySignature({
+        PasskeyValidatorLib.PasskeySignature
+            memory passkeySignature = PasskeyValidatorLib.PasskeySignature({
                 pubKeyX: TEST_PUBKEY_X,
                 pubKeyY: TEST_PUBKEY_Y,
                 r: TEST_SIG_R,
@@ -142,8 +143,8 @@ contract PasskeyValidatorTest is Base {
         ValidationLogic(_alice).getValidationTypedHash(batchedCall);
 
         // Create simplified mock Passkey signature data
-        PasskeyValidator.PasskeySignature
-            memory passkeySignature = PasskeyValidator.PasskeySignature({
+        PasskeyValidatorLib.PasskeySignature
+            memory passkeySignature = PasskeyValidatorLib.PasskeySignature({
                 pubKeyX: TEST_PUBKEY_X,
                 pubKeyY: TEST_PUBKEY_Y,
                 r: TEST_SIG_R, // Using real signature values for structure
@@ -171,8 +172,8 @@ contract PasskeyValidatorTest is Base {
         bytes32 wrongMessageHash = keccak256("wrong message");
 
         // Use real Passkey data but with wrong message hash
-        PasskeyValidator.PasskeySignature
-            memory passkeySignature = PasskeyValidator.PasskeySignature({
+        PasskeyValidatorLib.PasskeySignature
+            memory passkeySignature = PasskeyValidatorLib.PasskeySignature({
                 pubKeyX: TEST_PUBKEY_X,
                 pubKeyY: TEST_PUBKEY_Y,
                 r: TEST_SIG_R,
@@ -201,7 +202,7 @@ contract PasskeyValidatorTest is Base {
         uint256 wrongX = 0x1111111111111111111111111111111111111111111111111111111111111111;
         uint256 wrongY = 0x2222222222222222222222222222222222222222222222222222222222222222;
 
-        PasskeyValidator.PasskeySignature memory sig = PasskeyValidator
+        PasskeyValidatorLib.PasskeySignature memory sig = PasskeyValidatorLib
             .PasskeySignature({pubKeyX: wrongX, pubKeyY: wrongY, r: 0, s: 0});
 
         bytes memory validatorData = abi.encode(sig);
@@ -219,7 +220,7 @@ contract PasskeyValidatorTest is Base {
         bytes32 messageHash = keccak256("test message");
 
         // Use correct public key but zero signature (should fail P256 verification)
-        PasskeyValidator.PasskeySignature memory sig = PasskeyValidator
+        PasskeyValidatorLib.PasskeySignature memory sig = PasskeyValidatorLib
             .PasskeySignature({
                 pubKeyX: TEST_PUBKEY_X,
                 pubKeyY: TEST_PUBKEY_Y,
@@ -244,8 +245,8 @@ contract PasskeyValidatorTest is Base {
         bytes32 messageHash = SIGNED_MESSAGE_HASH;
 
         // Create passkey signature
-        PasskeyValidator.PasskeySignature
-            memory passkeySignature = PasskeyValidator.PasskeySignature({
+        PasskeyValidatorLib.PasskeySignature
+            memory passkeySignature = PasskeyValidatorLib.PasskeySignature({
                 pubKeyX: TEST_PUBKEY_X,
                 pubKeyY: TEST_PUBKEY_Y,
                 r: TEST_SIG_R,
@@ -284,8 +285,8 @@ contract PasskeyValidatorTest is Base {
         bytes32 messageHash = SIGNED_MESSAGE_HASH;
 
         // Standard signature without Merkle proofs
-        PasskeyValidator.PasskeySignature
-            memory passkeySignature = PasskeyValidator.PasskeySignature({
+        PasskeyValidatorLib.PasskeySignature
+            memory passkeySignature = PasskeyValidatorLib.PasskeySignature({
                 pubKeyX: TEST_PUBKEY_X,
                 pubKeyY: TEST_PUBKEY_Y,
                 r: TEST_SIG_R,
@@ -310,8 +311,8 @@ contract PasskeyValidatorTest is Base {
 
     function test_merkle_proof_processing_detection() public pure {
         // Test the MerkleProofProcessor's dynamic detection
-        PasskeyValidator.PasskeySignature
-            memory passkeySignature = PasskeyValidator.PasskeySignature({
+        PasskeyValidatorLib.PasskeySignature
+            memory passkeySignature = PasskeyValidatorLib.PasskeySignature({
                 pubKeyX: TEST_PUBKEY_X,
                 pubKeyY: TEST_PUBKEY_Y,
                 r: TEST_SIG_R,

@@ -2,9 +2,14 @@
 pragma solidity ^0.8.29;
 
 interface IFactory {
-
     /// @notice event when account is created
-    event AccountCreated(address indexed acount, address indexed implementation, bytes32[] owners, address[] validators, uint256 salt);
+    event AccountCreated(
+        address indexed acount,
+        address indexed implementation,
+        bytes32[] owners,
+        address[] validators,
+        uint256 salt
+    );
 
     /// @notice create smart account with owners and validators
     /// @param implementation: implementation address
@@ -16,7 +21,7 @@ interface IFactory {
         bytes32[] calldata owners,
         address[] calldata validators,
         uint256 salt
-    ) external payable returns(address acount);
+    ) external payable returns (address acount);
 
     /// @notice predict deterministic address
     /// @param implementation: implementation address
@@ -28,5 +33,5 @@ interface IFactory {
         bytes32[] calldata owners,
         address[] calldata validators,
         uint256 salt
-    ) external view returns(address);
-}   
+    ) external view returns (address);
+}

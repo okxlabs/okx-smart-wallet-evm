@@ -7,6 +7,8 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IValidation} from "./interfaces/IValidation.sol";
 import {IOwnersManager} from "./interfaces/IOwnersManager.sol";
 import {IValidator} from "./interfaces/IValidator.sol";
+import {ECDSAValidatorLib} from "./libraries/ECDSAValidatorLib.sol";
+import {PasskeyValidatorLib} from "./libraries/PasskeyValidatorLib.sol";
 
 import {Call, BatchedCall} from "./Types.sol";
 import {Errors} from "./libraries/Errors.sol";
@@ -88,23 +90,6 @@ abstract contract ValidationLogic is IValidation {
         return expiry != 0 && expiry < block.timestamp;
     }
 
-    /**
-     * @notice Validates validator existence and expiry timestamp
-     * @dev Reverts if validator is zero address or expiry has passed
-     * @param validator The validator address to check
-     * @param expiry The expiry timestamp to validate
-     */
-    function validateValidatorAndExpiry(
-        address validator,
-        uint256 expiry
-    ) internal view {
-        if (validator == address(0)) revert Errors.InvalidValidator(validator);
-
-        if (isExpired(expiry)) {
-            revert Errors.ExpiryPassed(expiry);
-        }
-    }
-
     /// @notice Returns the address of the current wallet implementation contract
     /// @return address The address of this contract used as the implementation
     function _walletImplementation() internal view virtual returns (address);
@@ -117,14 +102,15 @@ abstract contract ValidationLogic is IValidation {
     ) internal view virtual returns (bytes32);
 
     /**
-     * @notice Validates a signature using either ECDSA or an external validator contract
-     * @dev Two validation methods are supported:
-     *      1. ECDSA validation (when validator == address(1)): Recovers signer from signature and verifies it matches the wallet address
-     *      2. External validator (any other address): Calls the validator contract and checks if it's authorized to validate
-     * @param validator Address of the validator to use
+     * @notice Validates a signature using built-in validators or external validator contracts
+     * @dev Three validation methods are supported:
+     *      1. ECDSA validation (when validator == address(1)): Uses ECDSAValidatorLib for validation
+     *      2. Passkey validation (when validator == address(2)): Uses PasskeyValidatorLib for P256 validation
+     *      3. External validator (any other address): Calls the validator contract
+     * @param validator Address of the validator to use (1 for ECDSA, 2 for Passkey, or external contract)
      * @param keyHash The public key hash to look up
      * @param typedDataHash EIP-712 typed data hash of the data to be validated
-     * @param validationData For ECDSA: the 65-byte signature; For external validators: custom validation data
+     * @param validationData Signature data specific to the validator type
      * @return bool True if validation succeeds, false otherwise
      * @custom:security Ensure validator contracts are properly verified and authorized before use
      */
@@ -134,55 +120,32 @@ abstract contract ValidationLogic is IValidation {
         bytes32 typedDataHash,
         bytes calldata validationData
     ) internal view returns (bool) {
-        if (
-            keyHash == keccak256(abi.encode(address(this))) &&
-            validator != address(0)
-        ) {
-            (address recoveredSigner, , ) = typedDataHash.tryRecover(
-                validationData
-            );
-            return recoveredSigner == address(this);
+        // Use built-in ECDSA validator
+        if (validator == Static.ECDSA_VALIDATOR_ADDRESS) {
+            return
+                ECDSAValidatorLib.validateSignature(
+                    keyHash,
+                    typedDataHash,
+                    validationData
+                );
         }
 
+        // Use built-in Passkey validator
+        if (validator == Static.PASSKEY_VALIDATOR_ADDRESS) {
+            return
+                PasskeyValidatorLib.validateSignature(
+                    keyHash,
+                    typedDataHash,
+                    validationData
+                );
+        }
+
+        // Use external validator contract
         try
             IValidator(validator).validateSignature(
                 keyHash,
                 typedDataHash,
                 validationData
-            )
-        returns (bool result) {
-            return result;
-        } catch {
-            return false;
-        }
-    }
-
-    /**
-     * @notice Simulates signature validation for gas estimation without executing state changes
-     * @dev Two validation methods are supported:
-     *      1. ECDSA validation (when validator == address(1)): Recovers signer from signature and verifies it matches the wallet address
-     *      2. External validator (any other address): Calls the validator contract and checks if it's authorized to validate
-     * @param validator Address of the validator to use (address(1) for ECDSA signature validation)
-     * @param keyHash The public key hash to look up
-     * @param typedDataHash EIP-712 typed data hash of the data to be validated
-     * @param signature For ECDSA: the 65-byte signature; For external validators: custom validation data
-     */
-    function _simulateValidateSignature(
-        address validator,
-        bytes32 keyHash,
-        bytes32 typedDataHash,
-        bytes calldata signature
-    ) internal view returns (bool) {
-        if (validator == Static.SELF_VALIDATION_ADDRESS) {
-            (address recoveredSigner, , ) = typedDataHash.tryRecover(signature);
-            return recoveredSigner == address(this);
-        }
-
-        try
-            IValidator(validator).validateSignature(
-                keyHash,
-                typedDataHash,
-                signature
             )
         returns (bool result) {
             return result;
