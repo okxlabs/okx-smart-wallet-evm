@@ -131,6 +131,20 @@ contract InitializationTest is Base {
         // The wallet _bob is its own owner by design
     }
 
+    function test_implementation_cannot_be_initialized() public {
+        // Attempt to call initialize directly on the implementation
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: keccak256(abi.encodePacked(_bob)),
+            validator: address(_ecdsaValidator)
+        });
+
+        vm.expectRevert(
+            abi.encodeWithSelector(Initializable.InvalidInitialization.selector)
+        );
+        _walletCore.initialize(initialOwners);
+    }
+
     // Note: validateAndUpdateNonce is now internal and can only be called through executeFromRelayer
     // The nonce management tests are covered in Validation.t.sol through executeFromRelayer tests
 }
