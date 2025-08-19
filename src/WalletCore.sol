@@ -19,10 +19,12 @@ import {Static} from "./libraries/Static.sol";
 import {IHook} from "./interfaces/IHook.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {ERC4337Account, PackedUserOperation} from "./ERC4337Account.sol";
 
 // Do not set any states in this contract
 contract WalletCore is
     IWalletCore,
+    ERC4337Account,
     OwnersManager,
     NonceManager,
     ValidationLogic,
@@ -37,6 +39,8 @@ contract WalletCore is
     // EIP-1271
     bytes4 private constant MAGIC_VALUE = 0x1626ba7e;
     bytes4 private constant INVALID_VALUE = 0xffffffff;
+
+    uint256 private constant SIG_VALIDATION_FAILED = 1 << 96;
 
     address public immutable IMPLEMENTATION;
 
@@ -267,6 +271,26 @@ contract WalletCore is
         if (hookAddress != address(0)) {
             IHook(hookAddress).postCheck(ret, msg.sender);
         }
+    }
+    
+    /// @notice Validate the user operation
+    /// @param userOp The user operation to be validated
+    /// @param userOpHash The hash of the user operation
+    /// @param missingAccountFunds The missing account funds
+    /// @return validationData The validation data
+    function validateUserOp(
+        PackedUserOperation calldata userOp,
+        bytes32 userOpHash,
+        uint256 missingAccountFunds
+    ) external returns (uint256 validationData) {
+        _payPrefund(missingAccountFunds);
+
+        bytes32 keyHash = bytes32(userOp.signature[0:32]);
+        address validator = getValidator(keyHash);
+        validateValidatorAndExpiry(validator, type(uint256).max);
+
+        if(!_validateSignature(validator, keyHash, userOpHash, userOp.signature[32:])) return SIG_VALIDATION_FAILED;
+        return validationData;
     }
 
     /**
