@@ -59,6 +59,8 @@ contract WalletCore is
             revert Errors.VersionTooLong();
         }
         IMPLEMENTATION = address(this);
+
+        _disableInitializers();
     }
 
     modifier onlyOwnerOrEntryPoint() {
