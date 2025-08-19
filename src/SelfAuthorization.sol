@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity =0.8.23;
+pragma solidity ^0.8.29;
 
 contract SelfAuthorization {
     /// @notice An error that is thrown when an unauthorized address attempts to call a function

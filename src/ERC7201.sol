@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity =0.8.23;
+pragma solidity ^0.8.29;
 
 import {IERC7201} from "./interfaces/IERC7201.sol";
 

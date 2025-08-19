@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity =0.8.23;
+pragma solidity ^0.8.29;
 
 import {IERC4337AccountLocal} from "./interfaces/IERC4337AccountLocal.sol";
 import {PackedUserOperation} from "./Types4337.sol";

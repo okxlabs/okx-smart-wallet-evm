@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity =0.8.23;
+pragma solidity ^0.8.29;
 
 import {ISmartWallet} from "./interfaces/ISmartWallet.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
