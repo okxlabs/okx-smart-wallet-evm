@@ -15,14 +15,14 @@ abstract contract OwnersManager is IOwnersManager {
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
 
     // ============ State Variables ============
-    
+
     EnumerableSetLib.Bytes32Set internal _ownerKeys; // Set of all owner keyHashes
     mapping(bytes32 => address) public ownerValidators; // keyHash => validator address for this owner
     mapping(bytes32 => uint256) public ownerSettings; // keyHash => packed settings (isAdmin + expiration + hook)
     // TODO: add whitelistedBundlers
 
     // ============ Modifiers ============
-    
+
     modifier onlySelf() {
         if (msg.sender != address(this)) {
             revert Errors.NotFromSelf();
