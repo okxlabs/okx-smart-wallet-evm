@@ -80,7 +80,7 @@ contract WalletCore is
     ) public initializer {
         // Set up initial owners
         // isAdmin = true, expiration = 0 (never expires), hook = address(0)
-        uint256 settings = _packSettings(true, 0, address(0));
+        uint256 settings = packSettings(true, 0, address(0));
         for (uint256 i = 0; i < initialOwners.length; i++) {
             bytes32 keyHash = initialOwners[i].keyHash;
             address validator = initialOwners[i].validator;
@@ -263,8 +263,8 @@ contract WalletCore is
      * @param calls Array of Call structs containing destination address, value, and calldata
      */
     function _batchCall(Call[] calldata calls, bytes32 keyHash) internal {
-        uint256 settings = _getSettings(keyHash);
-        address hookAddress = _getHook(settings);
+        uint256 settings = ownerSettings[keyHash];
+        address hookAddress = getHook(settings);
         bytes memory ret;
 
         if (hookAddress != address(0)) {
@@ -272,7 +272,7 @@ contract WalletCore is
         }
 
         for (uint256 i; i < calls.length; i++) {
-            if (calls[i].target == address(this) && !_isAdmin(settings)) {
+            if (calls[i].target == address(this) && !isAdmin(settings)) {
                 revert Errors.NonAdminSelfCall();
             }
             _callWithRevert(calls[i]);

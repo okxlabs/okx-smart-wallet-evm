@@ -5,7 +5,11 @@ interface IOwnersManager {
     // EVENTS
     event ValidatorAdded(address validator);
     event ValidatorRemoved(bytes32 keyHash);
-    function getValidator(bytes32 keyHash) external view returns (address);
+    
+    // Public mappings (auto-generated getters)
+    function ownerValidators(bytes32 keyHash) external view returns (address);
+    function ownerSettings(bytes32 keyHash) external view returns (uint256);
+    
     function getVerifiedValidator(
         bytes32 keyHash
     ) external view returns (address);
@@ -26,23 +30,26 @@ interface IOwnersManager {
             address validator,
             address hook,
             uint40 expiration,
-            bool isAdmin,
-            bool isExpired
+            bool adminStatus,
+            bool expired
         );
 
-    function isSignerAdmin(bytes32 keyHash) external view returns (bool);
-
-    function getSignerExpiration(
-        bytes32 keyHash
-    ) external view returns (uint40);
-
-    function isSignerExpired(bytes32 keyHash) external view returns (bool);
+    // Settings utility functions
+    function getHook(uint256 settings) external pure returns (address);
+    function getExpiration(uint256 settings) external pure returns (uint40);
+    function isAdmin(uint256 settings) external pure returns (bool);
+    function isSettingsExpired(uint256 settings) external view returns (bool);
+    function packSettings(
+        bool adminFlag,
+        uint40 expiration,
+        address hook
+    ) external pure returns (uint256);
 
     // Validator management functions
     function addValidator(
         bytes32 keyHash,
         address validator,
-        bool isAdmin,
+        bool adminFlag,
         uint40 expiration,
         address hook
     ) external;

@@ -175,19 +175,20 @@ contract ValidatorTest is Base {
         );
 
         // Validator should be valid initially
-        address retrievedValidator = IOwnersManager(_alice).getValidator(
+        address retrievedValidator = IOwnersManager(_alice).ownerValidators(
             keyHash
         );
         assertEq(retrievedValidator, validatorAddress);
-        assertFalse(IOwnersManager(_alice).isSignerExpired(keyHash));
+        assertFalse(isSignerExpired(_alice, keyHash));
 
         // Advance time past expiration
         vm.warp(block.timestamp + 2);
 
-        // Validator should now be expired and return address(0)
-        retrievedValidator = IOwnersManager(_alice).getValidator(keyHash);
-        assertEq(retrievedValidator, address(0));
-        assertTrue(IOwnersManager(_alice).isSignerExpired(keyHash));
+        // Validator should now be expired but ownerValidators still returns the address
+        // Only getVerifiedValidator checks expiration
+        retrievedValidator = IOwnersManager(_alice).ownerValidators(keyHash);
+        assertEq(retrievedValidator, validatorAddress); // Still returns the address
+        assertTrue(isSignerExpired(_alice, keyHash));
     }
 
     function test_permanent_validator_never_expires() public {
@@ -206,12 +207,12 @@ contract ValidatorTest is Base {
         // Even after advancing time significantly, validator should remain valid
         vm.warp(block.timestamp + 365 days);
 
-        address retrievedValidator = IOwnersManager(_alice).getValidator(
+        address retrievedValidator = IOwnersManager(_alice).ownerValidators(
             keyHash
         );
         assertEq(retrievedValidator, validatorAddress);
-        assertFalse(IOwnersManager(_alice).isSignerExpired(keyHash));
-        assertEq(IOwnersManager(_alice).getSignerExpiration(keyHash), 0);
+        assertFalse(isSignerExpired(_alice, keyHash));
+        assertEq(getSignerExpiration(_alice, keyHash), 0);
     }
 
     function test_admin_signer_functionality() public {
@@ -229,7 +230,7 @@ contract ValidatorTest is Base {
         );
 
         // Verify admin status
-        assertTrue(IOwnersManager(_alice).isSignerAdmin(keyHash));
+        assertTrue(isSignerAdmin(_alice, keyHash));
 
         // Add non-admin validator
         bytes32 nonAdminKeyHash = keccak256(abi.encodePacked(_bob));
@@ -245,7 +246,7 @@ contract ValidatorTest is Base {
         );
 
         // Verify non-admin status
-        assertFalse(IOwnersManager(_alice).isSignerAdmin(nonAdminKeyHash));
+        assertFalse(isSignerAdmin(_alice, nonAdminKeyHash));
     }
 
     function test_backward_compatibility_with_old_addValidator() public {
@@ -306,8 +307,8 @@ contract ValidatorTest is Base {
         IWalletCore(newWallet).initialize(initialOwners);
 
         // Verify both initial owners have admin privileges
-        assertTrue(IOwnersManager(newWallet).isSignerAdmin(charlieKeyHash));
-        assertTrue(IOwnersManager(newWallet).isSignerAdmin(bobKeyHash));
+        assertTrue(isSignerAdmin(newWallet, charlieKeyHash));
+        assertTrue(isSignerAdmin(newWallet, bobKeyHash));
 
         // Verify their settings
         (
@@ -356,9 +357,9 @@ contract ValidatorTest is Base {
         // No signers should be set
         bytes32 testKeyHash = keccak256(abi.encodePacked(_alice));
         assertEq(
-            IOwnersManager(newWallet).getValidator(testKeyHash),
+            IOwnersManager(newWallet).ownerValidators(testKeyHash),
             address(0)
         );
-        assertFalse(IOwnersManager(newWallet).isSignerAdmin(testKeyHash));
+        assertFalse(isSignerAdmin(newWallet, testKeyHash));
     }
 }

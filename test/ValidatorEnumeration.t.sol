@@ -121,7 +121,7 @@ contract ValidatorEnumerationTest is Base {
         assertTrue(IOwnersManager(_alice).hasValidator(keyHash2));
 
         // Verify settings are preserved
-        assertTrue(IOwnersManager(_alice).isSignerAdmin(keyHash1));
-        assertFalse(IOwnersManager(_alice).isSignerAdmin(keyHash2));
+        assertTrue(isSignerAdmin(_alice, keyHash1));
+        assertFalse(isSignerAdmin(_alice, keyHash2));
     }
 }

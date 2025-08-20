@@ -87,11 +87,11 @@ contract InitializationTest is Base {
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
 
         assertEq(
-            IOwnersManager(_bob).getValidator(aliceKeyHash),
+            IOwnersManager(_bob).ownerValidators(aliceKeyHash),
             address(_ecdsaValidator)
         );
         assertEq(
-            IOwnersManager(_bob).getValidator(bobKeyHash),
+            IOwnersManager(_bob).ownerValidators(bobKeyHash),
             address(_ecdsaValidator)
         );
     }

@@ -58,7 +58,7 @@ contract PasskeyValidatorTest is Base {
     }
 
     function test_passkeyValidator_added_to_wallet() public view {
-        address validator = IOwnersManager(_alice).getValidator(testKeyHash);
+        address validator = IOwnersManager(_alice).ownerValidators(testKeyHash);
         assertEq(validator, address(passkeyValidator));
     }
 

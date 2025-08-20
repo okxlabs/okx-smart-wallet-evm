@@ -253,4 +253,22 @@ contract Base is Test {
         bytes memory signature = _construct_signature(privateKey, hash);
         return abi.encodePacked(keyHash, signature);
     }
+
+    // Helper function for tests to check if a signer is admin
+    function isSignerAdmin(address wallet, bytes32 keyHash) internal view returns (bool) {
+        uint256 settings = IOwnersManager(wallet).ownerSettings(keyHash);
+        return settings != 0 && IOwnersManager(wallet).isAdmin(settings);
+    }
+    
+    // Helper function for tests to check if a signer is expired  
+    function isSignerExpired(address wallet, bytes32 keyHash) internal view returns (bool) {
+        uint256 settings = IOwnersManager(wallet).ownerSettings(keyHash);
+        return settings != 0 && IOwnersManager(wallet).isSettingsExpired(settings);
+    }
+    
+    // Helper function for tests to get signer expiration
+    function getSignerExpiration(address wallet, bytes32 keyHash) internal view returns (uint40) {
+        uint256 settings = IOwnersManager(wallet).ownerSettings(keyHash);
+        return settings != 0 ? IOwnersManager(wallet).getExpiration(settings) : 0;
+    }
 }

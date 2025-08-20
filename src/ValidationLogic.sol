@@ -84,7 +84,7 @@ abstract contract ValidationLogic is IValidation {
      * @param expiry Unix timestamp expiry
      * @return bool True if expired, false otherwise
      */
-    function isExpired(uint256 expiry) internal view returns (bool) {
+    function isExpired(uint256 expiry) internal view virtual returns (bool) {
         return expiry != 0 && expiry < block.timestamp;
     }
 
