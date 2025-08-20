@@ -282,7 +282,7 @@ contract Base is Test {
         address account,
         uint256 signerPk
     ) public view returns (bytes memory) {
-        bytes32 hash = ValidationLogic(account).getValidationTypedHash(batchedCall);
+        bytes32 hash = ERC712(account).hashTypedData(BatchedCallLib.hash(batchedCall));
         address signer = vm.addr(signerPk);
         bytes32 keyHash = keccak256(abi.encodePacked(signer));
         bytes memory signature = _signHash(signerPk, hash);
