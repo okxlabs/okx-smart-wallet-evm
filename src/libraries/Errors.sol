@@ -33,4 +33,8 @@ library Errors {
         uint256 totalGas,
         bytes errorData
     );
+
+    error InvalidOwnersAndValidatorsLength();
+
+    error NotEntryPoint();
 }

@@ -74,7 +74,11 @@ contract WalletCore is
         // Set up initial owners
         // isAdmin = true, expiration = 0 (never expires), hook = address(0)
         uint256 settings = packSettings(true, 0, address(0));
-        for (uint256 i = 0; i < initialOwners.length; i++) {
+        uint256 len = initialOwners.length;
+        if(len == 0) {
+            /// revert Errors.InvalidOwnersAndValidatorsLength();
+        }
+        for (uint256 i = 0; i < len; i++) {
             bytes32 keyHash = initialOwners[i].keyHash;
             address validator = initialOwners[i].validator;
 
@@ -285,7 +289,7 @@ contract WalletCore is
         PackedUserOperation calldata userOp,
         bytes32 userOpHash,
         uint256 missingAccountFunds
-    ) external returns (uint256 validationData) {
+    ) external onlyEntryPoint returns (uint256 validationData) {
         _payPrefund(missingAccountFunds);
 
         bytes32 keyHash = bytes32(userOp.signature[0:32]);

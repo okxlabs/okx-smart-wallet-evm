@@ -3,11 +3,12 @@ pragma solidity ^0.8.29;
 
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 import {IERC4337Account} from "./interfaces/IERC4337Account.sol";
+import {Errors} from "./libraries/Errors.sol";
 
 abstract contract ERC4337Account is IERC4337Account {
     /// @notice Modifier to ensure the caller is the EntryPoint
     modifier onlyEntryPoint() {
-        if (msg.sender != entryPoint()) revert NotEntryPoint();
+        if (msg.sender != entryPoint()) revert Errors.NotEntryPoint();
         _;
     }
 

@@ -4,6 +4,7 @@ pragma solidity ^0.8.23;
 import "src/WalletCore.sol";
 import "src/validator/ECDSAValidator.sol";
 import "src/test/DeployFactory.sol";
+import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
 import "lib/forge-std/src/Test.sol";
 
 library DeployInitHelper {
@@ -14,7 +15,8 @@ library DeployInitHelper {
         internal
         returns (
             ECDSAValidator ecdsaValidatorImpl,
-            WalletCore walletCoreImpl
+            WalletCore walletCoreImpl,
+            SmartWalletFactory factoryImpl
         )
     {
         // deploy ECDSAValidator
@@ -30,5 +32,10 @@ library DeployInitHelper {
             deployFactorySalt
         );
         walletCoreImpl = WalletCore(walletCoreAddr);
+
+        factoryImpl = SmartWalletFactory(deployFactory.deploy(
+            type(SmartWalletFactory).creationCode,
+            deployFactorySalt
+        ));
     }
 }

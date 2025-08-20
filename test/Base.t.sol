@@ -18,6 +18,8 @@ import {ERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Static} from "src/libraries/Static.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {ERC712} from "src/ERC712.sol";
+import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
+
 contract Base is Test {
     string public constant NAME = "SmartWallet";
     string public constant VERSION = "1.0.0";
@@ -28,6 +30,7 @@ contract Base is Test {
     uint256 internal _bobPk;
     ECDSAValidator internal _ecdsaValidator; // Shared validator instance
     WalletCore internal _walletCore;
+    SmartWalletFactory internal _factory;
     DeployFactory public deployFactory;
     address internal relayer;
     uint256 internal relayerPk;
@@ -48,7 +51,7 @@ contract Base is Test {
         deployFactory = new DeployFactory();
         bytes32 deployFactorySalt = vm.envBytes32("DEPLOY_FACTORY_SALT");
 
-        (_ecdsaValidator, _walletCore) = DeployInitHelper.deployContracts(
+        (_ecdsaValidator, _walletCore, _factory) = DeployInitHelper.deployContracts(
             deployFactory,
             deployFactorySalt
         );
