@@ -1,0 +1,2 @@
+# Ignore files with special ERC7201 layout syntax that prettier-plugin-solidity doesn't support
+src/OKXSmartWalletEntry.sol
