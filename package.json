@@ -43,6 +43,7 @@
     "ethers": "^6.15.0",
     "hardhat": "^2.22.10",
     "hardhat-gas-reporter": "^2.2.2",
+    "pre-commit": "^1.2.2",
     "solidity-coverage": "^0.8.14",
     "ts-node": "^10.9.2",
     "typechain": "^8.3.2",

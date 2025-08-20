@@ -12,7 +12,7 @@ contract MockEntryPoint {
 
     function withdrawTo(address to, uint256 amount) public payable {
         balanceOf[msg.sender] -= amount;
-        (bool success,) = payable(to).call{value: amount}("");
+        (bool success, ) = payable(to).call{value: amount}("");
         require(success);
     }
 
@@ -22,7 +22,11 @@ contract MockEntryPoint {
         bytes32 userOpHash,
         uint256 missingAccountFunds
     ) public payable returns (uint256 validationData) {
-        validationData = IERC4337Account(payable(account)).validateUserOp(userOp, userOpHash, missingAccountFunds);
+        validationData = IERC4337Account(payable(account)).validateUserOp(
+            userOp,
+            userOpHash,
+            missingAccountFunds
+        );
     }
 
     receive() external payable {

@@ -49,7 +49,7 @@ contract WalletCore is
     modifier onlyOwnerOrEntryPoint() {
         bytes32 keyHash = keccak256(abi.encode(msg.sender));
         if (
-            _ownerKeys.contains(keyHash) || 
+            _ownerKeys.contains(keyHash) ||
             msg.sender == entryPoint() ||
             msg.sender == address(this)
         ) {
@@ -71,7 +71,7 @@ contract WalletCore is
         // isAdmin = true, expiration = 0 (never expires), hook = address(0)
         uint256 settings = packSettings(true, 0, address(0));
         uint256 len = initialOwners.length;
-        if(len == 0) {
+        if (len == 0) {
             /// revert Errors.InvalidOwnersAndValidatorsLength();
         }
         for (uint256 i = 0; i < len; i++) {

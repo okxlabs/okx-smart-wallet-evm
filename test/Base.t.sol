@@ -52,10 +52,8 @@ contract Base is Test {
         deployFactory = new DeployFactory();
         bytes32 deployFactorySalt = vm.envBytes32("DEPLOY_FACTORY_SALT");
 
-        (_ecdsaValidator, _walletCore, _factory) = DeployInitHelper.deployContracts(
-            deployFactory,
-            deployFactorySalt
-        );
+        (_ecdsaValidator, _walletCore, _factory) = DeployInitHelper
+            .deployContracts(deployFactory, deployFactorySalt);
 
         _setCodeToEOA(address(_walletCore), _alice);
 
@@ -282,7 +280,9 @@ contract Base is Test {
         address account,
         uint256 signerPk
     ) public view returns (bytes memory) {
-        bytes32 hash = ERC712(account).hashTypedData(BatchedCallLib.hash(batchedCall));
+        bytes32 hash = ERC712(account).hashTypedData(
+            BatchedCallLib.hash(batchedCall)
+        );
         address signer = vm.addr(signerPk);
         bytes32 keyHash = keccak256(abi.encodePacked(signer));
         bytes memory signature = _signHash(signerPk, hash);

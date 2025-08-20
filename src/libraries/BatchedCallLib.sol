@@ -19,13 +19,14 @@ library BatchedCallLib {
     function hash(
         BatchedCall memory batchedCall
     ) internal pure returns (bytes32) {
-        return keccak256(
-            abi.encode(
-                BATCHED_CALL_TYPEHASH,
-                CallLib.hash(batchedCall.calls),
-                batchedCall.nonce,
-                batchedCall.expiry
-            )
-        );
+        return
+            keccak256(
+                abi.encode(
+                    BATCHED_CALL_TYPEHASH,
+                    CallLib.hash(batchedCall.calls),
+                    batchedCall.nonce,
+                    batchedCall.expiry
+                )
+            );
     }
 }

@@ -18,14 +18,14 @@ contract FactoryTest is Base {
             keyHash: keccak256(abi.encodePacked(_alice)),
             validator: address(1)
         });
-        IWalletCore wallet = IWalletCore(_factory.createAccount(
-            address(_walletCore),
-            initialOwners,
-            0
-        ));
+        IWalletCore wallet = IWalletCore(
+            _factory.createAccount(address(_walletCore), initialOwners, 0)
+        );
 
         assertEq(
-            IOwnersManager(address(wallet)).hasValidator(keccak256(abi.encodePacked(_alice))), 
+            IOwnersManager(address(wallet)).hasValidator(
+                keccak256(abi.encodePacked(_alice))
+            ),
             true
         );
     }
@@ -53,4 +53,3 @@ contract FactoryTest is Base {
         assertEq(wallet, predictedAddress);
     }
 }
-   

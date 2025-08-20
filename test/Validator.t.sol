@@ -430,10 +430,16 @@ contract ValidatorTest is Base {
         });
 
         // Sign with non-admin signer (_bob)
-        bytes memory signature = _construct_signature(batchedCall, _alice, _bobPk);
+        bytes memory signature = _construct_signature(
+            batchedCall,
+            _alice,
+            _bobPk
+        );
 
         // Should revert with NonAdminSelfCall
-        vm.expectRevert(abi.encodeWithSelector(Errors.NonAdminSelfCall.selector));
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.NonAdminSelfCall.selector)
+        );
         IWalletCore(_alice).executeWithRelayer(batchedCall, signature);
     }
 
@@ -472,10 +478,16 @@ contract ValidatorTest is Base {
         });
 
         // Sign with non-admin signer (_bob)
-        bytes memory signature = _construct_signature(batchedCall, _alice, _bobPk);
+        bytes memory signature = _construct_signature(
+            batchedCall,
+            _alice,
+            _bobPk
+        );
 
         // Should revert with NonAdminSelfCall
-        vm.expectRevert(abi.encodeWithSelector(Errors.NonAdminSelfCall.selector));
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.NonAdminSelfCall.selector)
+        );
         IWalletCore(_alice).executeWithRelayer(batchedCall, signature);
     }
 
@@ -515,7 +527,11 @@ contract ValidatorTest is Base {
         });
 
         // Sign with admin signer (default initial owner is admin)
-        bytes memory signature = _construct_signature(batchedCall, _alice, _alicePk);
+        bytes memory signature = _construct_signature(
+            batchedCall,
+            _alice,
+            _alicePk
+        );
 
         // Should succeed
         vm.expectEmit(true, true, true, true);
@@ -523,9 +539,6 @@ contract ValidatorTest is Base {
         IWalletCore(_alice).executeWithRelayer(batchedCall, signature);
 
         // Verify validator is removed
-        assertEq(
-            IOwnersManager(_alice).ownerValidators(keyHash),
-            address(0)
-        );
+        assertEq(IOwnersManager(_alice).ownerValidators(keyHash), address(0));
     }
 }

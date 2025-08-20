@@ -9,7 +9,7 @@ contract InitializationTest is Base {
     function setUp() public override {
         super.setUp();
     }
-    
+
     function test_initialize_reverts_when_called_twice() public {
         // Set up bob with wallet code
         _setCodeToEOA(address(_walletCore), _bob);

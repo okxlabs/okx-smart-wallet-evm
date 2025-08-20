@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.29;
 
-
 import {Call} from "../Types.sol";
 
 library CallLib {
@@ -14,9 +13,7 @@ library CallLib {
      * @param calls Array of Call structs to hash.
      * @return Hash representing the full sequence of calls.
      */
-    function hash(
-        Call[] memory calls
-    ) internal pure returns (bytes32) {
+    function hash(Call[] memory calls) internal pure returns (bytes32) {
         bytes memory encoded;
         for (uint i = 0; i < calls.length; i++) {
             encoded = abi.encodePacked(encoded, hash(calls[i]));

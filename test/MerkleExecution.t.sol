@@ -44,8 +44,7 @@ contract MerkleExecutionTest is Base {
         address account,
         BatchedCall memory batchedCall
     ) internal view returns (bytes32) {
-        return
-            ERC712(account).hashTypedData(BatchedCallLib.hash(batchedCall));
+        return ERC712(account).hashTypedData(BatchedCallLib.hash(batchedCall));
     }
 
     function _setupMerkleTree() internal {
@@ -70,18 +69,9 @@ contract MerkleExecutionTest is Base {
 
         // Create leaf hashes using getValidationTypedHash
         merkleLeaves = new bytes32[](3);
-        merkleLeaves[0] = _getValidationTypedHash(
-            _alice,
-            batchedCall1
-        );
-        merkleLeaves[1] = _getValidationTypedHash(
-            _alice,
-            batchedCall2
-        );
-        merkleLeaves[2] = _getValidationTypedHash(
-            _alice,
-            batchedCall3
-        );
+        merkleLeaves[0] = _getValidationTypedHash(_alice, batchedCall1);
+        merkleLeaves[1] = _getValidationTypedHash(_alice, batchedCall2);
+        merkleLeaves[2] = _getValidationTypedHash(_alice, batchedCall3);
 
         // For simplicity, let's use a single leaf tree for now
         // This will avoid the complexity of merkle tree construction
@@ -456,10 +446,7 @@ contract MerkleExecutionTest is Base {
         BatchedCall memory batchedCall = _construct_batchedCall(calls, _alice);
 
         for (uint256 i = 0; i < numLeaves; i++) {
-            largeLeaves[i] = _getValidationTypedHash(
-                _alice,
-                batchedCall
-            );
+            largeLeaves[i] = _getValidationTypedHash(_alice, batchedCall);
         }
 
         bytes32 largeMerkleRoot = _computeMerkleRootOpenZeppelin(largeLeaves);

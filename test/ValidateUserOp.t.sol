@@ -36,7 +36,7 @@ contract ValidateUserOpTest is Base {
             0
         );
 
-         _TestTemps memory t;
+        _TestTemps memory t;
         t.userOpHash = keccak256("123");
         t.signer = _alice;
         t.privateKey = _alicePk;
@@ -45,23 +45,52 @@ contract ValidateUserOpTest is Base {
         vm.deal(address(account), 1 ether);
         assertEq(address(account).balance, 1 ether);
 
-        vm.etch(IERC4337Account(account).entryPoint(), address(new MockEntryPoint()).code);
-        MockEntryPoint ep = MockEntryPoint(payable(IERC4337Account(account).entryPoint()));
+        vm.etch(
+            IERC4337Account(account).entryPoint(),
+            address(new MockEntryPoint()).code
+        );
+        MockEntryPoint ep = MockEntryPoint(
+            payable(IERC4337Account(account).entryPoint())
+        );
 
         PackedUserOperation memory userOp;
         // Success returns 0.
-        userOp.signature = abi.encodePacked(_aliceKeyHash, abi.encodePacked(t.r, t.s, t.v));
-        assertEq(ep.validateUserOp(address(account), userOp, t.userOpHash, t.missingAccountFunds), 0);
+        userOp.signature = abi.encodePacked(
+            _aliceKeyHash,
+            abi.encodePacked(t.r, t.s, t.v)
+        );
+        assertEq(
+            ep.validateUserOp(
+                address(account),
+                userOp,
+                t.userOpHash,
+                t.missingAccountFunds
+            ),
+            0
+        );
         assertEq(address(ep).balance, t.missingAccountFunds);
         // // Failure returns 1.
-        userOp.signature = abi.encodePacked(_aliceKeyHash, abi.encodePacked(t.r, bytes32(uint256(t.s) ^ 1), t.v));
+        userOp.signature = abi.encodePacked(
+            _aliceKeyHash,
+            abi.encodePacked(t.r, bytes32(uint256(t.s) ^ 1), t.v)
+        );
 
-        assertEq(ep.validateUserOp(address(account), userOp, t.userOpHash, t.missingAccountFunds), 1 << 96);
+        assertEq(
+            ep.validateUserOp(
+                address(account),
+                userOp,
+                t.userOpHash,
+                t.missingAccountFunds
+            ),
+            1 << 96
+        );
         assertEq(address(ep).balance, t.missingAccountFunds * 2);
         // Not entry point reverts.
         vm.expectRevert(Errors.NotEntryPoint.selector);
-        IERC4337Account(account).validateUserOp(userOp, t.userOpHash, t.missingAccountFunds);
+        IERC4337Account(account).validateUserOp(
+            userOp,
+            t.userOpHash,
+            t.missingAccountFunds
+        );
     }
-    
 }
-   

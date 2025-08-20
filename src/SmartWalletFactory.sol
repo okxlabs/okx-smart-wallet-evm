@@ -8,7 +8,12 @@ import {Initializable} from "solady/utils/Initializable.sol";
 import {IWalletCore} from "./interfaces/IWalletCore.sol";
 import {ISmartWalletFactory, InitialOwner} from "./interfaces/ISmartWalletFactory.sol";
 
-contract SmartWalletFactory is Ownable, UUPSUpgradeable, Initializable, ISmartWalletFactory {
+contract SmartWalletFactory is
+    Ownable,
+    UUPSUpgradeable,
+    Initializable,
+    ISmartWalletFactory
+{
     constructor() {
         _disableInitializers();
     }
