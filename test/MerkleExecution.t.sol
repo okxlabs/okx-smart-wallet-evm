@@ -9,6 +9,8 @@ import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProo
 import {IWalletCore} from "src/interfaces/IWalletCore.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
 import {ValidationLogic} from "src/ValidationLogic.sol";
+import {ERC712} from "src/ERC712.sol";
+import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 
 contract MerkleExecutionTest is Base {
     // Test data for Merkle tree construction
@@ -46,6 +48,14 @@ contract MerkleExecutionTest is Base {
         _setupMerkleTree();
     }
 
+    function _getValidationTypedHash(
+        address account,
+        BatchedCall memory batchedCall
+    ) internal view returns (bytes32) {
+        return
+            ERC712(account).hashTypedData(BatchedCallLib.hash(batchedCall));
+    }
+
     function _setupMerkleTree() internal {
         // Create test BatchedCall data
         Call[] memory calls1 = _construct_calls_data();
@@ -68,13 +78,16 @@ contract MerkleExecutionTest is Base {
 
         // Create leaf hashes using getValidationTypedHash
         merkleLeaves = new bytes32[](3);
-        merkleLeaves[0] = ValidationLogic(_alice).getValidationTypedHash(
+        merkleLeaves[0] = _getValidationTypedHash(
+            _alice,
             batchedCall1
         );
-        merkleLeaves[1] = ValidationLogic(_alice).getValidationTypedHash(
+        merkleLeaves[1] = _getValidationTypedHash(
+            _alice,
             batchedCall2
         );
-        merkleLeaves[2] = ValidationLogic(_alice).getValidationTypedHash(
+        merkleLeaves[2] = _getValidationTypedHash(
+            _alice,
             batchedCall3
         );
 
@@ -451,7 +464,8 @@ contract MerkleExecutionTest is Base {
         BatchedCall memory batchedCall = _construct_batchedCall(calls, _alice);
 
         for (uint256 i = 0; i < numLeaves; i++) {
-            largeLeaves[i] = ValidationLogic(_alice).getValidationTypedHash(
+            largeLeaves[i] = _getValidationTypedHash(
+                _alice,
                 batchedCall
             );
         }

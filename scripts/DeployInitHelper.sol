@@ -9,9 +9,7 @@ import "lib/forge-std/src/Test.sol";
 library DeployInitHelper {
     function deployContracts(
         DeployFactory deployFactory,
-        bytes32 deployFactorySalt,
-        string memory walletCoreName,
-        string memory walletCoreVersion
+        bytes32 deployFactorySalt
     )
         internal
         returns (
@@ -28,10 +26,7 @@ library DeployInitHelper {
 
         // deploy WalletCore
         address payable walletCoreAddr = deployFactory.deploy(
-            abi.encodePacked(
-                type(WalletCore).creationCode,
-                abi.encode(walletCoreName, walletCoreVersion)
-            ),
+            type(WalletCore).creationCode,
             deployFactorySalt
         );
         walletCoreImpl = WalletCore(walletCoreAddr);

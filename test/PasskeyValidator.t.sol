@@ -11,6 +11,8 @@ import {ValidationLogic} from "src/ValidationLogic.sol";
 import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {P256} from "@openzeppelin/contracts/utils/cryptography/P256.sol";
+import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
+import {ERC712} from "src/ERC712.sol";
 
 contract PasskeyValidatorTest is Base {
     PasskeyValidator internal passkeyValidator;
@@ -122,8 +124,9 @@ contract PasskeyValidatorTest is Base {
         });
 
         // Get the REAL message hash that needs to be signed
-        bytes32 realTypedDataHash = ValidationLogic(_alice)
-            .getValidationTypedHash(batchedCall);
+        bytes32 realTypedDataHash = ERC712(_alice).hashTypedData(
+            BatchedCallLib.hash(batchedCall)
+        );
 
         // Log the real typedDataHash for our script
         console.log("REAL TYPED DATA HASH TO SIGN:");
@@ -140,7 +143,7 @@ contract PasskeyValidatorTest is Base {
         });
 
         // Get the message hash that needs to be signed
-        ValidationLogic(_alice).getValidationTypedHash(batchedCall);
+        ERC712(_alice).hashTypedData(BatchedCallLib.hash(batchedCall));
 
         // Create simplified mock Passkey signature data
         PasskeyValidatorLib.PasskeySignature

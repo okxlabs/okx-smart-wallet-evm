@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.29;
 
-import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-
 import {IValidation} from "./interfaces/IValidation.sol";
 import {IValidator} from "./interfaces/IValidator.sol";
 import {ECDSAValidatorLib} from "./libraries/ECDSAValidatorLib.sol";
@@ -13,71 +10,6 @@ import {Call, BatchedCall} from "./Types.sol";
 import {Static} from "./libraries/Static.sol";
 
 abstract contract ValidationLogic is IValidation {
-    using Clones for address;
-    using ECDSA for bytes32;
-
-    bytes32 private constant BATCHED_CALL_TYPEHASH =
-        keccak256(
-            "BatchedCall(address wallet,Call[] calls,uint256 nonce,uint256 expiry)Call(address target,uint256 value,bytes data)"
-        );
-    bytes32 private constant CALL_TYPEHASH =
-        keccak256("Call(address target,uint256 value,bytes data)");
-
-    /**
-     * @notice Generates an EIP-712 compliant typed data hash for transaction validation
-     * @dev Combines the message hash with the domain separator using EIP-712 standard
-     * @param batchedCall BatchedCall struct containing calls, nonce, and expiry
-     * @return bytes32 The EIP-712 typed data hash ready for signing
-     */
-    function getValidationTypedHash(
-        BatchedCall calldata batchedCall
-    ) public view returns (bytes32) {
-        bytes32 structHash = keccak256(
-            abi.encode(
-                BATCHED_CALL_TYPEHASH,
-                _walletImplementation(),
-                _getCallsHash(batchedCall.calls),
-                batchedCall.nonce,
-                batchedCall.expiry
-            )
-        );
-        return _hashTypedDataV4(structHash);
-    }
-
-    /**
-     * @notice Computes a keccak256 hash over an array of Call structs.
-     * @dev Iterates through the calls and encodes each individual call hash, then hashes the concatenation.
-     * @param calls Array of Call structs to hash.
-     * @return Hash representing the full sequence of calls.
-     */
-    function _getCallsHash(
-        Call[] calldata calls
-    ) private pure returns (bytes32) {
-        bytes memory encoded;
-        for (uint i = 0; i < calls.length; i++) {
-            encoded = abi.encodePacked(encoded, _getCallHash(calls[i]));
-        }
-        return keccak256(encoded);
-    }
-
-    /**
-     * @notice Computes a keccak256 hash for a single Call struct.
-     * @dev Encodes the call using EIP-712-style struct hashing.
-     * @param call A single Call struct including target, value, and calldata.
-     * @return Hash of the call.
-     */
-    function _getCallHash(Call calldata call) private pure returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    CALL_TYPEHASH,
-                    call.target,
-                    call.value,
-                    keccak256(call.data)
-                )
-            );
-    }
-
     /**
      * @notice Validates expiry has not passed
      * @dev Checks if the given expiry timestamp is in the past
@@ -87,17 +19,6 @@ abstract contract ValidationLogic is IValidation {
     function isExpired(uint256 expiry) internal view virtual returns (bool) {
         return expiry != 0 && expiry < block.timestamp;
     }
-
-    /// @notice Returns the address of the current wallet implementation contract
-    /// @return address The address of this contract used as the implementation
-    function _walletImplementation() internal view virtual returns (address);
-
-    /// @notice Creates the EIP-712 typed data hash for signing
-    /// @param structHash The struct hash to wrap with the domain separator
-    /// @return bytes32 The final EIP-712 typed data hash ready to be signed
-    function _hashTypedDataV4(
-        bytes32 structHash
-    ) internal view virtual returns (bytes32);
 
     /**
      * @notice Validates a signature using built-in validators or external validator contracts

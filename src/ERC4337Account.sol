@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.29;
 
-import {IERC4337AccountLocal} from "./interfaces/IERC4337AccountLocal.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
+import {IERC4337Account} from "./interfaces/IERC4337Account.sol";
 
-abstract contract ERC4337Account is IERC4337AccountLocal {
+abstract contract ERC4337Account is IERC4337Account {
     /// @notice Modifier to ensure the caller is the EntryPoint
     modifier onlyEntryPoint() {
         if (msg.sender != entryPoint()) revert NotEntryPoint();
@@ -13,7 +13,7 @@ abstract contract ERC4337Account is IERC4337AccountLocal {
 
     /// @notice Returns the EntryPoint address
     function entryPoint() public pure returns (address) {
-        return 0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108;
+        return 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
     }
 
     /**

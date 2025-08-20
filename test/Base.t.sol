@@ -16,8 +16,10 @@ import {Errors} from "src/libraries/Errors.sol";
 import {DeployInitHelper, DeployFactory} from "scripts/DeployInitHelper.sol";
 import {ERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Static} from "src/libraries/Static.sol";
+import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
+import {ERC712} from "src/ERC712.sol";
 contract Base is Test {
-    string public constant NAME = "wallet-core";
+    string public constant NAME = "SmartWallet";
     string public constant VERSION = "1.0.0";
 
     address internal _alice;
@@ -48,9 +50,7 @@ contract Base is Test {
 
         (_ecdsaValidator, _walletCore) = DeployInitHelper.deployContracts(
             deployFactory,
-            deployFactorySalt,
-            NAME,
-            VERSION
+            deployFactorySalt
         );
 
         _setCodeToEOA(address(_walletCore), _alice);
@@ -130,8 +130,10 @@ contract Base is Test {
         Call[] memory calls
     ) internal view returns (bytes32) {
         return
-            ValidationLogic(_alice).getValidationTypedHash(
-                BatchedCall({calls: calls, nonce: nonce, expiry: 0})
+            ERC712(_alice).hashTypedData(
+                BatchedCallLib.hash(
+                    BatchedCall({calls: calls, nonce: nonce, expiry: 0})
+                )
             );
     }
 
@@ -141,8 +143,10 @@ contract Base is Test {
     ) internal view returns (bytes32) {
         uint256 nonce = _getNonce(account);
         return
-            ValidationLogic(account).getValidationTypedHash(
-                BatchedCall({calls: calls, nonce: nonce, expiry: 0})
+            ERC712(account).hashTypedData(
+                BatchedCallLib.hash(
+                    BatchedCall({calls: calls, nonce: nonce, expiry: 0})
+                )
             );
     }
 
@@ -152,8 +156,10 @@ contract Base is Test {
         Call[] memory calls
     ) internal view returns (bytes32) {
         return
-            ValidationLogic(account).getValidationTypedHash(
-                BatchedCall({calls: calls, nonce: nonce, expiry: 0})
+            ERC712(account).hashTypedData(
+                BatchedCallLib.hash(
+                    BatchedCall({calls: calls, nonce: nonce, expiry: 0})
+                )
             );
     }
 

@@ -9,13 +9,13 @@ import {EIP712} from "solady/utils/EIP712.sol";
 contract ERC712 is EIP712 {
     function hashTypedData(
         bytes32 structHash
-    ) external view virtual returns (bytes32 digest) {
+    ) public view virtual returns (bytes32 digest) {
         return _hashTypedData(structHash);
     }
 
     function hashTypedDataSansChainId(
         bytes32 structHash
-    ) external view virtual returns (bytes32 digest) {
+    ) public view virtual returns (bytes32 digest) {
         return _hashTypedDataSansChainId(structHash);
     }
 
@@ -23,7 +23,7 @@ contract ERC712 is EIP712 {
     /// you must override `_domainNameAndVersionMayChange()` to return true.
     function _domainNameAndVersion()
         internal
-        view
+        pure
         override
         returns (string memory name, string memory version)
     {

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.29;
 
-import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import {ERC712} from "./ERC712.sol";
+import {ERC7201} from "./ERC7201.sol";
 import {IWalletCore} from "./interfaces/IWalletCore.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
@@ -17,21 +18,24 @@ import {Static} from "./libraries/Static.sol";
 import {IHook} from "./interfaces/IHook.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {ERC4337Account, PackedUserOperation} from "./ERC4337Account.sol";
+import {BatchedCallLib} from "./libraries/BatchedCallLib.sol";
 
 // Do not set any states in this contract
 contract WalletCore is
     IWalletCore,
+    ERC7201,
     ERC4337Account,
     OwnersManager,
     NonceManager,
     ValidationLogic,
     ExecutionLogic,
+    ERC712,
     FallbackHandler,
-    EIP712,
     Initializable
 {
     using ECDSA for bytes32;
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
+    using BatchedCallLib for BatchedCall;
 
     // EIP-1271
     bytes4 private constant MAGIC_VALUE = 0x1626ba7e;
@@ -41,33 +45,22 @@ contract WalletCore is
 
     address public immutable IMPLEMENTATION;
 
-    // TODO: change to IEntryPoint
-    address public immutable ENTRY_POINT;
-
-    constructor(
-        string memory name,
-        string memory version
-    ) EIP712(name, version) {
-        // Check name/version lengths, assure remain stateless
-        if (bytes(name).length >= 32) {
-            revert Errors.NameTooLong();
-        }
-        if (bytes(version).length >= 32) {
-            revert Errors.VersionTooLong();
-        }
+    constructor() {
         IMPLEMENTATION = address(this);
-
         _disableInitializers();
     }
 
     modifier onlyOwnerOrEntryPoint() {
         bytes32 keyHash = keccak256(abi.encode(msg.sender));
         if (
-            msg.sender != address(this) &&
-            !_ownerKeys.contains(keyHash) &&
-            msg.sender != address(ENTRY_POINT)
-        ) revert Errors.NotFromSelf();
-        _;
+            _ownerKeys.contains(keyHash) || 
+            msg.sender == entryPoint() ||
+            msg.sender == address(this)
+        ) {
+            _;
+        } else {
+            revert Errors.NotFromSelf();
+        }
     }
 
     /**
@@ -133,7 +126,7 @@ contract WalletCore is
             !_validateSignature(
                 validator,
                 keyHash,
-                getValidationTypedHash(batchedCall),
+                hashTypedData(batchedCall.hash()),
                 validatorData[32:]
             )
         ) revert Errors.InvalidSignature();
@@ -246,7 +239,7 @@ contract WalletCore is
             !_validateSignature(
                 validator,
                 keyHash,
-                getValidationTypedHash(batchedCall),
+                hashTypedData(batchedCall.hash()),
                 validatorData[32:]
             )
         ) {
@@ -275,7 +268,7 @@ contract WalletCore is
             if (calls[i].target == address(this) && !isAdmin(settings)) {
                 revert Errors.NonAdminSelfCall();
             }
-            _callWithRevert(calls[i]);
+            _call(calls[i]);
         }
 
         if (hookAddress != address(0)) {
@@ -349,30 +342,5 @@ contract WalletCore is
                     : Static.INVALID_VALUE;
         }
         return Static.INVALID_VALUE;
-    }
-
-    /**
-     * @notice Creates a typed data hash following EIP-712 standard
-     * @param structHash The hash of the struct data to be signed
-     * @return The final EIP-712 typed data hash that can be signed by a wallet
-     */
-    function _hashTypedDataV4(
-        bytes32 structHash
-    ) internal view override(EIP712, ValidationLogic) returns (bytes32) {
-        return EIP712._hashTypedDataV4(structHash);
-    }
-
-    /**
-     * @notice Returns the address of the current wallet implementation
-     * @dev This function is used in the proxy pattern to identify the implementation contract
-     * @return IMPLEMENTATION The address of this contract, which serves as the implementation
-     */
-    function _walletImplementation()
-        internal
-        view
-        override(ValidationLogic)
-        returns (address)
-    {
-        return IMPLEMENTATION;
     }
 }

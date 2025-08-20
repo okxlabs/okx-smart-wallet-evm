@@ -9,23 +9,7 @@ contract InitializationTest is Base {
     function setUp() public override {
         super.setUp();
     }
-
-    function test_EIP712_name_too_long() public {
-        vm.expectRevert(Errors.NameTooLong.selector);
-        new WalletCore(
-            "wallet-core-with-a-very-long-name-that-exceeds-32-bytes",
-            "1.0.0"
-        );
-    }
-
-    function test_EIP712_version_too_long() public {
-        vm.expectRevert(Errors.VersionTooLong.selector);
-        new WalletCore(
-            "wallet-core",
-            "1.0.0-with-a-very-long-version-that-exceeds-32-bytes"
-        );
-    }
-
+    
     function test_initialize_reverts_when_called_twice() public {
         // Set up bob with wallet code
         _setCodeToEOA(address(_walletCore), _bob);
