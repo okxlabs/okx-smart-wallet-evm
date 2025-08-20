@@ -10,7 +10,7 @@ struct Call {
 struct BatchedCall {
     Call[] calls;
     uint256 nonce;
-    uint256 expiry;
+    uint48 expiry;
 }
 
 struct InitialOwner {

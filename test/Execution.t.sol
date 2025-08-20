@@ -98,13 +98,14 @@ contract ExecutionTest is Base {
         vm.deal(charlie, 1 ether);
         _setCodeToEOA(address(_walletCore), charlie);
 
-        // Initialize charlie's wallet storage with empty owners
+        // Initialize charlie's wallet storage with charlie as initial admin owner
         vm.prank(charlie);
-        InitialOwner[] memory initialOwners = new InitialOwner[](0);
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: keccak256(abi.encodePacked(charlie)),
+            validator: address(_ecdsaValidator)
+        });
         IWalletCore(charlie).initialize(initialOwners);
-
-        // Add validator for charlie before executing
-        _addValidator(charlie);
 
         Call[] memory calls = _construct_calls_data();
 

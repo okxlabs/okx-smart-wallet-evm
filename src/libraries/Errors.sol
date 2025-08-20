@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 library Errors {
     // Storage related
     error InvalidNonce(uint256 nonce);
-    error ExpiryPassed(uint256 expiry);
+    error ExpiryPassed(uint48 expiry);
 
     // Account related
     error NotFromSelf();
@@ -17,7 +17,6 @@ library Errors {
     error InvalidKeyHash(bytes32 keyHash);
     error InvalidValidatorImpl(address validatorImpl);
     error ValidatorAlreadyExists();
-    error InvalidMerkleProof();
 
     // ECDSAValidator related
     error InvalidSignature();

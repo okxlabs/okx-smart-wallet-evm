@@ -14,10 +14,10 @@ import {Static} from "./libraries/Static.sol";
 abstract contract OwnersManager is IOwnersManager {
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
 
-    modifier onlyOwner() {
-        bytes32 keyHash = keccak256(abi.encode(msg.sender));
-        if (msg.sender != address(this) && !_ownerKeys.contains(keyHash))
+    modifier onlySelf() {
+        if (msg.sender != address(this)) {
             revert Errors.NotFromSelf();
+        }
         _;
     }
 
@@ -56,7 +56,6 @@ abstract contract OwnersManager is IOwnersManager {
 
     // ============ Validator Getter ============
 
-
     /**
      * @notice Get the verified validator address for a given keyHash with EIP-7702 support
      * @dev Returns built-in ECDSA validator (address(1)) for self-signing when no validator installed
@@ -87,7 +86,6 @@ abstract contract OwnersManager is IOwnersManager {
     // Bit layout for settings (following Calibur's layout)
     // Layout: 6 bytes UNUSED | 1 byte isAdmin | 5 bytes expiration | 20 bytes hook
     // Bits:   [255-208]       | [207-200]      | [199-160]        | [159-0]
-
 
     /**
      * @notice Extract hook address from packed settings (bits 0-159)
@@ -221,7 +219,6 @@ abstract contract OwnersManager is IOwnersManager {
         expired = isSettingsExpired(settings);
     }
 
-
     // ============ Validator Management Functions ============
 
     /**
@@ -239,7 +236,7 @@ abstract contract OwnersManager is IOwnersManager {
         bool adminFlag,
         uint40 expiration,
         address hook
-    ) external virtual override onlyOwner {
+    ) external virtual onlySelf {
         // Check if keyHash is already registered
         address existingValidator = ownerValidators[keyHash];
         if (existingValidator != address(0)) {
@@ -267,9 +264,7 @@ abstract contract OwnersManager is IOwnersManager {
      * @dev Only callable by the wallet owner
      * @param keyHash The public key hash to remove
      */
-    function removeValidator(
-        bytes32 keyHash
-    ) external virtual override onlyOwner {
+    function removeValidator(bytes32 keyHash) external virtual onlySelf {
         _removeValidator(keyHash);
         emit ValidatorRemoved(keyHash);
     }

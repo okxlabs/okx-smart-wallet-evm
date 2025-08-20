@@ -7,6 +7,7 @@ import {Call, BatchedCall} from "src/Types.sol";
 import {Errors} from "src/libraries/Errors.sol";
 import {IWalletCore} from "src/interfaces/IWalletCore.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
+import {OwnersManager} from "src/OwnersManager.sol";
 import {ValidationLogic} from "src/ValidationLogic.sol";
 import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
@@ -45,13 +46,13 @@ contract PasskeyValidatorTest is Base {
         testKeyHash = REAL_KEY_HASH;
 
         // Add PasskeyValidator for Alice's wallet
-        vm.prank(_alice);
-        IOwnersManager(_alice).addValidator(
+        _executeAddValidator(
+            _alice,
             testKeyHash,
             address(passkeyValidator),
-            true, // isAdmin
-            0, // no expiration
-            address(0) // no hook
+            true,
+            0,
+            address(0)
         );
     }
 
@@ -120,7 +121,7 @@ contract PasskeyValidatorTest is Base {
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: _getNonce(_alice),
-            expiry: block.timestamp + 1 hours
+            expiry: uint48(block.timestamp + 1 hours)
         });
 
         // Get the REAL message hash that needs to be signed
@@ -139,7 +140,7 @@ contract PasskeyValidatorTest is Base {
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: _getNonce(_alice),
-            expiry: block.timestamp + 1 hours
+            expiry: uint48(block.timestamp + 1 hours)
         });
 
         // Get the message hash that needs to be signed

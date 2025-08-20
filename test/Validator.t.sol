@@ -2,6 +2,7 @@
 pragma solidity ^0.8.23;
 
 import "./Base.t.sol";
+import {OwnersManager} from "src/OwnersManager.sol";
 import {IValidation} from "src/interfaces/IValidation.sol";
 import "src/libraries/Errors.sol";
 import {Static} from "src/libraries/Static.sol";
@@ -12,7 +13,7 @@ contract ValidatorTest is Base {
     uint256 internal _charliePk;
 
     event ValidatorAdded(address validator);
-    event ValidatorRemoved(address validator);
+    event ValidatorRemoved(bytes32 keyHash);
     error FailedDeployment();
 
     function setUp() public override {
@@ -26,26 +27,31 @@ contract ValidatorTest is Base {
         // Just use the shared validator directly
         address validatorAddress = address(_ecdsaValidator);
 
-        // Expect not from self revert
+        // Expect not from self revert when calling directly (not through execute)
         vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
-        IOwnersManager(_alice).addValidator(
-            keccak256(abi.encodePacked(address(this))),
-            validatorAddress,
-            false,
-            0,
-            address(0)
+        (bool success, ) = _alice.call(
+            abi.encodeWithSelector(
+                OwnersManager.addValidator.selector,
+                keccak256(abi.encodePacked(address(this))),
+                validatorAddress,
+                false,
+                0,
+                address(0)
+            )
         );
     }
 
     function test_addValidator_reverts_for_invalid_implementation() public {
-        vm.prank(_alice);
         address dave = vm.addr(2);
 
-        // Expect invalid validator implementation revert - for new interface, just pass invalid address
-        vm.expectRevert();
-        IOwnersManager(_alice).addValidator(
+        // Expect invalid validator implementation revert when called through execute
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.InvalidValidatorImpl.selector, dave)
+        );
+        _executeAddValidator(
+            _alice,
             keccak256(abi.encodePacked(address(this))),
-            dave, // Invalid validator address
+            dave,
             false,
             0,
             address(0)
@@ -53,16 +59,14 @@ contract ValidatorTest is Base {
     }
 
     function test_addValidator_reverts_for_duplicate() public {
-        // Deploy and add validator using helper
-        address validatorAddress = _addValidator(_alice);
-
-        // Expect failed if duplicate validator (same keyHash)
+        // Alice already has a validator from initialization, try to add duplicate
         bytes32 keyHash = keccak256(abi.encodePacked(_alice));
-        vm.prank(_alice);
-        vm.expectRevert();
-        IOwnersManager(_alice).addValidator(
+
+        vm.expectRevert(Errors.ValidatorAlreadyExists.selector);
+        _executeAddValidator(
+            _alice,
             keyHash,
-            validatorAddress,
+            address(_ecdsaValidator),
             false,
             0,
             address(0)
@@ -108,23 +112,22 @@ contract ValidatorTest is Base {
     }
 
     function test_validator_management_succeeds() public {
-        // First add a valid validator
-        address aliceECDSAValidator = _addValidator(_alice);
+        // Alice already has a validator from initialization
         bytes32 keyHash = keccak256(abi.encodePacked(_alice));
 
-        vm.startPrank(_alice);
         // Test that we can't add another validator for the same keyHash (should revert)
         vm.expectRevert(Errors.ValidatorAlreadyExists.selector);
-        IOwnersManager(_alice).addValidator(
+        _executeAddValidator(
+            _alice,
             keyHash,
-            aliceECDSAValidator,
+            address(_ecdsaValidator),
             false,
             0,
             address(0)
         );
 
         // Test removing the validator
-        IOwnersManager(_alice).removeValidator(keyHash);
+        _executeRemoveValidator(_alice, keyHash);
     }
 
     function test_addValidatorWithSettings_succeeds() public {
@@ -135,8 +138,8 @@ contract ValidatorTest is Base {
         uint40 expiration = uint40(block.timestamp + 3600); // 1 hour from now
         bool isAdmin = true;
 
-        vm.prank(_alice);
-        IOwnersManager(_alice).addValidator(
+        _executeAddValidator(
+            _alice,
             keyHash,
             validatorAddress,
             isAdmin,
@@ -165,8 +168,8 @@ contract ValidatorTest is Base {
         address validatorAddress = Static.ECDSA_VALIDATOR_ADDRESS;
         uint40 expiration = uint40(block.timestamp + 1); // Expires in 1 second
 
-        vm.prank(_alice);
-        IOwnersManager(_alice).addValidator(
+        _executeAddValidator(
+            _alice,
             keyHash,
             validatorAddress,
             false,
@@ -195,12 +198,12 @@ contract ValidatorTest is Base {
         bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
         address validatorAddress = Static.ECDSA_VALIDATOR_ADDRESS;
 
-        vm.prank(_alice);
-        IOwnersManager(_alice).addValidator(
+        _executeAddValidator(
+            _alice,
             keyHash,
             validatorAddress,
             false,
-            0, // expiration = 0 means never expires
+            0,
             address(0)
         );
 
@@ -220,11 +223,11 @@ contract ValidatorTest is Base {
         address validatorAddress = Static.ECDSA_VALIDATOR_ADDRESS;
 
         // Add admin validator
-        vm.prank(_alice);
-        IOwnersManager(_alice).addValidator(
+        _executeAddValidator(
+            _alice,
             keyHash,
             validatorAddress,
-            true, // isAdmin = true
+            true,
             0,
             address(0)
         );
@@ -236,11 +239,11 @@ contract ValidatorTest is Base {
         bytes32 nonAdminKeyHash = keccak256(abi.encodePacked(_bob));
         address nonAdminValidatorAddress = Static.ECDSA_VALIDATOR_ADDRESS;
 
-        vm.prank(_alice);
-        IOwnersManager(_alice).addValidator(
+        _executeAddValidator(
+            _alice,
             nonAdminKeyHash,
             nonAdminValidatorAddress,
-            false, // isAdmin = false
+            false,
             0,
             address(0)
         );
@@ -254,8 +257,8 @@ contract ValidatorTest is Base {
         bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
         address validatorAddress = Static.ECDSA_VALIDATOR_ADDRESS;
 
-        vm.prank(_alice);
-        IOwnersManager(_alice).addValidator(
+        _executeAddValidator(
+            _alice,
             keyHash,
             validatorAddress,
             false,
@@ -361,5 +364,168 @@ contract ValidatorTest is Base {
             address(0)
         );
         assertFalse(isSignerAdmin(newWallet, testKeyHash));
+    }
+
+    function test_removeValidator_reverts_for_non_owner() public {
+        // First add a validator to remove
+        bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
+        _executeAddValidator(
+            _alice,
+            keyHash,
+            Static.ECDSA_VALIDATOR_ADDRESS,
+            false,
+            0,
+            address(0)
+        );
+
+        // Try to call removeValidator directly from external address (not through execute)
+        vm.prank(_bob);
+        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        (bool success, ) = _alice.call(
+            abi.encodeWithSelector(
+                OwnersManager.removeValidator.selector,
+                keyHash
+            )
+        );
+    }
+
+    function test_removeValidator_reverts_for_non_admin() public {
+        // Add a validator first (using admin)
+        bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
+        _executeAddValidator(
+            _alice,
+            keyHash,
+            Static.ECDSA_VALIDATOR_ADDRESS,
+            false,
+            0,
+            address(0)
+        );
+
+        // Add a non-admin signer - use the correct keyHash for _bob's address
+        bytes32 nonAdminKeyHash = keccak256(abi.encodePacked(_bob));
+        _executeAddValidator(
+            _alice,
+            nonAdminKeyHash,
+            Static.ECDSA_VALIDATOR_ADDRESS,
+            false, // not admin
+            0,
+            address(0)
+        );
+
+        // Create a BatchedCall to remove validator using non-admin signer
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: _alice,
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnersManager.removeValidator.selector,
+                keyHash
+            )
+        });
+
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: _getNonce(_alice),
+            expiry: 0
+        });
+
+        // Sign with non-admin signer (_bob)
+        bytes memory signature = _construct_signature(batchedCall, _alice, _bobPk);
+
+        // Should revert with NonAdminSelfCall
+        vm.expectRevert(abi.encodeWithSelector(Errors.NonAdminSelfCall.selector));
+        IWalletCore(_alice).executeWithRelayer(batchedCall, signature);
+    }
+
+    function test_addValidator_reverts_for_non_admin() public {
+        // Add a non-admin signer - use the correct keyHash for _bob's address
+        bytes32 nonAdminKeyHash = keccak256(abi.encodePacked(_bob));
+        _executeAddValidator(
+            _alice,
+            nonAdminKeyHash,
+            Static.ECDSA_VALIDATOR_ADDRESS,
+            false, // not admin
+            0,
+            address(0)
+        );
+
+        // Create a BatchedCall to add another validator using non-admin signer
+        bytes32 newKeyHash = keccak256(abi.encodePacked(_charlie));
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: _alice,
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnersManager.addValidator.selector,
+                newKeyHash,
+                Static.ECDSA_VALIDATOR_ADDRESS,
+                false,
+                uint40(0),
+                address(0)
+            )
+        });
+
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: _getNonce(_alice),
+            expiry: 0
+        });
+
+        // Sign with non-admin signer (_bob)
+        bytes memory signature = _construct_signature(batchedCall, _alice, _bobPk);
+
+        // Should revert with NonAdminSelfCall
+        vm.expectRevert(abi.encodeWithSelector(Errors.NonAdminSelfCall.selector));
+        IWalletCore(_alice).executeWithRelayer(batchedCall, signature);
+    }
+
+    function test_removeValidator_succeeds_for_admin() public {
+        // First add a validator to remove
+        bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
+        _executeAddValidator(
+            _alice,
+            keyHash,
+            Static.ECDSA_VALIDATOR_ADDRESS,
+            false,
+            0,
+            address(0)
+        );
+
+        // Verify validator exists
+        assertEq(
+            IOwnersManager(_alice).ownerValidators(keyHash),
+            Static.ECDSA_VALIDATOR_ADDRESS
+        );
+
+        // Create a BatchedCall to remove validator using admin signer
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: _alice,
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnersManager.removeValidator.selector,
+                keyHash
+            )
+        });
+
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: _getNonce(_alice),
+            expiry: 0
+        });
+
+        // Sign with admin signer (default initial owner is admin)
+        bytes memory signature = _construct_signature(batchedCall, _alice, _alicePk);
+
+        // Should succeed
+        vm.expectEmit(true, true, true, true);
+        emit ValidatorRemoved(keyHash);
+        IWalletCore(_alice).executeWithRelayer(batchedCall, signature);
+
+        // Verify validator is removed
+        assertEq(
+            IOwnersManager(_alice).ownerValidators(keyHash),
+            address(0)
+        );
     }
 }

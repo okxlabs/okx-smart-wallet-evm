@@ -37,10 +37,6 @@ contract WalletCore is
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
     using BatchedCallLib for BatchedCall;
 
-    // EIP-1271
-    bytes4 private constant MAGIC_VALUE = 0x1626ba7e;
-    bytes4 private constant INVALID_VALUE = 0xffffffff;
-
     uint256 private constant SIG_VALIDATION_FAILED = 1 << 96;
 
     address public immutable IMPLEMENTATION;
@@ -251,7 +247,7 @@ contract WalletCore is
         }
 
         _batchCall(batchedCall.calls, keyHash);
-        revert ("");
+        revert("");
     }
 
     /**
@@ -262,6 +258,7 @@ contract WalletCore is
     function _batchCall(Call[] calldata calls, bytes32 keyHash) internal {
         uint256 settings = ownerSettings[keyHash];
         address hookAddress = getHook(settings);
+        bool isAdmin = isAdmin(settings);
         bytes memory ret;
 
         if (hookAddress != address(0)) {
@@ -269,7 +266,7 @@ contract WalletCore is
         }
 
         for (uint256 i; i < calls.length; i++) {
-            if (calls[i].target == address(this) && !isAdmin(settings)) {
+            if (calls[i].target == address(this) && !isAdmin) {
                 revert Errors.NonAdminSelfCall();
             }
             _call(calls[i]);
@@ -279,7 +276,7 @@ contract WalletCore is
             IHook(hookAddress).postCheck(ret, msg.sender);
         }
     }
-    
+
     /// @notice Validate the user operation
     /// @param userOp The user operation to be validated
     /// @param userOpHash The hash of the user operation
@@ -296,7 +293,14 @@ contract WalletCore is
         address validator = getVerifiedValidator(keyHash);
         if (validator == address(0)) return SIG_VALIDATION_FAILED;
 
-        if(!_validateSignature(validator, keyHash, userOpHash, userOp.signature[32:])) return SIG_VALIDATION_FAILED;
+        if (
+            !_validateSignature(
+                validator,
+                keyHash,
+                userOpHash,
+                userOp.signature[32:]
+            )
+        ) return SIG_VALIDATION_FAILED;
         return validationData;
     }
 

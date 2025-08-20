@@ -4,6 +4,7 @@ pragma solidity ^0.8.23;
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
+import {OwnersManager} from "src/OwnersManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {IWalletCore} from "src/interfaces/IWalletCore.sol";
 import {IValidation} from "src/interfaces/IValidation.sol";
@@ -60,10 +61,13 @@ contract Base is Test {
 
         deal(_alice, 10 ether);
 
-        // Alice initializes the account
+        // Alice initializes the account with herself as admin
         vm.prank(_alice);
-        // Initialize with empty owners array to allow tests to add validators as needed
-        InitialOwner[] memory initialOwners = new InitialOwner[](0);
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: keccak256(abi.encodePacked(_alice)),
+            validator: address(_ecdsaValidator)
+        });
         IWalletCore(_alice).initialize(initialOwners);
         vm.stopPrank();
     }
@@ -178,8 +182,13 @@ contract Base is Test {
         // Use the signer's address as the keyHash for testing
         bytes32 keyHash = keccak256(abi.encodePacked(signer));
 
-        vm.prank(signer);
-        IOwnersManager(signer).addValidator(
+        // Check if validator already exists (alice is initialized with a validator)
+        if (IOwnersManager(signer).hasValidator(keyHash)) {
+            return address(_ecdsaValidator);
+        }
+
+        _executeAddValidator(
+            signer,
             keyHash,
             address(_ecdsaValidator),
             false,
@@ -197,8 +206,13 @@ contract Base is Test {
         // Use the signer's address as the keyHash for testing
         bytes32 keyHash = keccak256(abi.encodePacked(signer));
 
-        vm.prank(account);
-        IOwnersManager(account).addValidator(
+        // Check if validator already exists
+        if (IOwnersManager(account).hasValidator(keyHash)) {
+            return address(_ecdsaValidator);
+        }
+
+        _executeAddValidator(
+            account,
             keyHash,
             address(_ecdsaValidator),
             false,
@@ -263,21 +277,87 @@ contract Base is Test {
         return abi.encodePacked(keyHash, signature);
     }
 
+    function _construct_signature(
+        BatchedCall memory batchedCall,
+        address account,
+        uint256 signerPk
+    ) public view returns (bytes memory) {
+        bytes32 hash = ValidationLogic(account).getValidationTypedHash(batchedCall);
+        address signer = vm.addr(signerPk);
+        bytes32 keyHash = keccak256(abi.encodePacked(signer));
+        bytes memory signature = _signHash(signerPk, hash);
+        return abi.encodePacked(keyHash, signature);
+    }
+
     // Helper function for tests to check if a signer is admin
-    function isSignerAdmin(address wallet, bytes32 keyHash) internal view returns (bool) {
+    function isSignerAdmin(
+        address wallet,
+        bytes32 keyHash
+    ) internal view returns (bool) {
         uint256 settings = IOwnersManager(wallet).ownerSettings(keyHash);
         return settings != 0 && IOwnersManager(wallet).isAdmin(settings);
     }
-    
-    // Helper function for tests to check if a signer is expired  
-    function isSignerExpired(address wallet, bytes32 keyHash) internal view returns (bool) {
+
+    // Helper function for tests to check if a signer is expired
+    function isSignerExpired(
+        address wallet,
+        bytes32 keyHash
+    ) internal view returns (bool) {
         uint256 settings = IOwnersManager(wallet).ownerSettings(keyHash);
-        return settings != 0 && IOwnersManager(wallet).isSettingsExpired(settings);
+        return
+            settings != 0 && IOwnersManager(wallet).isSettingsExpired(settings);
     }
-    
+
     // Helper function for tests to get signer expiration
-    function getSignerExpiration(address wallet, bytes32 keyHash) internal view returns (uint40) {
+    function getSignerExpiration(
+        address wallet,
+        bytes32 keyHash
+    ) internal view returns (uint40) {
         uint256 settings = IOwnersManager(wallet).ownerSettings(keyHash);
-        return settings != 0 ? IOwnersManager(wallet).getExpiration(settings) : 0;
+        return
+            settings != 0 ? IOwnersManager(wallet).getExpiration(settings) : 0;
+    }
+
+    // Helper function to call addValidator through execute
+    function _executeAddValidator(
+        address wallet,
+        bytes32 keyHash,
+        address validatorAddr,
+        bool adminFlag,
+        uint40 expiration,
+        address hook
+    ) internal {
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: wallet,
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnersManager.addValidator.selector,
+                keyHash,
+                validatorAddr,
+                adminFlag,
+                expiration,
+                hook
+            )
+        });
+
+        vm.prank(wallet);
+        IWalletCore(wallet).execute(calls);
+    }
+
+    // Helper function to call removeValidator through execute
+    function _executeRemoveValidator(address wallet, bytes32 keyHash) internal {
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: wallet,
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnersManager.removeValidator.selector,
+                keyHash
+            )
+        });
+
+        vm.prank(wallet);
+        IWalletCore(wallet).execute(calls);
     }
 }

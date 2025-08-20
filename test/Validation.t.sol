@@ -2,6 +2,7 @@
 pragma solidity ^0.8.23;
 
 import "./Base.t.sol";
+import {OwnersManager} from "src/OwnersManager.sol";
 
 contract ValidationTest is Base {
     event NonceConsumed(uint192 key, uint64 nonce);
@@ -62,17 +63,18 @@ contract ValidationTest is Base {
     function test_executeFromRelayer_reverts_for_invalid_nonce() public {
         Call[] memory calls = _construct_calls_data();
 
+        // Use a keyHash that doesn't exist (bob's keyHash, but bob is not a validator)
+        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         bytes32 hash = _getValidationTypedHash(_alice, calls);
         bytes memory validatorData = _construct_validatorData(
-            _alice,
-            _alicePk,
+            _bob, // Use bob's address for keyHash
+            _bobPk, // Use bob's private key for signing
             hash
         );
 
-        bytes32 keyHash = keccak256(abi.encodePacked(_alice));
         vm.prank(_bob);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidKeyHash.selector, keyHash)
+            abi.encodeWithSelector(Errors.InvalidKeyHash.selector, bobKeyHash)
         );
         IWalletCore(_alice).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),
@@ -86,9 +88,8 @@ contract ValidationTest is Base {
         Call[] memory calls = _construct_calls_data();
         _addValidator(_alice);
 
-        vm.prank(_alice);
         bytes32 keyHash = keccak256(abi.encodePacked(_alice));
-        IOwnersManager(_alice).removeValidator(keyHash);
+        _executeRemoveValidator(_alice, keyHash);
 
         bytes32 hash = _getValidationTypedHash(_alice, calls);
         bytes memory validatorData = _construct_validatorData(
@@ -154,10 +155,8 @@ contract ValidationTest is Base {
         _addValidator(_alice);
 
         // Remove validator
-        vm.startPrank(_alice);
         bytes32 keyHash = keccak256(abi.encodePacked(_alice));
-        IOwnersManager(_alice).removeValidator(keyHash);
-        vm.stopPrank();
+        _executeRemoveValidator(_alice, keyHash);
 
         bytes32 hash = keccak256("test");
         bytes memory sig = _signDigest(hash, _alicePk);

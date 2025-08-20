@@ -2,6 +2,7 @@
 pragma solidity ^0.8.23;
 
 import "./Base.t.sol";
+import {OwnersManager} from "src/OwnersManager.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
 
 contract ValidatorEnumerationTest is Base {
@@ -17,15 +18,15 @@ contract ValidatorEnumerationTest is Base {
     }
 
     function test_validator_enumeration_functions() public {
-        // Initially should have no validators
-        assertEq(IOwnersManager(_alice).getValidatorCount(), 0);
-        assertFalse(
+        // Alice starts with 1 validator from initialization
+        assertEq(IOwnersManager(_alice).getValidatorCount(), 1);
+        assertTrue(
             IOwnersManager(_alice).hasValidator(
                 keccak256(abi.encodePacked(_alice))
             )
         );
 
-        // Add first validator
+        // _addValidator will return early since alice already has a validator
         _addValidator(_alice);
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
 
@@ -33,7 +34,7 @@ contract ValidatorEnumerationTest is Base {
         assertTrue(IOwnersManager(_alice).hasValidator(aliceKeyHash));
         assertEq(IOwnersManager(_alice).getValidatorAt(0), aliceKeyHash);
 
-        // Add second validator
+        // Add second validator (charlie)
         _addValidator(_alice, _charlie);
         bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
 
@@ -67,8 +68,7 @@ contract ValidatorEnumerationTest is Base {
         assertTrue(foundDave);
 
         // Remove a validator and check count
-        vm.prank(_alice);
-        IOwnersManager(_alice).removeValidator(charlieKeyHash);
+        _executeRemoveValidator(_alice, charlieKeyHash);
 
         assertEq(IOwnersManager(_alice).getValidatorCount(), 2);
         assertFalse(IOwnersManager(_alice).hasValidator(charlieKeyHash));
@@ -93,30 +93,28 @@ contract ValidatorEnumerationTest is Base {
         bytes32 keyHash1 = keccak256(abi.encodePacked(_charlie));
         bytes32 keyHash2 = keccak256(abi.encodePacked(_dave));
 
-        vm.startPrank(_alice);
-
         // Add first validator with settings
-        IOwnersManager(_alice).addValidator(
+        _executeAddValidator(
+            _alice,
             keyHash1,
             address(_ecdsaValidator),
-            true, // admin
+            true,
             0,
             address(0)
         );
 
         // Add second validator with settings
-        IOwnersManager(_alice).addValidator(
+        _executeAddValidator(
+            _alice,
             keyHash2,
             address(_ecdsaValidator),
-            false, // not admin
+            false,
             uint40(block.timestamp + 3600),
             address(0)
         );
 
-        vm.stopPrank();
-
-        // Check enumeration
-        assertEq(IOwnersManager(_alice).getValidatorCount(), 2);
+        // Check enumeration (alice + 2 new validators = 3 total)
+        assertEq(IOwnersManager(_alice).getValidatorCount(), 3);
         assertTrue(IOwnersManager(_alice).hasValidator(keyHash1));
         assertTrue(IOwnersManager(_alice).hasValidator(keyHash2));
 

@@ -8,6 +8,7 @@ import {Errors} from "src/libraries/Errors.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {IWalletCore} from "src/interfaces/IWalletCore.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
+import {OwnersManager} from "src/OwnersManager.sol";
 import {ValidationLogic} from "src/ValidationLogic.sol";
 import {ERC712} from "src/ERC712.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
@@ -30,16 +31,7 @@ contract MerkleExecutionTest is Base {
         (charlie, charliePk) = makeAddrAndKey("charlie");
         (eve, evePk) = makeAddrAndKey("eve");
 
-        // First, add Alice as an owner by calling addValidator from the wallet itself
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
-        vm.prank(_alice);
-        IOwnersManager(_alice).addValidator(
-            aliceKeyHash,
-            address(_ecdsaValidator),
-            false,
-            0,
-            address(0)
-        );
+        // Alice already has a validator from initialization
 
         // Now setup Charlie as a validator
         _addValidator(_alice, charlie);
@@ -226,7 +218,7 @@ contract MerkleExecutionTest is Base {
             BatchedCall({
                 calls: calls,
                 nonce: _getNonce(account),
-                expiry: block.timestamp + 1 hours
+                expiry: uint48(block.timestamp + 1 hours)
             });
     }
 
@@ -353,7 +345,7 @@ contract MerkleExecutionTest is Base {
         BatchedCall memory invalidNonceBatchedCall = BatchedCall({
             calls: calls,
             nonce: nonce,
-            expiry: block.timestamp + 1 hours
+            expiry: uint48(block.timestamp + 1 hours)
         });
 
         bytes memory validatorData = _construct_merkle_validator_data(

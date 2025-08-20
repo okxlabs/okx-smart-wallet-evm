@@ -7,7 +7,7 @@ import {CallLib} from "./CallLib.sol";
 library BatchedCallLib {
     bytes32 private constant BATCHED_CALL_TYPEHASH =
         keccak256(
-            "BatchedCall(Call[] calls,uint256 nonce,uint256 expiry)Call(address target,uint256 value,bytes data)"
+            "BatchedCall(Call[] calls,uint256 nonce,uint48 expiry)Call(address target,uint256 value,bytes data)"
         );
 
     /**

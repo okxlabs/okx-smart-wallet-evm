@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.29;
 
-
 /// @notice A library to store constant values that are used across the WalletCore contracts
 library Static {
     // Validator addresses for built-in validators
