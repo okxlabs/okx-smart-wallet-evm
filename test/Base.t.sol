@@ -25,7 +25,7 @@ contract Base is Test {
     string public constant NAME = "SmartWallet";
     string public constant VERSION = "1.0.0";
 
-    address internal _alice;
+    address payable internal _alice;
     uint256 internal _alicePk;
     address internal _bob;
     uint256 internal _bobPk;
@@ -46,7 +46,11 @@ contract Base is Test {
     );
 
     function setUp() public virtual {
-        (_alice, _alicePk) = makeAddrAndKey("alice");
+        (address aliceAddr, uint256 alicePk) = makeAddrAndKey("alice");
+
+        // Make _alice payable so we can cast to SmartWallet (which has payable fallback functions) in relevant unit tests 
+        _alice = payable(aliceAddr);
+        _alicePk = alicePk;
         (_bob, _bobPk) = makeAddrAndKey("bob");
 
         deployFactory = new DeployFactory();

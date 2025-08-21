@@ -18,6 +18,7 @@ import {IHook} from "./interfaces/IHook.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {ERC4337Account, PackedUserOperation} from "./ERC4337Account.sol";
 import {BatchedCallLib} from "./libraries/BatchedCallLib.sol";
+import {AllowanceManager} from "./AllowanceManager.sol";
 
 // Do not set any states in this contract
 contract SmartWallet is
@@ -30,7 +31,8 @@ contract SmartWallet is
     ExecutionLogic,
     ERC712,
     FallbackHandler,
-    Initializable
+    Initializable,
+    AllowanceManager
 {
     using ECDSA for bytes32;
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
@@ -45,7 +47,7 @@ contract SmartWallet is
         _disableInitializers();
     }
 
-    modifier onlyOwnerOrEntryPoint() {
+    modifier onlyOwnerOrEntryPoint() override {
         bytes32 keyHash = keccak256(abi.encodePacked(msg.sender));
         if (
             _ownerKeys.contains(keyHash) ||
