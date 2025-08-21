@@ -28,11 +28,7 @@ library Errors {
 
     // Simulation related
     error GasEstimates(uint256 executionGas, bytes errorData);
-    error SimulateExecution(
-        uint256 executionGas,
-        uint256 totalGas,
-        bytes errorData
-    );
+    error SimulateExecution();
 
     error InvalidOwnersAndValidatorsLength();
 

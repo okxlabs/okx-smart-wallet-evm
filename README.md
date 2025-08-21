@@ -94,7 +94,36 @@ The implementation follows a modular design:
 | SmartWallet | `0x80296FF8D1ED46f8e3C7992664D13B833504c2Bb` |
 | CoreStorage | `0x7DAF91DFe55FcAb363416A6E3bceb3Da34ff1d30` |
 
+### XLayer Mainnet
+
+| Contract    | Address                                      |
+| ----------- | -------------------------------------------- |
+| WalletCore  | `0xe5c170b631d93edced30f654f58551dcfbee8d72` |
+| SmartWalletFactory | `0x0e9c0de106c0193f40a87b3cb45cd6e81ad5a895` |
+| ECDSAValidator | `0x54ca77dabd3cf025ef08545189f298023e7dc2f6` |
+
 ## Usage
+
+### Prepare environment
+
+```bash
+git submodule update --init --recursive
+```
+
+### Deploy
+
+Deploy on XLayer Mainnet:
+```bash
+RPC_URL=https://rpc.xlayer.tech
+forge script scripts/DeployInit.sol --rpc-url $RPC_URL --legacy --broadcast
+```
+
+Deploy and initialize 7702 wallet on local
+```bash
+# Start local blockchain node with 7702 support
+anvil --hardfork prague
+./initialise.sh
+```
 
 ### 1. Set Code & Initialize Wallet
 

@@ -612,30 +612,7 @@ contract SimulationTest is Base {
         }
     }
 
-    function _decodeSimulateExecution(
-        bytes memory simulationResult
-    )
-        private
-        pure
-        returns (uint256 executionGas, uint256 totalGas, bytes memory errorData)
-    {
-        bytes4 selector;
-        assembly {
-            selector := mload(add(simulationResult, 32))
-        }
-        assertEq(selector, Errors.SimulateExecution.selector);
 
-        // decode gas and error msg
-        uint256 argsLen = simulationResult.length - 4;
-        bytes memory payload = new bytes(argsLen);
-        for (uint256 i = 0; i < argsLen; i++) {
-            payload[i] = simulationResult[i + 4];
-        }
-        (executionGas, totalGas, errorData) = abi.decode(
-            payload,
-            (uint256, uint256, bytes)
-        );
-    }
 
     function _decodeCallFailed(
         bytes memory errorData
@@ -662,115 +639,15 @@ contract SimulationTest is Base {
         );
     }
 
-    // function test_executeWithRelayer() public {
-    //     uint256 callSize = 3;
-    //     // base cost + cost per call per validation + cost per call per erc20 transfer
-    //     uint256 executionGas = _get_execution_gas(callSize);
-    //     executionGas = executionGas - 25_000;
-    //     Call[] memory calls = _construct_usdc_batchcall(callSize);
-    //     bytes memory validatorData = _construct_signature(
-    //         _alice,
-    //         _alicePk,
-    //         relayerCalls,
-    //         calls,
-    //         executionGas
-    //     );
-
-    //     vm.prank(relayer);
-    //     uint256 gasStart = gasleft();
-    //     ISmartWallet(_alice).executeWithRelayer(
-    //         executionGas,
-    //         validator,
-    //         relayerCalls,
-    //         calls,
-    //         validatorData
-    //     );
-    //     uint256 gasEnd = gasleft();
-    //     console.log("gas used", gasStart - gasEnd);
-    // }
-
-    // function test_executeWithSponsor_prevent_gas_draining() public {
-    //     // `executionGas` should limit the gas useage of the user batch to prevent gas draining on relayer
-
-    //     uint256 callSize = 3;
-    //     // base cost + cost per call per validation + cost per call per rec20 transfer
-    //     uint256 executionGas = 31532 + 2210 * callSize + 25160 * callSize;
-    //     Call[] memory calls = _construct_malicious_batchcall(callSize);
-    //     bytes memory validatorData = _construct_signature(
-    //         _alice,
-    //         _alicePk,
-    //         relayerCalls,
-    //         calls,
-    //         executionGas
-    //     );
-
-    //     vm.roll(block.number + GAS_DRAINING_ATTACK_OFFSET);
-    //     assertEq(
-    //         block.number,
-    //         IMaliciousToken(address(maliciousToken)).getDrainingAttackHeight()
-    //     );
-
-    //     vm.prank(relayer);
-    //     vm.expectEmit(true, true, true, true, _alice);
-    //     emit CallFailed(callSize - 1, 0, ""); // expect user batch OOG and the failure catched by `CallFailed`
-
-    //     ISmartWallet(_alice).executeWithRelayer(
-    //         executionGas,
-    //         validator,
-    //         relayerCalls,
-    //         calls,
-    //         validatorData
-    //     );
-    // }
-
-    // function test_executeWithSponsor_prevent_large_blob_copy() public {
-    //     // the customized error in `ExecutionLogic._call` should limit the total bytes copied from returndatacopy
-    //     // this protects relayer from spending significant amount of gas to copy large blob from callee
-
-    //     uint256 callSize = 3;
-    //     // base cost + cost per call per validation + cost per call per rec20 transfer
-    //     uint256 executionGas = 31532 + 2210 * callSize + 25160 * callSize;
-    //     Call[] memory calls = _construct_malicious_batchcall(callSize);
-    //     bytes memory validatorData = _construct_signature(
-    //         _alice,
-    //         _alicePk,
-    //         relayerCalls,
-    //         calls,
-    //         executionGas
-    //     );
-
-    //     vm.roll(block.number + LARGE_BLOB_ATTACK_OFFSET);
-    //     assertEq(
-    //         block.number,
-    //         IMaliciousToken(address(maliciousToken)).getLargeBlobAttackHeight()
-    //     );
-
-    //     vm.prank(relayer);
-    //     vm.expectEmit(true, true, true, true, _alice);
-    //     // expect user batch revers Error(...large...string...) and the reverted bytes is truncated to MAX_RETURNDATA_SIZE
-    //     emit CallFailed(
-    //         callSize - 1,
-    //         9220,
-    //         hex"08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000023aa41747461636b3041747461636b3141747461636b3241747461636b3341747461636b3441747461636b3541747461636b3641747461636b3741747461636b3841747461636b3941747461636b313041747461636b313141747461636b313241747461636b313341747461636b313441747461636b313541747461636b313641747461636b313741747461636b313841747461636b313941747461636b323041747461636b323141747461636b323241747461636b323341747461636b"
-    //     );
-
-    //     ISmartWallet(_alice).executeWithRelayer(
-    //         executionGas,
-    //         validator,
-    //         relayerCalls,
-    //         calls,
-    //         validatorData
-    //     );
-    // }
-
     function test_simulate_executeFromRelayer() public {
-        uint256 callSize = 3;
 
-        Call[] memory calls = _construct_usdc_batchcall(callSize);
-        bytes memory validatorData = _construct_signature(
+        Call[] memory calls = _construct_calls_data();
+
+        bytes32 hash = _getValidationTypedHash(_alice, calls);
+        bytes memory validatorData = _construct_validatorData(
             _alice,
             _alicePk,
-            calls
+            hash
         );
 
         vm.prank(relayer);
@@ -783,80 +660,95 @@ contract SimulationTest is Base {
         {
             revert("should not reach here");
         } catch (bytes memory simulationResult) {
-            (
-                uint256 executionGas,
-                uint256 totalGas,
-                bytes memory errorData
-            ) = _decodeSimulateExecution(simulationResult);
+            // Check that it's the expected SimulateExecution error (now parameterless)
+            bytes4 selector;
+            assembly {
+                selector := mload(add(simulationResult, 32))
+            }
+            assertEq(selector, Errors.SimulateExecution.selector, "Expected SimulateExecution error");
 
-            console.log("executionGas %s", executionGas);
-            console.log("totalGas %s", totalGas);
-            console.logBytes(errorData);
+            console.log("Simulation completed successfully");
+            console.log("Note: Gas breakdown no longer available from simulation");
         }
         uint256 gasEnd = gasleft();
         console.log("gas used", gasStart - gasEnd);
     }
 
-    // function test_simulate_executeWithRelayer_invalid_user_batch() public {
-    //     uint256 callSize = 3;
-    //     uint256 executionGas = _get_execution_gas(callSize);
+    function test_compareGas_simulateVsActual_executeFromRelayer() public {
+        // Register validator first (required for both simulate and execute)
+        _addValidator(_alice);
+        
+        // Setup common data for both tests
+        Call[] memory calls = _construct_calls_data();
+        bytes32 hash = _getValidationTypedHash(_alice, calls);
+        bytes memory validatorData = _construct_validatorData(
+            _alice,
+            _alicePk,
+            hash
+        );
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls, 
+            nonce: 0, 
+            expiry: 0
+        });
 
-    //     Call[] memory calls = _construct_invalid_usdc_batchcall(callSize);
-    //     bytes memory validatorData = _construct_signature(
-    //         _alice,
-    //         _alicePk,
-    //         relayerCalls,
-    //         calls,
-    //         executionGas
-    //     );
+        // Test 1: Measure gas for simulateExecuteWithRelayer
+        uint256 simulateGasUsed;
+        
+        vm.prank(relayer);
+        uint256 gasStart = gasleft();
+        try
+            ISmartWallet(_alice).simulateExecuteWithRelayer(
+                batchedCall,
+                validatorData
+            )
+        {
+            revert("Simulation should always revert");
+        } catch (bytes memory simulationResult) {
+            uint256 gasUsedInSimulation = gasleft();
+            simulateGasUsed = gasStart - gasUsedInSimulation;
+            
+            // Check that it's the expected SimulateExecution error (now parameterless)
+            bytes4 selector;
+            assembly {
+                selector := mload(add(simulationResult, 32))
+            }
+            assertEq(selector, Errors.SimulateExecution.selector, "Expected SimulateExecution error");
+            
+            // No more gas data is returned from the simulation - just the fact that it executed
+        }
 
-    //     vm.prank(relayer);
-    //     try
-    //         ISmartWallet(_alice).simulateExecuteWithRelayer(
-    //             validator,
-    //             calls,
-    //             calls,
-    //             validatorData
-    //         )
-    //     {
-    //         revert("should not reach here");
-    //     } catch (bytes memory simulationResult) {
-    //         (
-    //             uint256 executionGas,
-    //             uint256 totalGas,
-    //             bytes memory errorData
-    //         ) = _decodeSimulateExecution(simulationResult);
 
-    //         (
-    //             uint256 index,
-    //             uint256 originalLength,
-    //             bytes memory returnData
-    //         ) = _decodeCallFailed(errorData);
+        // Test 2: Measure gas for actual executeWithRelayer
+        uint256 actualGasUsed;
+        
+        vm.prank(relayer);
+        gasStart = gasleft();
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        uint256 gasEnd = gasleft();
+        actualGasUsed = gasStart - gasEnd;
 
-    //         bytes4 errSelector;
-    //         assembly {
-    //             errSelector := mload(add(returnData, 32))
-    //         }
-
-    //         console.logBytes(returnData);
-
-    //         assertEq(index, callSize - 1); // this call expected to fail
-    //         assertEq(errSelector, ERC20InsufficientBalance.selector); // reverted error should be `ERC20InsufficientBalance`
-    //         assertEq(
-    //             originalLength, // the length of this customed error is expected within the MAX_RETURNDATA_SIZE range
-    //             abi
-    //                 .encodeWithSelector(
-    //                     ERC20InsufficientBalance.selector,
-    //                     address(0),
-    //                     0,
-    //                     0
-    //                 )
-    //                 .length
-    //         );
-
-    //         console.log("executionGas %s", executionGas);
-    //         console.log("totalGas %s", totalGas);
-    //         console.logBytes(returnData);
-    //     }
-    // }
+        // Log results for comparison
+        console.log("=== GAS USAGE COMPARISON ===");
+        console.log("Simulate gas used (total call):", simulateGasUsed);
+        console.log("Actual execution gas used:", actualGasUsed);
+        console.log("Note: Simulation no longer returns internal gas breakdown");
+        
+        // Calculate differences
+        if (actualGasUsed > simulateGasUsed) {
+            console.log("Actual uses MORE gas by:", actualGasUsed - simulateGasUsed);
+            console.log("Difference percentage:", ((actualGasUsed - simulateGasUsed) * 100) / simulateGasUsed);
+        } else {
+            console.log("Simulate uses MORE gas by:", simulateGasUsed - actualGasUsed);
+            console.log("Difference percentage:", ((simulateGasUsed - actualGasUsed) * 100) / actualGasUsed);
+        }
+        
+        // Assert both operations completed (basic sanity check)
+        assertTrue(simulateGasUsed > 0, "Simulation should consume gas");
+        assertTrue(actualGasUsed > 0, "Actual execution should consume gas");
+        
+        // The actual execution should generally use similar or slightly different gas
+        // This is more of an informational test than a strict assertion
+        console.log("Test completed successfully - check gas comparison above");
+    }
 }
