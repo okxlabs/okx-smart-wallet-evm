@@ -48,7 +48,7 @@ contract Base is Test {
     function setUp() public virtual {
         (address aliceAddr, uint256 alicePk) = makeAddrAndKey("alice");
 
-        // Make _alice payable so we can cast to SmartWallet (which has payable fallback functions) in relevant unit tests 
+        // Make _alice payable so we can cast to SmartWallet (which has payable fallback functions) in relevant unit tests
         _alice = payable(aliceAddr);
         _alicePk = alicePk;
         (_bob, _bobPk) = makeAddrAndKey("bob");

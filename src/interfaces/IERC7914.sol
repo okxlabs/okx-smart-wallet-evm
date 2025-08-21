@@ -11,13 +11,29 @@ interface IERC7914 {
     error TransferNativeFailed();
 
     /// @notice Emitted when a transfer from native is made
-    event TransferFromNative(address indexed from, address indexed to, uint256 value);
+    event TransferFromNative(
+        address indexed from,
+        address indexed to,
+        uint256 value
+    );
     /// @notice Emitted when a native approval is made
-    event ApproveNative(address indexed owner, address indexed spender, uint256 value);
+    event ApproveNative(
+        address indexed owner,
+        address indexed spender,
+        uint256 value
+    );
     /// @notice Emitted when a transfer from native transient is made
-    event TransferFromNativeTransient(address indexed from, address indexed to, uint256 value);
+    event TransferFromNativeTransient(
+        address indexed from,
+        address indexed to,
+        uint256 value
+    );
     /// @notice Emitted when a transient native approval is made
-    event ApproveNativeTransient(address indexed owner, address indexed spender, uint256 value);
+    event ApproveNativeTransient(
+        address indexed owner,
+        address indexed spender,
+        uint256 value
+    );
     /// @notice Emitted when the native allowance of a spender is updated when a transfer happens
     event NativeAllowanceUpdated(address indexed spender, uint256 value);
 
@@ -25,19 +41,35 @@ interface IERC7914 {
     function nativeAllowance(address spender) external view returns (uint256);
 
     /// @notice Returns the transient allowance of a spender
-    function transientNativeAllowance(address spender) external view returns (uint256);
+    function transientNativeAllowance(
+        address spender
+    ) external view returns (uint256);
 
     /// @notice Transfers native tokens from the caller to a recipient
     /// @dev Doesn't forward transferFrom requests - the specified `from` address must be address(this)
-    function transferFromNative(address from, address recipient, uint256 amount) external returns (bool);
+    function transferFromNative(
+        address from,
+        address recipient,
+        uint256 amount
+    ) external returns (bool);
 
     /// @notice Approves a spender to transfer native tokens on behalf of the caller
-    function approveNative(address spender, uint256 amount) external returns (bool);
+    function approveNative(
+        address spender,
+        uint256 amount
+    ) external returns (bool);
 
     /// @notice Transfers native tokens from the caller to a recipient with transient storage
     /// @dev Doesn't forward transferFrom requests - the specified `from` address must be address(this)
-    function transferFromNativeTransient(address from, address recipient, uint256 amount) external returns (bool);
+    function transferFromNativeTransient(
+        address from,
+        address recipient,
+        uint256 amount
+    ) external returns (bool);
 
     /// @notice Approves a spender to transfer native tokens on behalf of the caller with transient storage
-    function approveNativeTransient(address spender, uint256 amount) external returns (bool);
+    function approveNativeTransient(
+        address spender,
+        uint256 amount
+    ) external returns (bool);
 }

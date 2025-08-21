@@ -7,7 +7,6 @@ import {PackedUserOperation} from "account-abstraction/interfaces/IAccount.sol";
 import {UserOperationLib} from "account-abstraction/core/UserOperationLib.sol";
 
 contract Helper {
-
     uint256 constant CHALLENGE_LOCATION = 23;
     uint256 constant YTPE_INDEX = 1;
 
@@ -18,7 +17,14 @@ contract Helper {
         uint256 chainid,
         PackedUserOperation calldata userOp
     ) public pure returns (bytes32) {
-        return keccak256(abi.encode(userOp.hash(bytes32(uint256(uint160(entryPoint)))), entryPoint, chainid));
+        return
+            keccak256(
+                abi.encode(
+                    userOp.hash(bytes32(uint256(uint160(entryPoint)))),
+                    entryPoint,
+                    chainid
+                )
+            );
     }
 
     function getPubkeyHash(
@@ -86,8 +92,7 @@ contract Helper {
             memory authenticatorData = hex"49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631900000000";
         ///string
         ///    memory clientDataJSON = '{"type":"webauthn.get","challenge":"gw6YFSEOxfTvfP937iQt2nslHwbUYHOoKLKBhq2RLFM","origin":"http://localhost:8000","crossOrigin":false}';
-        return
-            abi.encode(authenticatorData, clientDataJSON, 1, r, s);
+        return abi.encode(authenticatorData, clientDataJSON, 1, r, s);
     }
 
     // function passkeyVerify(
@@ -148,6 +153,4 @@ contract Helper {
     //     uint256 gasUsed = gasBefore - gasleft();
     //     return (verified, gasUsed);
     // }
-
-    
 }
