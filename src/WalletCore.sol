@@ -13,7 +13,6 @@ import {ExecutionLogic} from "./ExecutionLogic.sol";
 import {FallbackHandler} from "./FallbackHandler.sol";
 import {Call, BatchedCall, InitialOwner} from "./Types.sol";
 import {Errors} from "./libraries/Errors.sol";
-import {GasEstimateUtil} from "./libraries/GasEstimateUtil.sol";
 import {Static} from "./libraries/Static.sol";
 import {IHook} from "./interfaces/IHook.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
@@ -147,76 +146,15 @@ contract WalletCore is
      * 2) "Successful simulation" means both validation and the sponsorship call passed.
      *    Any failure in the user’s batch calls is then captured in `errorData` and surfaced inside the `SimulateExecution` revert.
      * @param batchedCall BatchedCall struct containing calls, nonce, and expiry
+     * @param validator The validator address that is intended to be used with executeWithRelayer
      * @param validatorData Encoded data containing keyHash and signature: abi.encode(keyHash, signature)
      */
     function simulateExecuteWithRelayer(
         BatchedCall calldata batchedCall,
+        address validator,
         bytes calldata validatorData
     ) external {
-        uint256 gasStart;
-        uint256 gasEnd;
-        uint256 totalGas;
-        bytes memory returnData;
-        bytes memory payload = abi.encodeWithSelector(
-            this.simulateRelayerExecution.selector,
-            0,
-            batchedCall,
-            validatorData
-        );
 
-        // measure gas used through external call
-        assembly {
-            gasStart := gas()
-            pop(
-                call(
-                    gasStart,
-                    address(), // address(this)
-                    0, // value
-                    add(payload, 0x20), // payload mem location
-                    mload(payload), // payload size
-                    0, // output location
-                    0 // output size, to copy manually
-                )
-            )
-            gasEnd := gas()
-            let retSz := returndatasize() // get how much data was returned
-            returnData := mload(0x40) // load free memory pointer
-            mstore(returnData, retSz) // store length in the first slot of returnData
-            returndatacopy(add(returnData, 0x20), 0, retSz) // copy returned data right after the length slot
-            // update free-memory pointer: round up to nearest 32 bytes
-            // roundUpTo32(retSz) ≡ (retSz + 31) & ~31
-            mstore(
-                0x40,
-                add(add(returnData, 0x20), and(add(retSz, 0x1f), not(0x1f)))
-            )
-        }
-
-        // decode gas estimation result
-        if (bytes4(returnData) != Errors.GasEstimates.selector)
-            revert Errors.SimulateExecution(0, 0, returnData);
-
-        (uint256 executionGas, bytes memory errorData) = GasEstimateUtil
-            .decodeGasEstimates(returnData);
-
-        totalGas =
-            21000 +
-            GasEstimateUtil.intrinsicGas(payload) +
-            (gasStart - gasEnd);
-
-        revert Errors.SimulateExecution(executionGas, totalGas, errorData);
-    }
-
-    /**
-     * @notice Simulates validation and execution of a sponsored transaction.
-     * - Called via low-level `call(address(this), ...)` from `simulateExecuteWithSponsor` to simulate an  on-chain transaction.
-     * - This setup enables accurate gas measurement, proper context for validation, and revert data capturing.
-     * @param batchedCall BatchedCall struct containing calls, nonce, and expiry
-     * @param validatorData Encoded data containing keyHash and signature: pubkeyHash + signatures
-     */
-    function simulateRelayerExecution(
-        BatchedCall calldata batchedCall,
-        bytes calldata validatorData
-    ) external {
         // Check transaction expiry
         if (isExpired(batchedCall.expiry)) {
             // revert Errors.ExpiryPassed(batchedCall.expiry);
@@ -229,7 +167,9 @@ contract WalletCore is
 
         // Extract keyHash and validate validator
         bytes32 keyHash = bytes32(validatorData[:32]);
-        address validator = getVerifiedValidator(keyHash);
+
+        address mockValidator = getVerifiedValidator(keyHash);
+
         if (validator == address(0)) {
             // revert Errors.InvalidKeyHash(keyHash);
         }
@@ -247,7 +187,13 @@ contract WalletCore is
         }
 
         _batchCall(batchedCall.calls, keyHash);
-        revert("");
+
+        emit ExecuteSuccessEvent(
+            keccak256(abi.encode(batchedCall.calls)),
+            msg.sender,
+            batchedCall.nonce
+        );
+        revert Errors.SimulateExecution();
     }
 
     /**
