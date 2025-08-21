@@ -20,7 +20,7 @@ contract DeployInit is Script {
 
         // Deploy the DeployFactory first
         DeployFactory deployFactory = new DeployFactory();
-        bytes32 deployFactorySalt = bytes32(uint256(0x123)); // Use a default salt
+        bytes32 deployFactorySalt = bytes32(uint256(0x120)); // Use a default salt
         console.log("Deploy factory address: %s", address(deployFactory));
         console.log("Deploy factory salt:");
         console.logBytes32(deployFactorySalt);
