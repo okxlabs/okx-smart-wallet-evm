@@ -156,7 +156,6 @@ contract WalletCore is
         address validator,
         bytes calldata validatorData
     ) external {
-
         // Check transaction expiry
         if (isExpired(batchedCall.expiry)) {
             // revert Errors.ExpiryPassed(batchedCall.expiry);

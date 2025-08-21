@@ -14,13 +14,16 @@
     "1-setCodeAndInitialize": "npx hardhat run scripts/smoke_test/1-setCodeAndInitialize.ts --network sepolia",
     "2-sendTxs": "forge script scripts/smoke_test/2-sendTxs.sol --rpc-url <RPC_URL>",
     "3-sendTxsAsRelayer": "forge script scripts/smoke_test/3-sendTxsAsRelayer.sol --rpc-url <RPC_URL>",
-    "code": "cast code <ADDRESS> --rpc-url <RPC_URL>"
+    "code": "cast code <ADDRESS> --rpc-url <RPC_URL>",
+    "test-relayer": "npx mocha tests/RelayerFlow.t.ts --require ts-node/register --timeout 120000"
   },
   "pre-commit": [
     "prettier:sol"
   ],
   "dependencies": {
     "@openzeppelin/contracts": "^5.2.0",
+    "axios": "^1.11.0",
+    "dotenv": "^17.2.1",
     "ethereumjs-util": "^7.1.5",
     "prettier": "^3.1.0",
     "prettier-plugin-solidity": "^1.2.0",
