@@ -152,7 +152,6 @@ contract SmartWallet is
         BatchedCall calldata batchedCall,
         bytes calldata validatorData
     ) external {
-
         // Check transaction expiry
         if (isExpired(batchedCall.expiry)) {
             // revert Errors.ExpiryPassed(batchedCall.expiry);
@@ -166,7 +165,7 @@ contract SmartWallet is
         // Extract keyHash and validate validator
         bytes32 keyHash = bytes32(validatorData[:32]);
         address validator = getVerifiedValidator(keyHash);
-        
+
         if (validator == address(0)) {
             // revert Errors.InvalidKeyHash(keyHash);
         }

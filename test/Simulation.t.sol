@@ -612,8 +612,6 @@ contract SimulationTest is Base {
         }
     }
 
-
-
     function _decodeCallFailed(
         bytes memory errorData
     )
@@ -640,7 +638,6 @@ contract SimulationTest is Base {
     }
 
     function test_simulate_executeFromRelayer() public {
-
         Call[] memory calls = _construct_calls_data();
 
         bytes32 hash = _getValidationTypedHash(_alice, calls);
@@ -665,10 +662,16 @@ contract SimulationTest is Base {
             assembly {
                 selector := mload(add(simulationResult, 32))
             }
-            assertEq(selector, Errors.SimulateExecution.selector, "Expected SimulateExecution error");
+            assertEq(
+                selector,
+                Errors.SimulateExecution.selector,
+                "Expected SimulateExecution error"
+            );
 
             console.log("Simulation completed successfully");
-            console.log("Note: Gas breakdown no longer available from simulation");
+            console.log(
+                "Note: Gas breakdown no longer available from simulation"
+            );
         }
         uint256 gasEnd = gasleft();
         console.log("gas used", gasStart - gasEnd);
@@ -677,7 +680,7 @@ contract SimulationTest is Base {
     function test_compareGas_simulateVsActual_executeFromRelayer() public {
         // Register validator first (required for both simulate and execute)
         _addValidator(_alice);
-        
+
         // Setup common data for both tests
         Call[] memory calls = _construct_calls_data();
         bytes32 hash = _getValidationTypedHash(_alice, calls);
@@ -687,14 +690,14 @@ contract SimulationTest is Base {
             hash
         );
         BatchedCall memory batchedCall = BatchedCall({
-            calls: calls, 
-            nonce: 0, 
+            calls: calls,
+            nonce: 0,
             expiry: 0
         });
 
         // Test 1: Measure gas for simulateExecuteWithRelayer
         uint256 simulateGasUsed;
-        
+
         vm.prank(relayer);
         uint256 gasStart = gasleft();
         try
@@ -707,21 +710,24 @@ contract SimulationTest is Base {
         } catch (bytes memory simulationResult) {
             uint256 gasUsedInSimulation = gasleft();
             simulateGasUsed = gasStart - gasUsedInSimulation;
-            
+
             // Check that it's the expected SimulateExecution error (now parameterless)
             bytes4 selector;
             assembly {
                 selector := mload(add(simulationResult, 32))
             }
-            assertEq(selector, Errors.SimulateExecution.selector, "Expected SimulateExecution error");
-            
+            assertEq(
+                selector,
+                Errors.SimulateExecution.selector,
+                "Expected SimulateExecution error"
+            );
+
             // No more gas data is returned from the simulation - just the fact that it executed
         }
 
-
         // Test 2: Measure gas for actual executeWithRelayer
         uint256 actualGasUsed;
-        
+
         vm.prank(relayer);
         gasStart = gasleft();
         ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
@@ -732,21 +738,35 @@ contract SimulationTest is Base {
         console.log("=== GAS USAGE COMPARISON ===");
         console.log("Simulate gas used (total call):", simulateGasUsed);
         console.log("Actual execution gas used:", actualGasUsed);
-        console.log("Note: Simulation no longer returns internal gas breakdown");
-        
+        console.log(
+            "Note: Simulation no longer returns internal gas breakdown"
+        );
+
         // Calculate differences
         if (actualGasUsed > simulateGasUsed) {
-            console.log("Actual uses MORE gas by:", actualGasUsed - simulateGasUsed);
-            console.log("Difference percentage:", ((actualGasUsed - simulateGasUsed) * 100) / simulateGasUsed);
+            console.log(
+                "Actual uses MORE gas by:",
+                actualGasUsed - simulateGasUsed
+            );
+            console.log(
+                "Difference percentage:",
+                ((actualGasUsed - simulateGasUsed) * 100) / simulateGasUsed
+            );
         } else {
-            console.log("Simulate uses MORE gas by:", simulateGasUsed - actualGasUsed);
-            console.log("Difference percentage:", ((simulateGasUsed - actualGasUsed) * 100) / actualGasUsed);
+            console.log(
+                "Simulate uses MORE gas by:",
+                simulateGasUsed - actualGasUsed
+            );
+            console.log(
+                "Difference percentage:",
+                ((simulateGasUsed - actualGasUsed) * 100) / actualGasUsed
+            );
         }
-        
+
         // Assert both operations completed (basic sanity check)
         assertTrue(simulateGasUsed > 0, "Simulation should consume gas");
         assertTrue(actualGasUsed > 0, "Actual execution should consume gas");
-        
+
         // The actual execution should generally use similar or slightly different gas
         // This is more of an informational test than a strict assertion
         console.log("Test completed successfully - check gas comparison above");

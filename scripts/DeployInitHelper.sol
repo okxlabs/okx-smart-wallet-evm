@@ -15,7 +15,7 @@ library DeployInitHelper {
         internal
         returns (
             ECDSAValidator ecdsaValidatorImpl,
-            SmartWallet walletCoreImpl,
+            SmartWallet smartWalletImpl,
             SmartWalletFactory factoryImpl
         )
     {
@@ -27,11 +27,11 @@ library DeployInitHelper {
         ecdsaValidatorImpl = ECDSAValidator(ecdsaValidatorAddr);
 
         // deploy SmartWallet
-        address payable walletCoreAddr = deployFactory.deploy(
+        address payable smartWalletAddr = deployFactory.deploy(
             type(SmartWallet).creationCode,
             deployFactorySalt
         );
-        walletCoreImpl = SmartWallet(walletCoreAddr);
+        smartWalletImpl = SmartWallet(smartWalletAddr);
 
         factoryImpl = SmartWalletFactory(deployFactory.deploy(
             type(SmartWalletFactory).creationCode,
