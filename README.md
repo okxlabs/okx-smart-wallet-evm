@@ -96,6 +96,19 @@ The implementation follows a modular design:
 
 ## Usage
 
+### Prepare environment
+
+```bash
+git submodule update --init --recursive
+# Start local blockchain node with 7702 support
+anvil --hardfork prague
+```
+
+```bash
+# 7702 wallet deployment and initialization
+./initialise.sh
+```
+
 ### 1. Set Code & Initialize Wallet
 
 Deploy and initialize your ERC-7702 wallet:
