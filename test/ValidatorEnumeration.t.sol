@@ -19,9 +19,9 @@ contract ValidatorEnumerationTest is Base {
 
     function test_validator_enumeration_functions() public {
         // Alice starts with 1 validator from initialization
-        assertEq(IOwnersManager(_alice).getValidatorCount(), 1);
+        assertEq(IOwnersManager(_alice).ownerCount(), 1);
         assertTrue(
-            IOwnersManager(_alice).hasValidator(
+            IOwnersManager(_alice).hasOwner(
                 keccak256(abi.encodePacked(_alice))
             )
         );
@@ -30,26 +30,26 @@ contract ValidatorEnumerationTest is Base {
         _addValidator(_alice);
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
 
-        assertEq(IOwnersManager(_alice).getValidatorCount(), 1);
-        assertTrue(IOwnersManager(_alice).hasValidator(aliceKeyHash));
-        assertEq(IOwnersManager(_alice).getValidatorAt(0), aliceKeyHash);
+        assertEq(IOwnersManager(_alice).ownerCount(), 1);
+        assertTrue(IOwnersManager(_alice).hasOwner(aliceKeyHash));
+        assertEq(IOwnersManager(_alice).ownerAt(0), aliceKeyHash);
 
         // Add second validator (charlie)
         _addValidator(_alice, _charlie);
         bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
 
-        assertEq(IOwnersManager(_alice).getValidatorCount(), 2);
-        assertTrue(IOwnersManager(_alice).hasValidator(charlieKeyHash));
+        assertEq(IOwnersManager(_alice).ownerCount(), 2);
+        assertTrue(IOwnersManager(_alice).hasOwner(charlieKeyHash));
 
         // Add third validator
         _addValidator(_alice, _dave);
         bytes32 daveKeyHash = keccak256(abi.encodePacked(_dave));
 
-        assertEq(IOwnersManager(_alice).getValidatorCount(), 3);
-        assertTrue(IOwnersManager(_alice).hasValidator(daveKeyHash));
+        assertEq(IOwnersManager(_alice).ownerCount(), 3);
+        assertTrue(IOwnersManager(_alice).hasOwner(daveKeyHash));
 
         // Get all validators
-        bytes32[] memory allKeys = IOwnersManager(_alice).getAllValidatorKeys();
+        bytes32[] memory allKeys = IOwnersManager(_alice).getOwnerKeys();
         assertEq(allKeys.length, 3);
 
         // Verify all keys are present (order may vary)
@@ -70,22 +70,22 @@ contract ValidatorEnumerationTest is Base {
         // Remove a validator and check count
         _executeRemoveValidator(_alice, charlieKeyHash);
 
-        assertEq(IOwnersManager(_alice).getValidatorCount(), 2);
-        assertFalse(IOwnersManager(_alice).hasValidator(charlieKeyHash));
-        assertTrue(IOwnersManager(_alice).hasValidator(aliceKeyHash));
-        assertTrue(IOwnersManager(_alice).hasValidator(daveKeyHash));
+        assertEq(IOwnersManager(_alice).ownerCount(), 2);
+        assertFalse(IOwnersManager(_alice).hasOwner(charlieKeyHash));
+        assertTrue(IOwnersManager(_alice).hasOwner(aliceKeyHash));
+        assertTrue(IOwnersManager(_alice).hasOwner(daveKeyHash));
     }
 
-    function test_getValidatorAt_reverts_on_out_of_bounds() public {
+    function test_ownerAt_reverts_on_out_of_bounds() public {
         // Add one validator
         _addValidator(_alice);
 
         // This should work
-        IOwnersManager(_alice).getValidatorAt(0);
+        IOwnersManager(_alice).ownerAt(0);
 
         // This should revert (out of bounds)
         vm.expectRevert();
-        IOwnersManager(_alice).getValidatorAt(1);
+        IOwnersManager(_alice).ownerAt(1);
     }
 
     function test_enumeration_with_validator_settings() public {
@@ -114,9 +114,9 @@ contract ValidatorEnumerationTest is Base {
         );
 
         // Check enumeration (alice + 2 new validators = 3 total)
-        assertEq(IOwnersManager(_alice).getValidatorCount(), 3);
-        assertTrue(IOwnersManager(_alice).hasValidator(keyHash1));
-        assertTrue(IOwnersManager(_alice).hasValidator(keyHash2));
+        assertEq(IOwnersManager(_alice).ownerCount(), 3);
+        assertTrue(IOwnersManager(_alice).hasOwner(keyHash1));
+        assertTrue(IOwnersManager(_alice).hasOwner(keyHash2));
 
         // Verify settings are preserved
         assertTrue(isSignerAdmin(_alice, keyHash1));

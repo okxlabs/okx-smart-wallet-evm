@@ -181,7 +181,7 @@ contract Base is Test {
         bytes32 keyHash = keccak256(abi.encodePacked(signer));
 
         // Check if validator already exists (alice is initialized with a validator)
-        if (IOwnersManager(signer).hasValidator(keyHash)) {
+        if (IOwnersManager(signer).hasOwner(keyHash)) {
             return address(_ecdsaValidator);
         }
 
@@ -205,7 +205,7 @@ contract Base is Test {
         bytes32 keyHash = keccak256(abi.encodePacked(signer));
 
         // Check if validator already exists
-        if (IOwnersManager(account).hasValidator(keyHash)) {
+        if (IOwnersManager(account).hasOwner(keyHash)) {
             return address(_ecdsaValidator);
         }
 
@@ -327,6 +327,18 @@ contract Base is Test {
         uint40 expiration,
         address hook
     ) internal {
+        // Get packed settings before any potential revert expectations are set
+        uint256 settings = OwnersManager(wallet).packSettings(adminFlag, expiration, hook);
+        _executeAddValidatorWithSettings(wallet, keyHash, validatorAddr, settings);
+    }
+
+    // Helper function to call addValidator with pre-packed settings
+    function _executeAddValidatorWithSettings(
+        address wallet,
+        bytes32 keyHash,
+        address validatorAddr,
+        uint256 settings
+    ) internal {
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
             target: wallet,
@@ -335,9 +347,7 @@ contract Base is Test {
                 OwnersManager.addValidator.selector,
                 keyHash,
                 validatorAddr,
-                adminFlag,
-                expiration,
-                hook
+                settings
             )
         });
 

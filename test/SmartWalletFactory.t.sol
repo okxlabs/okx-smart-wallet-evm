@@ -23,7 +23,7 @@ contract FactoryTest is Base {
         );
 
         assertEq(
-            IOwnersManager(address(wallet)).hasValidator(
+            IOwnersManager(address(wallet)).hasOwner(
                 keccak256(abi.encodePacked(_alice))
             ),
             true

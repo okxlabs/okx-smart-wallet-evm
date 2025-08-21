@@ -34,40 +34,55 @@ abstract contract OwnersManager is IOwnersManager {
 
     /**
      * @notice Registers a validator with optional settings
-     * @dev Only callable by the wallet itself. Use default parameters for simple registration.
+     * @dev Only callable by the wallet itself. Use packSettings() to create the settings parameter.
      * @param keyHash The public key hash to associate with this validator
      * @param validator The address of the validator contract to be registered
-     * @param adminFlag Whether this validator has admin privileges
-     * @param expiration Unix timestamp when validator expires (0 = never expires)
-     * @param hook The hook address for additional validation (address(0) = no hook)
+     * @param settings Packed settings value (use packSettings to create)
      */
     function addValidator(
         bytes32 keyHash,
         address validator,
-        bool adminFlag,
-        uint40 expiration,
-        address hook
-    ) external virtual onlySelf {
+        uint256 settings
+    ) external onlySelf {
         // Check if keyHash is already registered
-        address existingValidator = ownerValidators[keyHash];
-        if (existingValidator != address(0)) {
+        if (_ownerKeys.contains(keyHash)) {
             revert Errors.ValidatorAlreadyExists();
         }
 
-        // Allow built-in validator addresses (1 and 2), but check other addresses have contract code
-        if (
-            validator != Static.ECDSA_VALIDATOR_ADDRESS &&
-            validator != Static.PASSKEY_VALIDATOR_ADDRESS &&
-            validator.code.length == 0
-        ) {
-            revert Errors.InvalidValidatorImpl(validator);
-        }
+        // Validate validator address
+        _validateValidatorAddress(validator);
 
-        // Pack and store settings
-        uint256 settings = packSettings(adminFlag, expiration, hook);
+        // Store validator with settings
         _setValidatorWithSettings(keyHash, validator, settings);
 
         emit ValidatorAdded(validator);
+    }
+
+    /**
+     * @notice Updates an existing validator's address and/or settings
+     * @dev Only callable by the wallet itself. Use packSettings() to create the settings parameter.
+     * @param keyHash The public key hash to update
+     * @param newValidator The new validator address
+     * @param newSettings New packed settings value (use packSettings to create)
+     */
+    function updateValidator(
+        bytes32 keyHash,
+        address newValidator,
+        uint256 newSettings
+    ) external onlySelf {
+        // Check if keyHash exists
+        if (!_ownerKeys.contains(keyHash)) {
+            revert Errors.ValidatorNotFound();
+        }
+
+        // Validate new validator address
+        _validateValidatorAddress(newValidator);
+
+        // Update validator and settings
+        ownerValidators[keyHash] = newValidator;
+        ownerSettings[keyHash] = newSettings;
+
+        emit ValidatorUpdated(keyHash, newValidator);
     }
 
     /**
@@ -75,7 +90,7 @@ abstract contract OwnersManager is IOwnersManager {
      * @dev Only callable by the wallet owner
      * @param keyHash The public key hash to remove
      */
-    function removeValidator(bytes32 keyHash) external virtual onlySelf {
+    function removeValidator(bytes32 keyHash) external onlySelf {
         _removeValidator(keyHash);
         emit ValidatorRemoved(keyHash);
     }
@@ -84,35 +99,33 @@ abstract contract OwnersManager is IOwnersManager {
     // Note: Function names retain "Validator" for interface compatibility,
     // but they actually enumerate wallet owners and their keyHashes
 
-    function getValidatorCount()
+    function ownerCount()
         external
         view
-        virtual
         override
         returns (uint256)
     {
         return _ownerKeys.length();
     }
 
-    function getValidatorAt(
+    function ownerAt(
         uint256 index
-    ) external view virtual override returns (bytes32) {
+    ) external view override returns (bytes32) {
         return _ownerKeys.at(index);
     }
 
-    function getAllValidatorKeys()
+    function getOwnerKeys()
         external
         view
-        virtual
         override
         returns (bytes32[] memory)
     {
         return _ownerKeys.values();
     }
 
-    function hasValidator(
+    function hasOwner(
         bytes32 keyHash
-    ) external view virtual override returns (bool) {
+    ) external view override returns (bool) {
         return _ownerKeys.contains(keyHash);
     }
 
@@ -125,12 +138,11 @@ abstract contract OwnersManager is IOwnersManager {
      * @return adminStatus Whether this validator has admin privileges
      * @return expired Whether the validator is currently expired
      */
-    function getValidatorSettings(
+    function getOwnerSettings(
         bytes32 keyHash
     )
         external
         view
-        virtual
         override
         returns (
             address validator,
@@ -269,4 +281,20 @@ abstract contract OwnersManager is IOwnersManager {
         delete ownerSettings[keyHash];
         _ownerKeys.remove(keyHash); // Remove from the set
     }
+
+    /**
+     * @notice Internal function to validate validator address
+     * @param validator The validator address to validate
+     */
+    function _validateValidatorAddress(address validator) internal view {
+        // Allow built-in validator addresses (1 and 2), but check other addresses have contract code
+        if (
+            validator != Static.ECDSA_VALIDATOR_ADDRESS &&
+            validator != Static.PASSKEY_VALIDATOR_ADDRESS &&
+            validator.code.length == 0
+        ) {
+            revert Errors.InvalidValidatorImpl(validator);
+        }
+    }
+
 }

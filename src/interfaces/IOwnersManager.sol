@@ -5,6 +5,7 @@ interface IOwnersManager {
     // EVENTS
     event ValidatorAdded(address validator);
     event ValidatorRemoved(bytes32 keyHash);
+    event ValidatorUpdated(bytes32 keyHash, address newValidator);
 
     // Public mappings (auto-generated getters)
     function ownerValidators(bytes32 keyHash) external view returns (address);
@@ -15,13 +16,13 @@ interface IOwnersManager {
     ) external view returns (address);
 
     // Validator enumeration functions
-    function getValidatorCount() external view returns (uint256);
-    function getValidatorAt(uint256 index) external view returns (bytes32);
-    function getAllValidatorKeys() external view returns (bytes32[] memory);
-    function hasValidator(bytes32 keyHash) external view returns (bool);
+    function ownerCount() external view returns (uint256);
+    function ownerAt(uint256 index) external view returns (bytes32);
+    function getOwnerKeys() external view returns (bytes32[] memory);
+    function hasOwner(bytes32 keyHash) external view returns (bool);
 
     // Validator settings query functions
-    function getValidatorSettings(
+    function getOwnerSettings(
         bytes32 keyHash
     )
         external
