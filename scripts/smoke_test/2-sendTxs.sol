@@ -2,7 +2,7 @@
 pragma solidity ^0.8.12;
 
 import "lib/forge-std/src/Script.sol";
-import "src/interfaces/IWalletCore.sol";
+import "src/interfaces/ISmartWallet.sol";
 import "src/Types.sol";
 
 /// @title CreateDeployFactory
@@ -21,7 +21,7 @@ contract SendTxs is Script {
         calls[0] = Call({target: receiver, value: 0.00001 ether, data: ""});
         // calls[1] = Call({target: receiver, value: 0.00002 ether, data: ""});
 
-        IWalletCore(sender).execute(calls);
+        ISmartWallet(sender).execute(calls);
 
         console.log("Completed ExecuteFromSelf script");
         vm.stopBroadcast();

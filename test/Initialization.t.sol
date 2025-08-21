@@ -17,14 +17,14 @@ contract InitializationTest is Base {
         // First initialization should succeed
         vm.prank(_bob);
         InitialOwner[] memory emptyOwners = new InitialOwner[](0);
-        IWalletCore(_bob).initialize(emptyOwners);
+        ISmartWallet(_bob).initialize(emptyOwners);
 
         // Second initialization should fail with OpenZeppelin's error
         vm.prank(_bob);
         vm.expectRevert(
             abi.encodeWithSelector(Initializable.InvalidInitialization.selector)
         );
-        IWalletCore(_bob).initialize(emptyOwners);
+        ISmartWallet(_bob).initialize(emptyOwners);
     }
 
     function test_initialize_properly_sets_storage() public {
@@ -37,7 +37,7 @@ contract InitializationTest is Base {
 
         // Bob initializes the account with empty owners
         InitialOwner[] memory emptyOwners = new InitialOwner[](0);
-        IWalletCore(_bob).initialize(emptyOwners);
+        ISmartWallet(_bob).initialize(emptyOwners);
 
         // Get accessed storage slots
         (, bytes32[] memory writes) = vm.accesses(_bob);
@@ -64,7 +64,7 @@ contract InitializationTest is Base {
             validator: address(_ecdsaValidator)
         });
 
-        IWalletCore(_bob).initialize(initialOwners);
+        ISmartWallet(_bob).initialize(initialOwners);
 
         // Verify owners were set correctly
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
@@ -96,7 +96,7 @@ contract InitializationTest is Base {
                 address(0)
             )
         );
-        IWalletCore(_bob).initialize(initialOwners);
+        ISmartWallet(_bob).initialize(initialOwners);
     }
 
     function test_storage_returns_correct_owner() public {
@@ -109,7 +109,7 @@ contract InitializationTest is Base {
 
         // Bob initializes the account with empty owners
         InitialOwner[] memory emptyOwners = new InitialOwner[](0);
-        IWalletCore(_bob).initialize(emptyOwners);
+        ISmartWallet(_bob).initialize(emptyOwners);
 
         // check that wallet is its own owner (implicit - no function needed)
         // The wallet _bob is its own owner by design

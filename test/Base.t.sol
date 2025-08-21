@@ -6,11 +6,11 @@ import "forge-std/console.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
 import {OwnersManager} from "src/OwnersManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
-import {IWalletCore} from "src/interfaces/IWalletCore.sol";
+import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {IValidation} from "src/interfaces/IValidation.sol";
 import {IValidator} from "src/interfaces/IValidator.sol";
 import {ValidationLogic} from "src/ValidationLogic.sol";
-import {WalletCore} from "src/WalletCore.sol";
+import {SmartWallet} from "src/SmartWallet.sol";
 import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 import {Errors} from "src/libraries/Errors.sol";
@@ -30,7 +30,7 @@ contract Base is Test {
     address internal _bob;
     uint256 internal _bobPk;
     ECDSAValidator internal _ecdsaValidator; // Shared validator instance
-    WalletCore internal _walletCore;
+    SmartWallet internal _walletCore;
     SmartWalletFactory internal _factory;
     DeployFactory public deployFactory;
     address internal relayer;
@@ -66,7 +66,7 @@ contract Base is Test {
             keyHash: keccak256(abi.encodePacked(_alice)),
             validator: address(_ecdsaValidator)
         });
-        IWalletCore(_alice).initialize(initialOwners);
+        ISmartWallet(_alice).initialize(initialOwners);
         vm.stopPrank();
     }
 
@@ -353,7 +353,7 @@ contract Base is Test {
             target: wallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addValidator.selector,
+                OwnersManager.addOwner.selector,
                 keyHash,
                 validatorAddr,
                 settings
@@ -361,7 +361,7 @@ contract Base is Test {
         });
 
         vm.prank(wallet);
-        IWalletCore(wallet).execute(calls);
+        ISmartWallet(wallet).execute(calls);
     }
 
     // Helper function to call removeValidator through execute
@@ -371,12 +371,12 @@ contract Base is Test {
             target: wallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.removeValidator.selector,
+                OwnersManager.removeOwner.selector,
                 keyHash
             )
         });
 
         vm.prank(wallet);
-        IWalletCore(wallet).execute(calls);
+        ISmartWallet(wallet).execute(calls);
     }
 }

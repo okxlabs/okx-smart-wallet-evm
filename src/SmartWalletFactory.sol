@@ -5,7 +5,7 @@ import {Ownable} from "solady/auth/Ownable.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 import {LibClone} from "solady/utils/LibClone.sol";
 import {Initializable} from "solady/utils/Initializable.sol";
-import {IWalletCore} from "./interfaces/IWalletCore.sol";
+import {ISmartWallet} from "./interfaces/ISmartWallet.sol";
 import {ISmartWalletFactory, InitialOwner} from "./interfaces/ISmartWalletFactory.sol";
 
 contract SmartWalletFactory is
@@ -39,7 +39,7 @@ contract SmartWalletFactory is
             );
 
         if (!alreadyDeployed) {
-            IWalletCore(instance).initialize(initialOwners);
+            ISmartWallet(instance).initialize(initialOwners);
         }
 
         emit AccountCreated(instance, implementation, initialOwners, salt);

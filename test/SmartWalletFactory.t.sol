@@ -18,7 +18,7 @@ contract FactoryTest is Base {
             keyHash: keccak256(abi.encodePacked(_alice)),
             validator: address(1)
         });
-        IWalletCore wallet = IWalletCore(
+        ISmartWallet wallet = ISmartWallet(
             _factory.createAccount(address(_walletCore), initialOwners, 0)
         );
 

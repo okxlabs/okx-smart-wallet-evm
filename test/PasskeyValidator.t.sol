@@ -5,7 +5,7 @@ import {Test, console} from "forge-std/Test.sol";
 import {Base} from "./Base.t.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 import {Errors} from "src/libraries/Errors.sol";
-import {IWalletCore} from "src/interfaces/IWalletCore.sol";
+import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
 import {OwnersManager} from "src/OwnersManager.sol";
 import {ValidationLogic} from "src/ValidationLogic.sol";

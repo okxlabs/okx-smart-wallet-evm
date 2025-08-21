@@ -2,7 +2,7 @@
 pragma solidity ^0.8.12;
 
 import "lib/forge-std/src/Script.sol";
-import "src/WalletCore.sol";
+import "src/SmartWallet.sol";
 import "src/interfaces/IOwnersManager.sol";
 import "src/ValidationLogic.sol";
 import "src/Types.sol";
@@ -35,7 +35,7 @@ contract SendTxsAsRelayer is Script {
         bytes memory signature = abi.encodePacked(r, s, v);
 
         address validator = address(1);
-        IWalletCore(sender).executeWithValidator(calls, validator, signature);
+        ISmartWallet(sender).executeWithValidator(calls, validator, signature);
 
         console.log("Completed ExecuteWithValidator script");
         vm.stopBroadcast();

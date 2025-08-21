@@ -3,7 +3,7 @@ pragma solidity ^0.8.29;
 
 import {ERC712} from "./ERC712.sol";
 import {ERC7201} from "./ERC7201.sol";
-import {IWalletCore} from "./interfaces/IWalletCore.sol";
+import {ISmartWallet} from "./interfaces/ISmartWallet.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
 import {OwnersManager} from "./OwnersManager.sol";
@@ -21,8 +21,8 @@ import {ERC4337Account, PackedUserOperation} from "./ERC4337Account.sol";
 import {BatchedCallLib} from "./libraries/BatchedCallLib.sol";
 
 // Do not set any states in this contract
-contract WalletCore is
-    IWalletCore,
+contract SmartWallet is
+    ISmartWallet,
     ERC7201,
     ERC4337Account,
     OwnersManager,
@@ -47,7 +47,7 @@ contract WalletCore is
     }
 
     modifier onlyOwnerOrEntryPoint() {
-        bytes32 keyHash = keccak256(abi.encode(msg.sender));
+        bytes32 keyHash = keccak256(abi.encodePacked(msg.sender));
         if (
             _ownerKeys.contains(keyHash) ||
             msg.sender == entryPoint() ||
@@ -147,7 +147,7 @@ contract WalletCore is
      * 2) "Successful simulation" means both validation and the sponsorship call passed.
      *    Any failure in the user’s batch calls is then captured in `errorData` and surfaced inside the `SimulateExecution` revert.
      * @param batchedCall BatchedCall struct containing calls, nonce, and expiry
-     * @param validatorData Encoded data containing keyHash and signature: abi.encode(keyHash, signature)
+     * @param validatorData Encoded data containing keyHash and signature: abi.encodePacked(keyHash, signature)
      */
     function simulateExecuteWithRelayer(
         BatchedCall calldata batchedCall,
@@ -258,7 +258,9 @@ contract WalletCore is
     function _batchCall(Call[] calldata calls, bytes32 keyHash) internal {
         uint256 settings = ownerSettings[keyHash];
         address hookAddress = getHook(settings);
+
         bool isAdmin = isAdmin(settings);
+
         bytes memory ret;
 
         if (hookAddress != address(0)) {

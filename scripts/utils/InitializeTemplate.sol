@@ -2,7 +2,7 @@
 pragma solidity ^0.8.12;
 
 import "lib/forge-std/src/Script.sol";
-import "src/WalletCore.sol";
+import "src/SmartWallet.sol";
 import "src/interfaces/IOwnersManager.sol";
 import "src/ValidationLogic.sol";
 import "src/Types.sol";

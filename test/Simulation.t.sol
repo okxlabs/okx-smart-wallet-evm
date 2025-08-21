@@ -678,7 +678,7 @@ contract SimulationTest is Base {
 
     //     vm.prank(relayer);
     //     uint256 gasStart = gasleft();
-    //     IWalletCore(_alice).executeWithRelayer(
+    //     ISmartWallet(_alice).executeWithRelayer(
     //         executionGas,
     //         validator,
     //         relayerCalls,
@@ -714,7 +714,7 @@ contract SimulationTest is Base {
     //     vm.expectEmit(true, true, true, true, _alice);
     //     emit CallFailed(callSize - 1, 0, ""); // expect user batch OOG and the failure catched by `CallFailed`
 
-    //     IWalletCore(_alice).executeWithRelayer(
+    //     ISmartWallet(_alice).executeWithRelayer(
     //         executionGas,
     //         validator,
     //         relayerCalls,
@@ -754,7 +754,7 @@ contract SimulationTest is Base {
     //         hex"08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000023aa41747461636b3041747461636b3141747461636b3241747461636b3341747461636b3441747461636b3541747461636b3641747461636b3741747461636b3841747461636b3941747461636b313041747461636b313141747461636b313241747461636b313341747461636b313441747461636b313541747461636b313641747461636b313741747461636b313841747461636b313941747461636b323041747461636b323141747461636b323241747461636b323341747461636b"
     //     );
 
-    //     IWalletCore(_alice).executeWithRelayer(
+    //     ISmartWallet(_alice).executeWithRelayer(
     //         executionGas,
     //         validator,
     //         relayerCalls,
@@ -776,7 +776,7 @@ contract SimulationTest is Base {
         vm.prank(relayer);
         uint256 gasStart = gasleft();
         try
-            IWalletCore(_alice).simulateExecuteWithRelayer(
+            ISmartWallet(_alice).simulateExecuteWithRelayer(
                 BatchedCall({calls: calls, nonce: 0, expiry: 0}),
                 validatorData
             )
@@ -812,7 +812,7 @@ contract SimulationTest is Base {
 
     //     vm.prank(relayer);
     //     try
-    //         IWalletCore(_alice).simulateExecuteWithRelayer(
+    //         ISmartWallet(_alice).simulateExecuteWithRelayer(
     //             validator,
     //             calls,
     //             calls,

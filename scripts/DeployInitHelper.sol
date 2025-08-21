@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.23;
 
-import "src/WalletCore.sol";
+import "src/SmartWallet.sol";
 import "src/validator/ECDSAValidator.sol";
 import "src/test/DeployFactory.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
@@ -15,7 +15,7 @@ library DeployInitHelper {
         internal
         returns (
             ECDSAValidator ecdsaValidatorImpl,
-            WalletCore walletCoreImpl,
+            SmartWallet walletCoreImpl,
             SmartWalletFactory factoryImpl
         )
     {
@@ -26,12 +26,12 @@ library DeployInitHelper {
         );
         ecdsaValidatorImpl = ECDSAValidator(ecdsaValidatorAddr);
 
-        // deploy WalletCore
+        // deploy SmartWallet
         address payable walletCoreAddr = deployFactory.deploy(
-            type(WalletCore).creationCode,
+            type(SmartWallet).creationCode,
             deployFactorySalt
         );
-        walletCoreImpl = WalletCore(walletCoreAddr);
+        walletCoreImpl = SmartWallet(walletCoreAddr);
 
         factoryImpl = SmartWalletFactory(deployFactory.deploy(
             type(SmartWalletFactory).creationCode,

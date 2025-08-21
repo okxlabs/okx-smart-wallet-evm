@@ -6,7 +6,7 @@ import {DeployInitHelper} from "./DeployInitHelper.sol";
 import {DeployFactory} from "src/test/DeployFactory.sol";
 import {OwnersManager} from "src/OwnersManager.sol";
 import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
-import {WalletCore} from "src/WalletCore.sol";
+import {SmartWallet} from "src/SmartWallet.sol";
 
 /// @title DeployInit
 /// @notice A script for deploying, initializing, and setting the access controls

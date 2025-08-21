@@ -30,7 +30,7 @@ contract ValidationTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidSignature.selector)
         );
-        IWalletCore(_alice).executeWithRelayer(
+        ISmartWallet(_alice).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),
             validatorData
         );
@@ -52,7 +52,7 @@ contract ValidationTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidSignature.selector)
         );
-        IWalletCore(_alice).executeWithRelayer(
+        ISmartWallet(_alice).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),
             validatorData
         );
@@ -76,7 +76,7 @@ contract ValidationTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidKeyHash.selector, bobKeyHash)
         );
-        IWalletCore(_alice).executeWithRelayer(
+        ISmartWallet(_alice).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),
             validatorData
         );
@@ -86,23 +86,27 @@ contract ValidationTest is Base {
 
     function test_executeFromRelayer_reverts_for_removed_validator() public {
         Call[] memory calls = _construct_calls_data();
-        _addValidator(_alice);
 
-        bytes32 keyHash = keccak256(abi.encodePacked(_alice));
-        _executeRemoveValidator(_alice, keyHash);
+        // Use _bob instead of _alice to avoid EIP-7702 fallback collision
+        // (In test environment, address(this) == _alice due to setCode)
+        _addValidator(_alice, _bob);
+
+        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        _executeRemoveValidator(_alice, bobKeyHash);
 
         bytes32 hash = _getValidationTypedHash(_alice, calls);
         bytes memory validatorData = _construct_validatorData(
             _alice,
-            _alicePk,
+            _bob, // Using _bob's address
+            _bobPk, // Using _bob's private key
             hash
         );
 
         vm.prank(_alice);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidKeyHash.selector, keyHash)
+            abi.encodeWithSelector(Errors.InvalidKeyHash.selector, bobKeyHash)
         );
-        IWalletCore(_alice).executeWithRelayer(
+        ISmartWallet(_alice).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),
             validatorData
         );
@@ -131,7 +135,7 @@ contract ValidationTest is Base {
         vm.prank(_alice);
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _alice, 0);
-        IWalletCore(_alice).executeWithRelayer(
+        ISmartWallet(_alice).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),
             validatorData
         );
@@ -146,24 +150,25 @@ contract ValidationTest is Base {
         bytes memory signature = abi.encodePacked(_signDigest(hash, _bobPk));
 
         // Call isValidSignature
-        bytes4 result = IWalletCore(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
         assertEq(result, bytes4(0xffffffff));
     }
 
     function test_isValidSignature_fails_for_removed_validator() public {
-        // Add validator
-        _addValidator(_alice);
+        // Add validator using _bob to avoid EIP-7702 fallback collision
+        // (In test environment, address(this) == _alice due to setCode)
+        _addValidator(_alice, _bob);
 
         // Remove validator
-        bytes32 keyHash = keccak256(abi.encodePacked(_alice));
-        _executeRemoveValidator(_alice, keyHash);
+        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        _executeRemoveValidator(_alice, bobKeyHash);
 
         bytes32 hash = keccak256("test");
-        bytes memory sig = _signDigest(hash, _alicePk);
-        bytes memory signature = abi.encodePacked(keyHash, sig);
+        bytes memory sig = _signDigest(hash, _bobPk); // Use _bob's private key
+        bytes memory signature = abi.encodePacked(bobKeyHash, sig);
 
         // Call isValidSignature
-        bytes4 result = IWalletCore(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
         assertEq(result, bytes4(0xffffffff));
     }
 
@@ -174,7 +179,7 @@ contract ValidationTest is Base {
         bytes memory signature = bytes("");
 
         // Call isValidSignature
-        bytes4 result = IWalletCore(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
         assertEq(result, bytes4(0xffffffff));
     }
 
@@ -188,7 +193,7 @@ contract ValidationTest is Base {
         bytes memory signature = bytes(new bytes(100));
 
         // Call isValidSignature
-        bytes4 result = IWalletCore(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
         assertEq(result, bytes4(0xffffffff));
     }
 
@@ -200,7 +205,7 @@ contract ValidationTest is Base {
         bytes memory signature = abi.encodePacked(_signDigest(hash, _alicePk));
 
         // Call isValidSignature
-        bytes4 result = IWalletCore(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
         assertEq(result, bytes4(0x1626ba7e));
     }
 
@@ -216,7 +221,7 @@ contract ValidationTest is Base {
         bytes memory signature = abi.encodePacked(keyHash, sig);
 
         // Call isValidSignature
-        bytes4 result = IWalletCore(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
         assertEq(result, bytes4(0x1626ba7e));
     }
 
@@ -236,7 +241,7 @@ contract ValidationTest is Base {
         bytes memory validatorData = abi.encodePacked(r, s, v);
 
         // Call isValidSignature
-        bytes4 result = IWalletCore(_alice).isValidSignature(
+        bytes4 result = ISmartWallet(_alice).isValidSignature(
             hash,
             validatorData
         );
