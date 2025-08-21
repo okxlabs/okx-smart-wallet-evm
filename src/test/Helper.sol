@@ -5,10 +5,12 @@ import {EntryPoint} from "account-abstraction/core/EntryPoint.sol";
 import {Base64} from "@openzeppelin/contracts/utils/Base64.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/IAccount.sol";
 import {UserOperationLib} from "account-abstraction/core/UserOperationLib.sol";
+import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
+import {Utils, WebAuthnInfo} from "webauthn-sol/../test/Utils.sol";
 
 contract Helper {
     uint256 constant CHALLENGE_LOCATION = 23;
-    uint256 constant YTPE_INDEX = 1;
+    uint256 constant TYPE_INDEX = 1;
 
     using UserOperationLib for PackedUserOperation;
 
@@ -71,6 +73,27 @@ contract Helper {
         messageHash = sha256(message);
     }
 
+    function getWebAuthnInfo(
+        bytes32 userOpHash
+    ) external pure returns (WebAuthnInfo memory) {
+        return Utils.getWebAuthnStruct(userOpHash);
+    }
+
+    function getWebAuthnAuth(
+        bytes32 userOpHash,
+        uint256 r,
+        uint256 s
+    ) external pure returns (WebAuthn.WebAuthnAuth memory webAuthnAuth) {
+        WebAuthnInfo memory webAuthn = Utils.getWebAuthnStruct(userOpHash);
+        webAuthnAuth = WebAuthn.WebAuthnAuth({
+            authenticatorData: webAuthn.authenticatorData,
+            clientDataJSON: webAuthn.clientDataJSON,
+            typeIndex: TYPE_INDEX,
+            challengeIndex: CHALLENGE_LOCATION,
+            r: r,
+            s: s
+        });
+    }
     // /// decode the WebAuthn signature
     // (
     //     bytes memory authenticatorData,
@@ -92,7 +115,7 @@ contract Helper {
             memory authenticatorData = hex"49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631900000000";
         ///string
         ///    memory clientDataJSON = '{"type":"webauthn.get","challenge":"gw6YFSEOxfTvfP937iQt2nslHwbUYHOoKLKBhq2RLFM","origin":"http://localhost:8000","crossOrigin":false}';
-        return abi.encode(authenticatorData, clientDataJSON, 1, r, s);
+        return abi.encode(authenticatorData, clientDataJSON, TYPE_INDEX, r, s);
     }
 
     // function passkeyVerify(
