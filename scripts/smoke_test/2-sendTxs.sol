@@ -16,7 +16,7 @@ contract SendTxs is Script {
         console.log("Sender: ", sender);
         console.log("Receiver: ", receiver);
 
-        // Construct the call data for the WalletCore.execute() function
+        // Construct the call data for the SmartWallet.execute() function
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: receiver, value: 0.00001 ether, data: ""});
         // calls[1] = Call({target: receiver, value: 0.00002 ether, data: ""});

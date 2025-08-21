@@ -2,9 +2,10 @@
 pragma solidity ^0.8.12;
 
 import "lib/forge-std/src/Script.sol";
+import "src/interfaces/ISmartWallet.sol";
 import "src/SmartWallet.sol";
-import "src/interfaces/IOwnersManager.sol";
-import "src/ValidationLogic.sol";
+import "src/interfaces/INonceManager.sol";
+import "src/libraries/BatchedCallLib.sol";
 import "src/Types.sol";
 
 /// @title CreateDeployFactory
@@ -19,23 +20,37 @@ contract SendTxsAsRelayer is Script {
         console.log("Sender: ", sender);
         console.log("Receiver: ", receiver);
 
-        // Construct the call data for the WalletCore.execute() function
+        // Construct the call data for the SmartWallet.execute() function
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: receiver, value: 0.00001 ether, data: ""});
         // calls[1] = Call({target: receiver, value: 0.00002 ether, data: ""});
 
-        uint256 nonce = IOwnersManager(WalletCore(sender).getMainStorage())
-            .getNonce();
-        bytes32 hash = ValidationLogic(sender).getValidationTypedHash(
-            nonce,
-            calls
-        );
+        // Create BatchedCall for executeWithRelayer
+        uint256 nonce = 0; // First transaction should use nonce 0
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: nonce,
+            expiry: uint48(block.timestamp + 1 hours)
+        });
 
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(senderPk, hash);
-        bytes memory signature = abi.encodePacked(r, s, v);
+        // Get typed hash for signing using BatchedCallLib
+        bytes32 hash = BatchedCallLib.hash(batchedCall);
+        console.log("BatchedCall hash:", vm.toString(hash));
+        
+        // Ensure the sender has SmartWallet code
+        bytes memory code = sender.code;
+        console.log("Sender code length:", code.length);
+        require(code.length > 0, "Sender does not have contract code");
+        
+        bytes32 typedHash = SmartWallet(payable(sender)).hashTypedData(hash);
 
-        address validator = address(1);
-        ISmartWallet(sender).executeWithValidator(calls, validator, signature);
+        // Sign the hash
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(senderPk, typedHash);
+        bytes32 keyHash = keccak256(abi.encodePacked(sender));
+        bytes memory validatorData = abi.encodePacked(keyHash, r, s, v);
+
+        // Execute with relayer
+        ISmartWallet(sender).executeWithRelayer(batchedCall, validatorData);
 
         console.log("Completed ExecuteWithValidator script");
         vm.stopBroadcast();

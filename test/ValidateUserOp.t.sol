@@ -31,7 +31,7 @@ contract ValidateUserOpTest is Base {
             validator: address(1)
         });
         address account = _factory.createAccount(
-            address(_walletCore),
+            address(_smartWallet),
             initialOwners,
             0
         );

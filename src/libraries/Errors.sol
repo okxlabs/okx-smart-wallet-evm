@@ -22,7 +22,7 @@ library Errors {
     // ECDSAValidator related
     error InvalidSignature();
 
-    // WalletCore related
+    // SmartWallet related
     error NameTooLong();
     error VersionTooLong();
 

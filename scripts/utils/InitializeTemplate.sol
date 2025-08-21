@@ -14,8 +14,9 @@ contract InitializeTemplate is Script {
         uint256 senderPk = vm.envUint("DEPLOYER_PRIVATE_KEY");
         vm.startBroadcast(senderPk);
 
-        address walletCore = vm.envAddress("WALLET_CORE");
-        WalletCore(payable(walletCore)).initialize();
+        address smartWallet = vm.envAddress("SMART_WALLET");
+        InitialOwner[] memory emptyInitialOwners;
+        SmartWallet(payable(smartWallet)).initialize(emptyInitialOwners);
 
         console.log("Completed InitializeTemplate script");
         vm.stopBroadcast();

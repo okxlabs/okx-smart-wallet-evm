@@ -6,8 +6,8 @@ RELAYER_ADDRESS="0x55f3a93f544e01ce4378d25e927d7c493b863bd6" # Address of the re
 # Deploy the factory
 forge script scripts/CreateDeployFactory.sol --broadcast --rpc-url localhost:8545
 
-# Extract WalletCore address from deployment output
-WALLET_CORE_ADDRESS=$(forge script scripts/DeployInit.sol --broadcast --rpc-url localhost:8545 | grep "WalletCore address:" | awk '{print $3}')
+# Extract SmartWallet address from deployment output
+SMART_WALLET_ADDRESS=$(forge script scripts/DeployInit.sol --broadcast --rpc-url localhost:8545 | grep "SmartWallet address:" | awk '{print $3}')
 
 # Extract ERC20 token address from deployment output
 ERC20_ADDRESS=$(forge script scripts/DeployTestToken.sol:DeployTestToken --sig "run(address)" $EOA_ADDRESS --broadcast --rpc-url localhost:8545 | grep "TestToken deployed at:" | awk '{print $4}')
@@ -24,17 +24,17 @@ echo "CallData to sending 10 tokens to the relayer"
 cast calldata "transfer(address,uint256)" $RELAYER_ADDRESS 10
 
 echo "Upgrading EOA into 7702"
-cast send $(cast az) --auth $WALLET_CORE_ADDRESS --private-key $EOA_PRIVATE_KEY --rpc-url http://localhost:8545
+cast send $(cast az) --auth $SMART_WALLET_ADDRESS --private-key $EOA_PRIVATE_KEY --rpc-url http://localhost:8545
 cast send $EOA_ADDRESS "initialize()" --private-key $EOA_PRIVATE_KEY --rpc-url http://localhost:8545
 
-cast send $WALLET_CORE_ADDRESS --private-key $DEPLOYER_PRIVATE_KEY --rpc-url http://localhost:8545 --value 10000 
-cast send $WALLET_CORE_ADDRESS --private-key $DEPLOYER_PRIVATE_KEY --rpc-url http://localhost:8545 --value 10000 
-cast send $WALLET_CORE_ADDRESS --private-key $DEPLOYER_PRIVATE_KEY --rpc-url http://localhost:8545 --value 10000 
-cast send $WALLET_CORE_ADDRESS --private-key $DEPLOYER_PRIVATE_KEY --rpc-url http://localhost:8545 --value 10000 
+cast send $SMART_WALLET_ADDRESS --private-key $DEPLOYER_PRIVATE_KEY --rpc-url http://localhost:8545 --value 10000 
+cast send $SMART_WALLET_ADDRESS --private-key $DEPLOYER_PRIVATE_KEY --rpc-url http://localhost:8545 --value 10000 
+cast send $SMART_WALLET_ADDRESS --private-key $DEPLOYER_PRIVATE_KEY --rpc-url http://localhost:8545 --value 10000 
+cast send $SMART_WALLET_ADDRESS --private-key $DEPLOYER_PRIVATE_KEY --rpc-url http://localhost:8545 --value 10000 
 
 echo -e "\033[1;36m\n----------------------------VARIABLES----------------------------\033[0m"
 
-echo "WalletCore address: $WALLET_CORE_ADDRESS"
+echo "SmartWallet address: $SMART_WALLET_ADDRESS"
 echo "ERC20 address: $ERC20_ADDRESS"
 echo "AAVE address: $AAVE_ADDRESS"
 echo "Relayer address: $RELAYER_ADDRESS"

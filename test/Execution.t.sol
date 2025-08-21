@@ -214,7 +214,7 @@ contract ExecutionTest is Base {
     function test_executeFromRelayer_initialization_on_first_time() public {
         (address charlie, uint256 charliePk) = makeAddrAndKey("charlie");
         vm.deal(charlie, 1 ether);
-        _setCodeToEOA(address(_walletCore), charlie);
+        _setCodeToEOA(address(_smartWallet), charlie);
 
         // Initialize charlie's wallet storage with charlie as initial admin owner
         vm.prank(charlie);

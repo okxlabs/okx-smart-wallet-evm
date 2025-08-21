@@ -30,7 +30,7 @@ contract Base is Test {
     address internal _bob;
     uint256 internal _bobPk;
     ECDSAValidator internal _ecdsaValidator; // Shared validator instance
-    SmartWallet internal _walletCore;
+    SmartWallet internal _smartWallet;
     SmartWalletFactory internal _factory;
     DeployFactory public deployFactory;
     address internal relayer;
@@ -52,10 +52,10 @@ contract Base is Test {
         deployFactory = new DeployFactory();
         bytes32 deployFactorySalt = vm.envBytes32("DEPLOY_FACTORY_SALT");
 
-        (_ecdsaValidator, _walletCore, _factory) = DeployInitHelper
+        (_ecdsaValidator, _smartWallet, _factory) = DeployInitHelper
             .deployContracts(deployFactory, deployFactorySalt);
 
-        _setCodeToEOA(address(_walletCore), _alice);
+        _setCodeToEOA(address(_smartWallet), _alice);
 
         deal(_alice, 10 ether);
 

@@ -19,7 +19,7 @@ contract FactoryTest is Base {
             validator: address(1)
         });
         ISmartWallet wallet = ISmartWallet(
-            _factory.createAccount(address(_walletCore), initialOwners, 0)
+            _factory.createAccount(address(_smartWallet), initialOwners, 0)
         );
 
         assertEq(
@@ -39,13 +39,13 @@ contract FactoryTest is Base {
             validator: address(1)
         });
         address wallet = _factory.createAccount(
-            address(_walletCore),
+            address(_smartWallet),
             initialOwners,
             0
         );
 
         address predictedAddress = _factory.getAddress(
-            address(_walletCore),
+            address(_smartWallet),
             initialOwners,
             0
         );

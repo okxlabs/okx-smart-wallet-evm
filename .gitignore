@@ -24,6 +24,7 @@ coverage_report
 # Hardhat files
 artifacts
 cache
+cache_hardhat
 typechain-types
 
 #node Module

@@ -311,7 +311,7 @@ contract ValidatorTest is Base {
         // Create a new wallet for this test
         (address newWallet, ) = makeAddrAndKey("newWallet");
         vm.deal(newWallet, 10 ether);
-        _setCodeToEOA(address(_walletCore), newWallet);
+        _setCodeToEOA(address(_smartWallet), newWallet);
 
         // Prepare initial owners with different keys
         InitialOwner[] memory initialOwners = new InitialOwner[](2);
@@ -373,7 +373,7 @@ contract ValidatorTest is Base {
         // Create a new wallet for this test
         (address newWallet, ) = makeAddrAndKey("emptyWallet");
         vm.deal(newWallet, 10 ether);
-        _setCodeToEOA(address(_walletCore), newWallet);
+        _setCodeToEOA(address(_smartWallet), newWallet);
 
         // Initialize with empty array
         InitialOwner[] memory initialOwners = new InitialOwner[](0);
@@ -733,7 +733,7 @@ contract ValidatorTest is Base {
         // Create a new wallet to test cleanly
         (address newWallet, ) = makeAddrAndKey("newWallet");
         vm.deal(newWallet, 10 ether);
-        _setCodeToEOA(address(_walletCore), newWallet);
+        _setCodeToEOA(address(_smartWallet), newWallet);
 
         // Initialize with empty owners
         vm.prank(newWallet);
@@ -759,7 +759,7 @@ contract ValidatorTest is Base {
         // Create a fresh wallet to test cleanly
         (address freshWallet, ) = makeAddrAndKey("freshWallet");
         vm.deal(freshWallet, 10 ether);
-        _setCodeToEOA(address(_walletCore), freshWallet);
+        _setCodeToEOA(address(_smartWallet), freshWallet);
 
         // Initialize with alice as admin so we can test adding the selfKeyHash
         vm.prank(freshWallet);

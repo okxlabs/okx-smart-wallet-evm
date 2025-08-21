@@ -8,8 +8,8 @@ import {Static} from "./libraries/Static.sol";
 
 /**
  * @title OwnersManager
- * @notice Abstract contract providing owners management functionality for WalletCore
- * @dev To be inherited by WalletCore
+ * @notice Abstract contract providing owners management functionality for SmartWallet
+ * @dev To be inherited by SmartWallet
  */
 abstract contract OwnersManager is IOwnersManager {
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;

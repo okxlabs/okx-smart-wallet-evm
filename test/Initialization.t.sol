@@ -12,7 +12,7 @@ contract InitializationTest is Base {
 
     function test_initialize_reverts_when_called_twice() public {
         // Set up bob with wallet code
-        _setCodeToEOA(address(_walletCore), _bob);
+        _setCodeToEOA(address(_smartWallet), _bob);
 
         // First initialization should succeed
         vm.prank(_bob);
@@ -33,7 +33,7 @@ contract InitializationTest is Base {
 
         // Execute the function that SHOULD modify storage
         vm.prank(_bob);
-        _setCodeToEOA(address(_walletCore), _bob);
+        _setCodeToEOA(address(_smartWallet), _bob);
 
         // Bob initializes the account with empty owners
         InitialOwner[] memory emptyOwners = new InitialOwner[](0);
@@ -51,7 +51,7 @@ contract InitializationTest is Base {
     }
 
     function test_initialize_sets_initial_owners_correctly() public {
-        _setCodeToEOA(address(_walletCore), _bob);
+        _setCodeToEOA(address(_smartWallet), _bob);
 
         vm.prank(_bob);
         InitialOwner[] memory initialOwners = new InitialOwner[](2);
@@ -81,7 +81,7 @@ contract InitializationTest is Base {
     }
 
     function test_initialize_reverts_with_zero_validator() public {
-        _setCodeToEOA(address(_walletCore), _bob);
+        _setCodeToEOA(address(_smartWallet), _bob);
 
         vm.prank(_bob);
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
@@ -105,7 +105,7 @@ contract InitializationTest is Base {
 
         // Execute the function that should NOT modify storage
         vm.prank(_bob);
-        _setCodeToEOA(address(_walletCore), _bob);
+        _setCodeToEOA(address(_smartWallet), _bob);
 
         // Bob initializes the account with empty owners
         InitialOwner[] memory emptyOwners = new InitialOwner[](0);
@@ -126,7 +126,7 @@ contract InitializationTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Initializable.InvalidInitialization.selector)
         );
-        _walletCore.initialize(initialOwners);
+        _smartWallet.initialize(initialOwners);
     }
 
     // Note: validateAndUpdateNonce is now internal and can only be called through executeFromRelayer
