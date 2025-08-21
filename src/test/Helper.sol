@@ -22,7 +22,7 @@ contract Helper {
         return
             keccak256(
                 abi.encode(
-                    userOp.hash(bytes32(uint256(uint160(entryPoint)))),
+                    userOp.hash(),
                     entryPoint,
                     chainid
                 )
