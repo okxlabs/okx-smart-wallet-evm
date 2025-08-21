@@ -328,8 +328,17 @@ contract Base is Test {
         address hook
     ) internal {
         // Get packed settings before any potential revert expectations are set
-        uint256 settings = OwnersManager(wallet).packSettings(adminFlag, expiration, hook);
-        _executeAddValidatorWithSettings(wallet, keyHash, validatorAddr, settings);
+        uint256 settings = OwnersManager(wallet).packSettings(
+            adminFlag,
+            expiration,
+            hook
+        );
+        _executeAddValidatorWithSettings(
+            wallet,
+            keyHash,
+            validatorAddr,
+            settings
+        );
     }
 
     // Helper function to call addValidator with pre-packed settings

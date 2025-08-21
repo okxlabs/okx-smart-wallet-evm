@@ -21,9 +21,7 @@ contract ValidatorEnumerationTest is Base {
         // Alice starts with 1 validator from initialization
         assertEq(IOwnersManager(_alice).ownerCount(), 1);
         assertTrue(
-            IOwnersManager(_alice).hasOwner(
-                keccak256(abi.encodePacked(_alice))
-            )
+            IOwnersManager(_alice).hasOwner(keccak256(abi.encodePacked(_alice)))
         );
 
         // _addValidator will return early since alice already has a validator

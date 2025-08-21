@@ -99,33 +99,19 @@ abstract contract OwnersManager is IOwnersManager {
     // Note: Function names retain "Validator" for interface compatibility,
     // but they actually enumerate wallet owners and their keyHashes
 
-    function ownerCount()
-        external
-        view
-        override
-        returns (uint256)
-    {
+    function ownerCount() external view override returns (uint256) {
         return _ownerKeys.length();
     }
 
-    function ownerAt(
-        uint256 index
-    ) external view override returns (bytes32) {
+    function ownerAt(uint256 index) external view override returns (bytes32) {
         return _ownerKeys.at(index);
     }
 
-    function getOwnerKeys()
-        external
-        view
-        override
-        returns (bytes32[] memory)
-    {
+    function getOwnerKeys() external view override returns (bytes32[] memory) {
         return _ownerKeys.values();
     }
 
-    function hasOwner(
-        bytes32 keyHash
-    ) external view override returns (bool) {
+    function hasOwner(bytes32 keyHash) external view override returns (bool) {
         return _ownerKeys.contains(keyHash);
     }
 
@@ -296,5 +282,4 @@ abstract contract OwnersManager is IOwnersManager {
             revert Errors.InvalidValidatorImpl(validator);
         }
     }
-
 }

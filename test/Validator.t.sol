@@ -27,7 +27,11 @@ contract ValidatorTest is Base {
         address validatorAddress = address(_ecdsaValidator);
 
         // Pack settings before setting expectRevert
-        uint256 settings = OwnersManager(_alice).packSettings(false, 0, address(0));
+        uint256 settings = OwnersManager(_alice).packSettings(
+            false,
+            0,
+            address(0)
+        );
 
         vm.prank(_bob);
         // Expect not from self revert when calling directly (not through execute)
@@ -48,7 +52,11 @@ contract ValidatorTest is Base {
         address dave = vm.addr(2);
 
         // Pack settings before setting expectRevert
-        uint256 settings = OwnersManager(_alice).packSettings(false, 0, address(0));
+        uint256 settings = OwnersManager(_alice).packSettings(
+            false,
+            0,
+            address(0)
+        );
 
         // Expect invalid validator implementation revert when called through execute
         vm.expectRevert(
@@ -70,7 +78,11 @@ contract ValidatorTest is Base {
         assertTrue(IOwnersManager(_alice).hasOwner(keyHash));
 
         // Pack settings before setting expectRevert
-        uint256 settings = OwnersManager(_alice).packSettings(false, 0, address(0));
+        uint256 settings = OwnersManager(_alice).packSettings(
+            false,
+            0,
+            address(0)
+        );
 
         vm.expectRevert(Errors.ValidatorAlreadyExists.selector);
         _executeAddValidatorWithSettings(
@@ -124,7 +136,11 @@ contract ValidatorTest is Base {
         bytes32 keyHash = keccak256(abi.encodePacked(_alice));
 
         // Pack settings before setting expectRevert
-        uint256 settings = OwnersManager(_alice).packSettings(false, 0, address(0));
+        uint256 settings = OwnersManager(_alice).packSettings(
+            false,
+            0,
+            address(0)
+        );
 
         // Test that we can't add another validator for the same keyHash (should revert)
         vm.expectRevert(Errors.ValidatorAlreadyExists.selector);
@@ -468,7 +484,11 @@ contract ValidatorTest is Base {
 
         // Create a BatchedCall to add another validator using non-admin signer
         bytes32 newKeyHash = keccak256(abi.encodePacked(_charlie));
-        uint256 settings = OwnersManager(_alice).packSettings(false, uint40(0), address(0));
+        uint256 settings = OwnersManager(_alice).packSettings(
+            false,
+            uint40(0),
+            address(0)
+        );
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
             target: _alice,
@@ -571,7 +591,11 @@ contract ValidatorTest is Base {
         );
 
         // Create new settings
-        uint256 newSettings = OwnersManager(_alice).packSettings(true, uint40(block.timestamp + 3600), address(0));
+        uint256 newSettings = OwnersManager(_alice).packSettings(
+            true,
+            uint40(block.timestamp + 3600),
+            address(0)
+        );
 
         // Create a BatchedCall to update validator
         Call[] memory calls = new Call[](1);
@@ -605,13 +629,20 @@ contract ValidatorTest is Base {
         IWalletCore(_alice).executeWithRelayer(batchedCall, signature);
 
         // Verify validator is updated
-        assertEq(IOwnersManager(_alice).ownerValidators(keyHash), Static.PASSKEY_VALIDATOR_ADDRESS);
+        assertEq(
+            IOwnersManager(_alice).ownerValidators(keyHash),
+            Static.PASSKEY_VALIDATOR_ADDRESS
+        );
         assertEq(IOwnersManager(_alice).ownerSettings(keyHash), newSettings);
     }
 
     function test_updateValidator_reverts_for_non_existent_keyHash() public {
         bytes32 nonExistentKeyHash = keccak256(abi.encodePacked("nonexistent"));
-        uint256 settings = OwnersManager(_alice).packSettings(false, 0, address(0));
+        uint256 settings = OwnersManager(_alice).packSettings(
+            false,
+            0,
+            address(0)
+        );
 
         // Create a BatchedCall to update non-existent validator
         Call[] memory calls = new Call[](1);
@@ -639,7 +670,9 @@ contract ValidatorTest is Base {
         );
 
         // Should revert
-        vm.expectRevert(abi.encodeWithSelector(Errors.ValidatorNotFound.selector));
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.ValidatorNotFound.selector)
+        );
         IWalletCore(_alice).executeWithRelayer(batchedCall, signature);
     }
 
@@ -655,7 +688,11 @@ contract ValidatorTest is Base {
             address(0)
         );
 
-        uint256 settings = OwnersManager(_alice).packSettings(false, 0, address(0));
+        uint256 settings = OwnersManager(_alice).packSettings(
+            false,
+            0,
+            address(0)
+        );
 
         // Create a BatchedCall to update with invalid validator (EOA with no code)
         Call[] memory calls = new Call[](1);
@@ -683,7 +720,12 @@ contract ValidatorTest is Base {
         );
 
         // Should revert
-        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidValidatorImpl.selector, _charlie));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Errors.InvalidValidatorImpl.selector,
+                _charlie
+            )
+        );
         IWalletCore(_alice).executeWithRelayer(batchedCall, signature);
     }
 }
