@@ -6,15 +6,15 @@ EOA_PRIVATE_KEY=0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b7869
 export DEPLOYER_PRIVATE_KEY="0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80" # can be any address
 RELAYER_ADDRESS="0x55f3a93f544e01ce4378d25e927d7c493b863bd6" # Address of the relayer
 
-# Extract WalletCore address from deployment output  
+# Extract SmartWallet address from deployment output  
 DEPLOYMENT_OUTPUT=$(forge script scripts/DeployInit.sol --broadcast --rpc-url $RPC_URL)
-WALLET_CORE_ADDRESS=$(echo "$DEPLOYMENT_OUTPUT" | grep "WalletCore address:" | awk '{print $3}')
+SMART_WALLET_ADDRESS=$(echo "$DEPLOYMENT_OUTPUT" | grep "SmartWallet address:" | awk '{print $3}')
 ECDSA_VALIDATOR_ADDRESS=$(echo "$DEPLOYMENT_OUTPUT" | grep "ECDSAValidator address:" | awk '{print $3}')
 
 # Check if addresses were extracted successfully
-if [ -z "$WALLET_CORE_ADDRESS" ] || [ -z "$ECDSA_VALIDATOR_ADDRESS" ]; then
+if [ -z "$SMART_WALLET_ADDRESS" ] || [ -z "$ECDSA_VALIDATOR_ADDRESS" ]; then
     echo "Error: Failed to extract contract addresses from deployment output"
-    echo "WALLET_CORE_ADDRESS: $WALLET_CORE_ADDRESS"
+    echo "SMART_WALLET_ADDRESS: $SMART_WALLET_ADDRESS"
     echo "ECDSA_VALIDATOR_ADDRESS: $ECDSA_VALIDATOR_ADDRESS"
     exit 1
 fi
@@ -34,7 +34,7 @@ echo "CallData to sending 10 tokens to the relayer"
 cast calldata "transfer(address,uint256)" $RELAYER_ADDRESS 10
 
 echo "Upgrading EOA into 7702"
-cast send $(cast az) --auth $WALLET_CORE_ADDRESS --private-key $EOA_PRIVATE_KEY --rpc-url $RPC_URL
+cast send $(cast az) --auth $SMART_WALLET_ADDRESS --private-key $EOA_PRIVATE_KEY --rpc-url $RPC_URL
 
 echo "Initializing wallet with EOA as owner and ECDSAValidator"
 # Create keyHash from EOA address (keccak256(abi.encode(address)))
@@ -50,14 +50,14 @@ echo "Initialize calldata: $INIT_CALLDATA"
 # Use cast send with proper escaping for the tuple array
 cast send $EOA_ADDRESS "initialize((bytes32,address)[])" "[(${KEY_HASH},${ECDSA_VALIDATOR_ADDRESS})]" --private-key $EOA_PRIVATE_KEY --rpc-url $RPC_URL
 
-cast send $WALLET_CORE_ADDRESS --private-key $DEPLOYER_PRIVATE_KEY --rpc-url $RPC_URL --value 10000
-cast send $WALLET_CORE_ADDRESS --private-key $DEPLOYER_PRIVATE_KEY --rpc-url $RPC_URL --value 10000
-cast send $WALLET_CORE_ADDRESS --private-key $DEPLOYER_PRIVATE_KEY --rpc-url $RPC_URL --value 10000
-cast send $WALLET_CORE_ADDRESS --private-key $DEPLOYER_PRIVATE_KEY --rpc-url $RPC_URL --value 10000
+cast send $SMART_WALLET_ADDRESS --private-key $DEPLOYER_PRIVATE_KEY --rpc-url $RPC_URL --value 10000
+cast send $SMART_WALLET_ADDRESS --private-key $DEPLOYER_PRIVATE_KEY --rpc-url $RPC_URL --value 10000
+cast send $SMART_WALLET_ADDRESS --private-key $DEPLOYER_PRIVATE_KEY --rpc-url $RPC_URL --value 10000
+cast send $SMART_WALLET_ADDRESS --private-key $DEPLOYER_PRIVATE_KEY --rpc-url $RPC_URL --value 10000
 
 echo -e "\033[1;36m\n----------------------------VARIABLES----------------------------\033[0m"
 
-echo "WalletCore address: $WALLET_CORE_ADDRESS"
+echo "SmartWallet address: $SMART_WALLET_ADDRESS"
 echo "ECDSAValidator address: $ECDSA_VALIDATOR_ADDRESS"
 echo "ERC20 address: $ERC20_ADDRESS"
 echo "AAVE address: $AAVE_ADDRESS"

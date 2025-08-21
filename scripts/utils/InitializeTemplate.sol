@@ -2,7 +2,7 @@
 pragma solidity ^0.8.12;
 
 import "lib/forge-std/src/Script.sol";
-import "src/WalletCore.sol";
+import "src/SmartWallet.sol";
 import "src/interfaces/IOwnersManager.sol";
 import "src/ValidationLogic.sol";
 import "src/Types.sol";
@@ -14,8 +14,9 @@ contract InitializeTemplate is Script {
         uint256 senderPk = vm.envUint("DEPLOYER_PRIVATE_KEY");
         vm.startBroadcast(senderPk);
 
-        address walletCore = vm.envAddress("WALLET_CORE");
-        WalletCore(payable(walletCore)).initialize();
+        address smartWallet = vm.envAddress("SMART_WALLET");
+        InitialOwner[] memory emptyInitialOwners;
+        SmartWallet(payable(smartWallet)).initialize(emptyInitialOwners);
 
         console.log("Completed InitializeTemplate script");
         vm.stopBroadcast();

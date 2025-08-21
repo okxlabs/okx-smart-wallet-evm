@@ -5,15 +5,15 @@ const main = async () => {
   const chainId = (await ethers.provider.getNetwork()).chainId;
 
   // Get the contract instance
-  const WALLET_CORE = process.env.WALLET_CORE;
-  const WalletCore = await ethers.getContractAt("WalletCore", WALLET_CORE);
+  const SMART_WALLET = process.env.SMART_WALLET;
+  const SmartWallet = await ethers.getContractAt("SmartWallet", SMART_WALLET);
 
   console.log("Chain ID: ", chainId);
   console.log("EOA address: ", wallet.address);
-  console.log("Setting code for EIP7702 account at: ", WALLET_CORE);
+  console.log("Setting code for EIP7702 account at: ", SMART_WALLET);
 
-  // Encode the execute function call with WalletCore.initialize()
-  const calldata = WalletCore.interface.encodeFunctionData("initialize");
+  // Encode the initialize function call with empty initialOwners array
+  const calldata = SmartWallet.interface.encodeFunctionData("initialize", [[]]);
 
   const currentNonce = await ethers.provider.getTransactionCount(wallet.address);
 
@@ -26,7 +26,7 @@ const main = async () => {
     s?: string;
   } = {
     chainId: ethers.toBeHex(chainId.toString()),
-    address: WALLET_CORE,
+    address: SMART_WALLET,
     nonce: ethers.toBeHex(currentNonce + 1),
   };
 
@@ -59,7 +59,7 @@ const main = async () => {
     ethers.toBeHex(feeData.maxPriorityFeePerGas), // Priority fee (tip)
     ethers.toBeHex(feeData.maxFeePerGas), // Maximum total fee willing to pay
     ethers.toBeHex(1000000), // Gas limit
-    wallet.address, // Sender address
+    wallet.address, // Sender address (but code will be set on this EOA)
     '0x', // Value (in addition to batch transfers)
     calldata, // Encoded function call
     [], // Access list (empty for this transaction)

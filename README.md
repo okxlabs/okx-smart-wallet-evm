@@ -71,7 +71,7 @@ The wallet setup involves two main steps:
 
 The implementation follows a modular design:
 
-- `WalletCore`: Main contract handling execution logic
+- `SmartWallet`: Main contract handling execution logic
 - `Core Storage`: Manages nonces and validation states
 - `ExecutionLogic`: Handles different execution types
 - `ValidationLogic`: Manages signature and session validation
@@ -84,14 +84,14 @@ The implementation follows a modular design:
 
 | Contract    | Address                                      |
 | ----------- | -------------------------------------------- |
-| WalletCore  | `0x80296FF8D1ED46f8e3C7992664D13B833504c2Bb` |
+| SmartWallet | `0x80296FF8D1ED46f8e3C7992664D13B833504c2Bb` |
 | CoreStorage | `0x7DAF91DFe55FcAb363416A6E3bceb3Da34ff1d30` |
 
 ### Sepolia Testnet
 
 | Contract    | Address                                      |
 | ----------- | -------------------------------------------- |
-| WalletCore  | `0x80296FF8D1ED46f8e3C7992664D13B833504c2Bb` |
+| SmartWallet | `0x80296FF8D1ED46f8e3C7992664D13B833504c2Bb` |
 | CoreStorage | `0x7DAF91DFe55FcAb363416A6E3bceb3Da34ff1d30` |
 
 ### XLayer Mainnet

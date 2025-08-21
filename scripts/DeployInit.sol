@@ -6,7 +6,7 @@ import {DeployInitHelper} from "./DeployInitHelper.sol";
 import {DeployFactory} from "src/test/DeployFactory.sol";
 import {OwnersManager} from "src/OwnersManager.sol";
 import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
-import {WalletCore} from "src/WalletCore.sol";
+import {SmartWallet} from "src/SmartWallet.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
 
 /// @title DeployInit
@@ -18,26 +18,31 @@ contract DeployInit is Script {
         address deployOwner = vm.addr(vm.envUint("DEPLOYER_PRIVATE_KEY"));
         console.log("Deploy owner: %s", deployOwner);
 
-        // Deploy the DeployFactory first
+        // Create a new DeployFactory for local testing instead of using pre-deployed one
         DeployFactory deployFactory = new DeployFactory();
-        bytes32 deployFactorySalt = bytes32(uint256(0x120)); // Use a default salt
+        bytes32 deployFactorySalt = vm.envBytes32("DEPLOY_FACTORY_SALT");
         console.log("Deploy factory address: %s", address(deployFactory));
         console.log("Deploy factory salt:");
         console.logBytes32(deployFactorySalt);
 
+        string memory smartWalletName = "smart-wallet";
+        string memory smartWalletVersion = "1.0.0";
+        console.log("SmartWallet name: %s", smartWalletName);
+        console.log("SmartWallet version: %s", smartWalletVersion);
+
         // Deploy the contracts using DeployInitHelper
         (
             ECDSAValidator ecdsaValidator_,
-            WalletCore walletCore_,
-            SmartWalletFactory smartWalletFactory_
+            SmartWallet smartWallet_,
+            SmartWalletFactory factory_
         ) = DeployInitHelper.deployContracts(
                 deployFactory,
                 deployFactorySalt
             );
 
-        console.log("WalletCore address: %s", address(walletCore_));
+        console.log("SmartWallet address: %s", address(smartWallet_));
+        console.log("SmartWalletFactory address: %s", address(factory_));
         console.log("ECDSAValidator address: %s", address(ecdsaValidator_));
-        console.log("SmartWalletFactory address: %s", address(smartWalletFactory_));
         console.log("Completed DeployInit script");
         vm.stopBroadcast();
     }

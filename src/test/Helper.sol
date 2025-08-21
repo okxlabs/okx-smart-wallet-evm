@@ -19,7 +19,14 @@ contract Helper {
         uint256 chainid,
         PackedUserOperation calldata userOp
     ) public pure returns (bytes32) {
-        return keccak256(abi.encode(userOp.hash(), entryPoint, chainid));
+        return
+            keccak256(
+                abi.encode(
+                    userOp.hash(bytes32(uint256(uint160(entryPoint)))),
+                    entryPoint,
+                    chainid
+                )
+            );
     }
 
     function getPubkeyHash(

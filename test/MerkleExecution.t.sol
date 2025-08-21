@@ -6,7 +6,7 @@ import {Base} from "./Base.t.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 import {Errors} from "src/libraries/Errors.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
-import {IWalletCore} from "src/interfaces/IWalletCore.sol";
+import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
 import {OwnersManager} from "src/OwnersManager.sol";
 import {ValidationLogic} from "src/ValidationLogic.sol";
@@ -257,7 +257,7 @@ contract MerkleExecutionTest is Base {
         vm.prank(_bob); // Bob is the relayer
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
-        IWalletCore(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
 
         // Verify execution succeeded
         assertEq(address(_bob).balance, 1 ether);
@@ -280,7 +280,7 @@ contract MerkleExecutionTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidSignature.selector)
         );
-        IWalletCore(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
     }
 
     function test_executeWithMerkle_reverts_with_wrong_root() public {
@@ -300,7 +300,7 @@ contract MerkleExecutionTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidSignature.selector)
         );
-        IWalletCore(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
     }
 
     function test_executeWithMerkle_reverts_with_invalid_validator() public {
@@ -321,7 +321,7 @@ contract MerkleExecutionTest is Base {
                 keccak256(abi.encodePacked(eve))
             )
         );
-        IWalletCore(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
     }
 
     function test_executeWithMerkle_reverts_with_invalid_nonce() public {
@@ -349,7 +349,7 @@ contract MerkleExecutionTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidNonce.selector, nonce)
         );
-        IWalletCore(_alice).executeWithRelayer(
+        ISmartWallet(_alice).executeWithRelayer(
             invalidNonceBatchedCall,
             validatorData
         );
@@ -370,7 +370,7 @@ contract MerkleExecutionTest is Base {
         vm.prank(_bob);
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
-        IWalletCore(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
 
         // Second execution with same nonce should fail
         vm.prank(_bob);
@@ -380,7 +380,7 @@ contract MerkleExecutionTest is Base {
                 batchedCall.nonce
             )
         );
-        IWalletCore(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
     }
 
     function test_executeWithMerkle_reverts_with_manipulated_batchedCall()
@@ -410,7 +410,7 @@ contract MerkleExecutionTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidSignature.selector)
         );
-        IWalletCore(_alice).executeWithRelayer(
+        ISmartWallet(_alice).executeWithRelayer(
             manipulatedBatchedCall,
             validatorData
         );
@@ -432,7 +432,10 @@ contract MerkleExecutionTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidSignature.selector)
         );
-        IWalletCore(_alice).executeWithRelayer(batchedCall, shortValidatorData);
+        ISmartWallet(_alice).executeWithRelayer(
+            batchedCall,
+            shortValidatorData
+        );
     }
 
     // ============ EDGE CASES ============
@@ -465,7 +468,7 @@ contract MerkleExecutionTest is Base {
         vm.prank(_bob);
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
-        IWalletCore(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
 
         assertEq(address(_bob).balance, 1 ether);
     }

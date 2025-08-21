@@ -8,8 +8,8 @@ import {Static} from "./libraries/Static.sol";
 
 /**
  * @title OwnersManager
- * @notice Abstract contract providing owners management functionality for WalletCore
- * @dev To be inherited by WalletCore
+ * @notice Abstract contract providing owners management functionality for SmartWallet
+ * @dev To be inherited by SmartWallet
  */
 abstract contract OwnersManager is IOwnersManager {
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
@@ -39,7 +39,7 @@ abstract contract OwnersManager is IOwnersManager {
      * @param validator The address of the validator contract to be registered
      * @param settings Packed settings value (use packSettings to create)
      */
-    function addValidator(
+    function addOwner(
         bytes32 keyHash,
         address validator,
         uint256 settings
@@ -55,7 +55,7 @@ abstract contract OwnersManager is IOwnersManager {
         // Store validator with settings
         _setValidatorWithSettings(keyHash, validator, settings);
 
-        emit ValidatorAdded(validator);
+        emit OwnerAdded(validator);
     }
 
     /**
@@ -65,7 +65,7 @@ abstract contract OwnersManager is IOwnersManager {
      * @param newValidator The new validator address
      * @param newSettings New packed settings value (use packSettings to create)
      */
-    function updateValidator(
+    function updateOwner(
         bytes32 keyHash,
         address newValidator,
         uint256 newSettings
@@ -82,7 +82,7 @@ abstract contract OwnersManager is IOwnersManager {
         ownerValidators[keyHash] = newValidator;
         ownerSettings[keyHash] = newSettings;
 
-        emit ValidatorUpdated(keyHash, newValidator);
+        emit OwnerUpdated(keyHash, newValidator);
     }
 
     /**
@@ -90,9 +90,9 @@ abstract contract OwnersManager is IOwnersManager {
      * @dev Only callable by the wallet owner
      * @param keyHash The public key hash to remove
      */
-    function removeValidator(bytes32 keyHash) external onlySelf {
+    function removeOwner(bytes32 keyHash) external onlySelf {
         _removeValidator(keyHash);
-        emit ValidatorRemoved(keyHash);
+        emit OwnerRemoved(keyHash);
     }
 
     // ============ External View Functions (Interface Implementation) ============
@@ -171,9 +171,6 @@ abstract contract OwnersManager is IOwnersManager {
             if (settings != 0 && isSettingsExpired(settings)) {
                 validator = address(0); // Expired validator
             }
-        } else if (keyHash == keccak256(abi.encode(address(this)))) {
-            // EIP-7702: Default to ECDSA for self-signing
-            return Static.ECDSA_VALIDATOR_ADDRESS;
         }
 
         return validator;

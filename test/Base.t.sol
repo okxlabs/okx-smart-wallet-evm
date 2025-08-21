@@ -6,11 +6,11 @@ import "forge-std/console.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
 import {OwnersManager} from "src/OwnersManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
-import {IWalletCore} from "src/interfaces/IWalletCore.sol";
+import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {IValidation} from "src/interfaces/IValidation.sol";
 import {IValidator} from "src/interfaces/IValidator.sol";
 import {ValidationLogic} from "src/ValidationLogic.sol";
-import {WalletCore} from "src/WalletCore.sol";
+import {SmartWallet} from "src/SmartWallet.sol";
 import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 import {Errors} from "src/libraries/Errors.sol";
@@ -30,7 +30,7 @@ contract Base is Test {
     address internal _bob;
     uint256 internal _bobPk;
     ECDSAValidator internal _ecdsaValidator; // Shared validator instance
-    WalletCore internal _walletCore;
+    SmartWallet internal _smartWallet;
     SmartWalletFactory internal _factory;
     DeployFactory public deployFactory;
     address internal relayer;
@@ -48,7 +48,7 @@ contract Base is Test {
     function setUp() public virtual {
         (address aliceAddr, uint256 alicePk) = makeAddrAndKey("alice");
 
-        // Make _alice payable so we can cast to WalletCore (which has payable fallback functions) in relevant unit tests 
+        // Make _alice payable so we can cast to SmartWallet (which has payable fallback functions) in relevant unit tests
         _alice = payable(aliceAddr);
         _alicePk = alicePk;
         (_bob, _bobPk) = makeAddrAndKey("bob");
@@ -56,10 +56,10 @@ contract Base is Test {
         deployFactory = new DeployFactory();
         bytes32 deployFactorySalt = vm.envBytes32("DEPLOY_FACTORY_SALT");
 
-        (_ecdsaValidator, _walletCore, _factory) = DeployInitHelper
+        (_ecdsaValidator, _smartWallet, _factory) = DeployInitHelper
             .deployContracts(deployFactory, deployFactorySalt);
 
-        _setCodeToEOA(address(_walletCore), _alice);
+        _setCodeToEOA(address(_smartWallet), _alice);
 
         deal(_alice, 10 ether);
 
@@ -70,7 +70,7 @@ contract Base is Test {
             keyHash: keccak256(abi.encodePacked(_alice)),
             validator: address(_ecdsaValidator)
         });
-        IWalletCore(_alice).initialize(initialOwners);
+        ISmartWallet(_alice).initialize(initialOwners);
         vm.stopPrank();
     }
 
@@ -357,7 +357,7 @@ contract Base is Test {
             target: wallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addValidator.selector,
+                OwnersManager.addOwner.selector,
                 keyHash,
                 validatorAddr,
                 settings
@@ -365,7 +365,7 @@ contract Base is Test {
         });
 
         vm.prank(wallet);
-        IWalletCore(wallet).execute(calls);
+        ISmartWallet(wallet).execute(calls);
     }
 
     // Helper function to call removeValidator through execute
@@ -375,12 +375,12 @@ contract Base is Test {
             target: wallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.removeValidator.selector,
+                OwnersManager.removeOwner.selector,
                 keyHash
             )
         });
 
         vm.prank(wallet);
-        IWalletCore(wallet).execute(calls);
+        ISmartWallet(wallet).execute(calls);
     }
 }

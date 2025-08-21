@@ -18,8 +18,8 @@ contract FactoryTest is Base {
             keyHash: keccak256(abi.encodePacked(_alice)),
             validator: address(1)
         });
-        IWalletCore wallet = IWalletCore(
-            _factory.createAccount(address(_walletCore), initialOwners, 0)
+        ISmartWallet wallet = ISmartWallet(
+            _factory.createAccount(address(_smartWallet), initialOwners, 0)
         );
 
         assertEq(
@@ -39,13 +39,13 @@ contract FactoryTest is Base {
             validator: address(1)
         });
         address wallet = _factory.createAccount(
-            address(_walletCore),
+            address(_smartWallet),
             initialOwners,
             0
         );
 
         address predictedAddress = _factory.getAddress(
-            address(_walletCore),
+            address(_smartWallet),
             initialOwners,
             0
         );

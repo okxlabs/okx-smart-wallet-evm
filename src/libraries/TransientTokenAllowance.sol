@@ -8,7 +8,10 @@ library TransientTokenAllowance {
     /// @param token The ERC20 token address
     /// @param spender The address approved to spend tokens
     /// @return hashSlot The computed storage slot
-    function _computeSlot(address token, address spender) internal pure returns (bytes32 hashSlot) {
+    function _computeSlot(
+        address token,
+        address spender
+    ) internal pure returns (bytes32 hashSlot) {
         assembly ("memory-safe") {
             mstore(0, and(token, 0xffffffffffffffffffffffffffffffffffffffff))
             mstore(32, and(spender, 0xffffffffffffffffffffffffffffffffffffffff))
@@ -20,7 +23,10 @@ library TransientTokenAllowance {
     /// @param token The ERC20 token address
     /// @param spender The address approved to spend tokens
     /// @return allowance The current transient allowance
-    function get(address token, address spender) internal view returns (uint256 allowance) {
+    function get(
+        address token,
+        address spender
+    ) internal view returns (uint256 allowance) {
         bytes32 hashSlot = _computeSlot(token, spender);
         assembly ("memory-safe") {
             allowance := tload(hashSlot)

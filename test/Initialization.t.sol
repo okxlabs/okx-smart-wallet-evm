@@ -12,19 +12,19 @@ contract InitializationTest is Base {
 
     function test_initialize_reverts_when_called_twice() public {
         // Set up bob with wallet code
-        _setCodeToEOA(address(_walletCore), _bob);
+        _setCodeToEOA(address(_smartWallet), _bob);
 
         // First initialization should succeed
         vm.prank(_bob);
         InitialOwner[] memory emptyOwners = new InitialOwner[](0);
-        IWalletCore(_bob).initialize(emptyOwners);
+        ISmartWallet(_bob).initialize(emptyOwners);
 
         // Second initialization should fail with OpenZeppelin's error
         vm.prank(_bob);
         vm.expectRevert(
             abi.encodeWithSelector(Initializable.InvalidInitialization.selector)
         );
-        IWalletCore(_bob).initialize(emptyOwners);
+        ISmartWallet(_bob).initialize(emptyOwners);
     }
 
     function test_initialize_properly_sets_storage() public {
@@ -33,11 +33,11 @@ contract InitializationTest is Base {
 
         // Execute the function that SHOULD modify storage
         vm.prank(_bob);
-        _setCodeToEOA(address(_walletCore), _bob);
+        _setCodeToEOA(address(_smartWallet), _bob);
 
         // Bob initializes the account with empty owners
         InitialOwner[] memory emptyOwners = new InitialOwner[](0);
-        IWalletCore(_bob).initialize(emptyOwners);
+        ISmartWallet(_bob).initialize(emptyOwners);
 
         // Get accessed storage slots
         (, bytes32[] memory writes) = vm.accesses(_bob);
@@ -51,7 +51,7 @@ contract InitializationTest is Base {
     }
 
     function test_initialize_sets_initial_owners_correctly() public {
-        _setCodeToEOA(address(_walletCore), _bob);
+        _setCodeToEOA(address(_smartWallet), _bob);
 
         vm.prank(_bob);
         InitialOwner[] memory initialOwners = new InitialOwner[](2);
@@ -64,7 +64,7 @@ contract InitializationTest is Base {
             validator: address(_ecdsaValidator)
         });
 
-        IWalletCore(_bob).initialize(initialOwners);
+        ISmartWallet(_bob).initialize(initialOwners);
 
         // Verify owners were set correctly
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
@@ -81,7 +81,7 @@ contract InitializationTest is Base {
     }
 
     function test_initialize_reverts_with_zero_validator() public {
-        _setCodeToEOA(address(_walletCore), _bob);
+        _setCodeToEOA(address(_smartWallet), _bob);
 
         vm.prank(_bob);
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
@@ -96,7 +96,7 @@ contract InitializationTest is Base {
                 address(0)
             )
         );
-        IWalletCore(_bob).initialize(initialOwners);
+        ISmartWallet(_bob).initialize(initialOwners);
     }
 
     function test_storage_returns_correct_owner() public {
@@ -105,11 +105,11 @@ contract InitializationTest is Base {
 
         // Execute the function that should NOT modify storage
         vm.prank(_bob);
-        _setCodeToEOA(address(_walletCore), _bob);
+        _setCodeToEOA(address(_smartWallet), _bob);
 
         // Bob initializes the account with empty owners
         InitialOwner[] memory emptyOwners = new InitialOwner[](0);
-        IWalletCore(_bob).initialize(emptyOwners);
+        ISmartWallet(_bob).initialize(emptyOwners);
 
         // check that wallet is its own owner (implicit - no function needed)
         // The wallet _bob is its own owner by design
@@ -126,7 +126,7 @@ contract InitializationTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Initializable.InvalidInitialization.selector)
         );
-        _walletCore.initialize(initialOwners);
+        _smartWallet.initialize(initialOwners);
     }
 
     // Note: validateAndUpdateNonce is now internal and can only be called through executeFromRelayer

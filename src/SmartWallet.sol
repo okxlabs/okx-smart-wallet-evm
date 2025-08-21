@@ -3,7 +3,7 @@ pragma solidity ^0.8.29;
 
 import {ERC712} from "./ERC712.sol";
 import {ERC7201} from "./ERC7201.sol";
-import {IWalletCore} from "./interfaces/IWalletCore.sol";
+import {ISmartWallet} from "./interfaces/ISmartWallet.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
 import {OwnersManager} from "./OwnersManager.sol";
@@ -21,8 +21,8 @@ import {BatchedCallLib} from "./libraries/BatchedCallLib.sol";
 import {AllowanceManager} from "./AllowanceManager.sol";
 
 // Do not set any states in this contract
-contract WalletCore is
-    IWalletCore,
+contract SmartWallet is
+    ISmartWallet,
     ERC7201,
     ERC4337Account,
     OwnersManager,
@@ -48,7 +48,7 @@ contract WalletCore is
     }
 
     modifier onlyOwnerOrEntryPoint() override {
-        bytes32 keyHash = keccak256(abi.encode(msg.sender));
+        bytes32 keyHash = keccak256(abi.encodePacked(msg.sender));
         if (
             _ownerKeys.contains(keyHash) ||
             msg.sender == entryPoint() ||
@@ -62,7 +62,7 @@ contract WalletCore is
 
     /**
      * @notice Initializes the wallet core with initial owners
-     * @dev Storage is now integrated directly into WalletCore
+     * @dev Storage is now integrated directly into SmartWallet
      * @param initialOwners Array of tuples containing keyHash and validator address pairs
      */
     function initialize(
@@ -148,12 +148,10 @@ contract WalletCore is
      * 2) "Successful simulation" means both validation and the sponsorship call passed.
      *    Any failure in the user’s batch calls is then captured in `errorData` and surfaced inside the `SimulateExecution` revert.
      * @param batchedCall BatchedCall struct containing calls, nonce, and expiry
-     * @param validator The validator address that is intended to be used with executeWithRelayer
-     * @param validatorData Encoded data containing keyHash and signature: abi.encode(keyHash, signature)
+     * @param validatorData Encoded data containing keyHash and signature: abi.encodePacked(keyHash, signature)
      */
     function simulateExecuteWithRelayer(
         BatchedCall calldata batchedCall,
-        address validator,
         bytes calldata validatorData
     ) external {
         // Check transaction expiry
@@ -168,8 +166,7 @@ contract WalletCore is
 
         // Extract keyHash and validate validator
         bytes32 keyHash = bytes32(validatorData[:32]);
-
-        address mockValidator = getVerifiedValidator(keyHash);
+        address validator = getVerifiedValidator(keyHash);
 
         if (validator == address(0)) {
             // revert Errors.InvalidKeyHash(keyHash);
@@ -205,7 +202,9 @@ contract WalletCore is
     function _batchCall(Call[] calldata calls, bytes32 keyHash) internal {
         uint256 settings = ownerSettings[keyHash];
         address hookAddress = getHook(settings);
+
         bool isAdmin = isAdmin(settings);
+
         bytes memory ret;
 
         if (hookAddress != address(0)) {

@@ -7,7 +7,9 @@ pragma solidity ^0.8.29;
 /// However, since transient storage is automatically cleared between transactions and does not persist, custom storage is not needed.
 library TransientNativeAllowance {
     /// @notice calculates which storage slot a transient native allowance should be stored in for a given spender
-    function _computeSlot(address spender) internal pure returns (bytes32 hashSlot) {
+    function _computeSlot(
+        address spender
+    ) internal pure returns (bytes32 hashSlot) {
         assembly ("memory-safe") {
             mstore(0, and(spender, 0xffffffffffffffffffffffffffffffffffffffff))
             hashSlot := keccak256(0, 32)
