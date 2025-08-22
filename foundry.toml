@@ -6,10 +6,12 @@ gas_report = true
 optimizer = true
 optimizer_runs = 2000
 
-remappings = [    
+remappings = [
+    "openzeppelin-contracts/contracts/=lib/openzeppelin-contracts/contracts/",
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
     "forge-std/=lib/forge-std/src/",
     "solady/=lib/solady/src/",
-    "account-abstraction/=lib/account-abstraction/contracts/"
+    "account-abstraction/=lib/account-abstraction/contracts/",
+    "webauthn-sol/=lib/webauthn-sol/",
 ]
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

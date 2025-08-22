@@ -2,11 +2,11 @@
 pragma solidity ^0.8.25;
 
 import {EntryPoint} from "account-abstraction/core/EntryPoint.sol";
-import {Base64} from "@openzeppelin/contracts/utils/Base64.sol";
+import {Base64} from "openzeppelin-contracts/contracts/utils/Base64.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/IAccount.sol";
 import {UserOperationLib} from "account-abstraction/core/UserOperationLib.sol";
-import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
-import {Utils, WebAuthnInfo} from "webauthn-sol/../test/Utils.sol";
+import {WebAuthn} from "webauthn-sol/src/WebAuthn.sol";
+import {Utils, WebAuthnInfo} from "webauthn-sol/test/Utils.sol";
 
 contract Helper {
     uint256 constant CHALLENGE_LOCATION = 23;
