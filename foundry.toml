@@ -5,6 +5,7 @@ libs = ["lib"]
 gas_report = true
 optimizer = true
 optimizer_runs = 2000
+evm_version = "shanghai"
 
 remappings = [
     "openzeppelin-contracts/contracts/=lib/openzeppelin-contracts/contracts/",
