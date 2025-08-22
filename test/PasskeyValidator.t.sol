@@ -15,7 +15,7 @@ import {P256} from "@openzeppelin/contracts/utils/cryptography/P256.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {ERC712} from "src/ERC712.sol";
 import {Helper} from "src/test/Helper.sol";
-import {WebAuthn} from "webauthn-sol/src/WebAuthn.sol";
+import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {Base64} from "@openzeppelin/contracts/utils/Base64.sol";
 
 contract PasskeyValidatorTest is Base {
@@ -23,21 +23,19 @@ contract PasskeyValidatorTest is Base {
 
     // Generated real P256 signature using SmartAccount method (crypto.createSign compatibility)
     uint256 internal constant TEST_PUBKEY_X =
-        28573233055232466711029625910063034642429572463461595413086259353299906450061;
+        0x640c5cacef387563d0b105c7724c45ee19f8a952cb583de494a6a7ce5ed16760;
     uint256 internal constant TEST_PUBKEY_Y =
-        39367742072897599771788408398752356480431855827262528811857788332151452825281;
+        0x142b33cbf8255e9f0628ab9e250e179a3e7e8e24e0a2a4340f0b9fdeb29a1b48;
     uint256 internal constant TEST_SIG_R =
-        43684192885701841787131392247364253107519555363555461570655060745499568693242;
+        112450831948757142750562360134609669473647155538405639309009281430691665378703;
     uint256 internal constant TEST_SIG_S =
-        22655632649588629308599201066602670461698485748654492451178007896016452673579;
+        18363333552806174256136300126987944752421142252269824522148009181078823230960;
     bytes32 internal constant REAL_KEY_HASH =
-        0x7a655e59bb879aff4a25592b02afb672bb2d2cbb1e5a60cd591f3b07bad0b8ff;
+        0xd559c34bc5d637a31524453a28d30dda47ff7ca19d1a5f71db22bf59e0b7f1ad;
 
     // Message hash that gets passed to validator (typedDataHash, gets SHA256 in contract for compatibility)
     bytes32 constant SIGNED_MESSAGE_HASH =
-        bytes32(
-            0xf631058a3ba1116acce12396fad0a125b5041c43f8e15723709f81aa8d5f4ccf
-        );
+        0x34753a30843cdf97fd7c7f1cf2556d397c93bdfa6732b0b8b79bad029f5875e5;
 
     bytes32 internal testKeyHash;
 
@@ -71,12 +69,11 @@ contract PasskeyValidatorTest is Base {
     }
 
     function test_webauthn_signature_directly() public view {
-        WebAuthn.WebAuthnAuth memory auth = Helper.getCoinbaseWebAuthnAuth(
+        WebAuthn.WebAuthnAuth memory auth = Helper.getWebAuthnAuth(
             SIGNED_MESSAGE_HASH,
             TEST_SIG_R,
             TEST_SIG_S
         );
-        console.log("auth.clientDataJSON:", auth.clientDataJSON);
         bool isValid = WebAuthn.verify(
             abi.encode(SIGNED_MESSAGE_HASH),
             false,
@@ -90,7 +87,7 @@ contract PasskeyValidatorTest is Base {
 
     function test_real_passkey_signature_validates() public view {
         // Test with the signed message hash directly
-        WebAuthn.WebAuthnAuth memory auth = Helper.getCoinbaseWebAuthnAuth(
+        WebAuthn.WebAuthnAuth memory auth = Helper.getWebAuthnAuth(
             SIGNED_MESSAGE_HASH,
             TEST_SIG_R,
             TEST_SIG_S
@@ -179,7 +176,7 @@ contract PasskeyValidatorTest is Base {
         bytes32 wrongMessageHash = keccak256("wrong message");
 
         // Test with the signed message hash directly
-        WebAuthn.WebAuthnAuth memory auth = Helper.getCoinbaseWebAuthnAuth(
+        WebAuthn.WebAuthnAuth memory auth = Helper.getWebAuthnAuth(
             wrongMessageHash,
             TEST_SIG_R,
             TEST_SIG_S
@@ -214,10 +211,9 @@ contract PasskeyValidatorTest is Base {
         // Use wrong public key coordinates
         uint256 wrongX = 0x1111111111111111111111111111111111111111111111111111111111111111;
         uint256 wrongY = 0x2222222222222222222222222222222222222222222222222222222222222222;
-        bytes32 messageHash = SIGNED_MESSAGE_HASH;
 
         WebAuthn.WebAuthnAuth memory webAuthnAuth = Helper.getWebAuthnAuth(
-            messageHash,
+            SIGNED_MESSAGE_HASH,
             TEST_SIG_R,
             TEST_SIG_S
         );
@@ -237,7 +233,7 @@ contract PasskeyValidatorTest is Base {
 
         bool isValid = passkeyValidator.validateSignature(
             testKeyHash,
-            messageHash,
+            SIGNED_MESSAGE_HASH,
             validatorData
         );
 
@@ -247,21 +243,26 @@ contract PasskeyValidatorTest is Base {
     // ===== Merkle Proof Tests =====
 
     function test_validateSignature_with_merkle_proof_single() public view {
-        WebAuthn.WebAuthnAuth memory auth = Helper.getCoinbaseWebAuthnAuth(
-            SIGNED_MESSAGE_HASH,
-            TEST_SIG_R,
-            TEST_SIG_S
-        );
-        // Create simplified PasskeySignature struct
-
         // Create a simple Merkle proof - in real scenario, messageHash would be a leaf
         // For testing, we'll create a proof where messageHash is already the root
         bytes32[] memory proofs = new bytes32[](1);
-        proofs[0] = keccak256(
-            abi.encodePacked(SIGNED_MESSAGE_HASH, bytes32(0))
+        proofs[0] = keccak256("123");
+        bytes32 rootHash = Helper.getMerkleProofRootHash(
+            proofs,
+            SIGNED_MESSAGE_HASH
         );
+        console.logBytes32(rootHash);
 
-        bytes memory sig = abi.encode(auth, new bytes(0));
+        uint256 r = 115089831660395801645201494062165654030955933932905789802589562760237870153377;
+        uint256 s = 9836647715005216035744379238445769602048920336947092990322163033664673154607;
+        WebAuthn.WebAuthnAuth memory auth = Helper.getWebAuthnAuth(
+            rootHash,
+            r,
+            s
+        );
+        // Create simplified PasskeySignature struct
+
+        bytes memory sig = abi.encode(auth, proofs);
         bytes memory validatorData = abi.encodePacked(
             abi.encode(
                 PasskeyValidatorLib.PasskeyPubKey({

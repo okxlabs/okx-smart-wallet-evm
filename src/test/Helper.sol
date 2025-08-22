@@ -7,6 +7,7 @@ import {PackedUserOperation} from "account-abstraction/interfaces/IAccount.sol";
 import {UserOperationLib} from "account-abstraction/core/UserOperationLib.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {Utils, WebAuthnInfo} from "webauthn-sol/../test/Utils.sol";
+import {MerkleProof} from "openzeppelin-contracts/contracts/utils/cryptography/MerkleProof.sol";
 
 library Helper {
     uint256 constant CHALLENGE_LOCATION = 23;
@@ -67,32 +68,6 @@ library Helper {
         messageHash = sha256(message);
     }
 
-    function getCoinbasePasskeyMessageHash(
-        bytes32 challenge
-    )
-        internal
-        pure
-        returns (
-            string memory clientDataJSON,
-            bytes memory message,
-            bytes32 messageHash
-        )
-    {
-        clientDataJSON = string.concat(
-            '{"type":"webauthn.get","challenge":"',
-            Base64.encodeURL(abi.encode(challenge)),
-            '","origin":"http://localhost:3005"}'
-        );
-
-        bytes32 clientDataHash = sha256(bytes(clientDataJSON));
-
-        message = bytes.concat(
-            hex"49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97630500000101",
-            clientDataHash
-        );
-        messageHash = sha256(message);
-    }
-
     function getWebAuthnAuth(
         bytes32 challenge,
         uint256 r,
@@ -109,24 +84,6 @@ library Helper {
         });
     }
 
-    function getCoinbaseWebAuthnAuth(
-        bytes32 challenge,
-        uint256 r,
-        uint256 s
-    ) internal pure returns (WebAuthn.WebAuthnAuth memory webAuthnAuth) {
-        (string memory clientDataJSON, , ) = getCoinbasePasskeyMessageHash(
-            challenge
-        );
-        webAuthnAuth = WebAuthn.WebAuthnAuth({
-            authenticatorData: hex"49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97630500000101",
-            clientDataJSON: clientDataJSON,
-            typeIndex: TYPE_INDEX,
-            challengeIndex: CHALLENGE_LOCATION,
-            r: r,
-            s: s
-        });
-    }
-
     function webAuthnVerify(
         bytes32 challenge,
         uint256 r,
@@ -134,12 +91,19 @@ library Helper {
         uint256 x,
         uint256 y
     ) internal view returns (bool) {
-        WebAuthn.WebAuthnAuth memory webAuthnAuth = getCoinbaseWebAuthnAuth(
+        WebAuthn.WebAuthnAuth memory webAuthnAuth = getWebAuthnAuth(
             challenge,
             r,
             s
         );
         return
             WebAuthn.verify(abi.encode(challenge), false, webAuthnAuth, x, y);
+    }
+
+    function getMerkleProofRootHash(
+        bytes32[] memory proofs,
+        bytes32 leaf
+    ) internal pure returns (bytes32) {
+        return MerkleProof.processProof(proofs, leaf);
     }
 }
