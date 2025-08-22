@@ -8,6 +8,7 @@ library Errors {
 
     // Account related
     error NotFromSelf();
+    error OwnerExpired();
 
     // Call related
     error CallFailed(uint256 index, uint256 originalLength, bytes returnData);

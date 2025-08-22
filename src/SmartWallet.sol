@@ -49,16 +49,23 @@ contract SmartWallet is
     }
 
     modifier onlyOwnerOrEntryPoint() override {
-        bytes32 keyHash = keccak256(abi.encodePacked(msg.sender));
-        if (
-            _ownerKeys.contains(keyHash) ||
-            msg.sender == entryPoint() ||
-            msg.sender == address(this)
-        ) {
+        if (msg.sender == entryPoint() || msg.sender == address(this)) {
             _;
-        } else {
+            return;
+        }
+        
+        bytes32 keyHash = keccak256(abi.encodePacked(msg.sender));
+        address validator = ownerValidators[keyHash];
+        
+        if (validator == address(0)) {
             revert Errors.NotFromSelf();
         }
+        
+        uint256 settings = ownerSettings[keyHash];
+        if (settings != 0 && isSettingsExpired(settings)) {
+            revert Errors.OwnerExpired();
+        }
+        _;
     }
 
     /**
