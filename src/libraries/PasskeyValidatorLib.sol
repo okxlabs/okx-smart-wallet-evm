@@ -3,6 +3,7 @@ pragma solidity ^0.8.29;
 
 import {P256} from "@openzeppelin/contracts/utils/cryptography/P256.sol";
 import {MerkleProofProcessor} from "./MerkleProofProcessor.sol";
+import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 
 /**
  * @title PasskeyValidatorLib
@@ -10,12 +11,13 @@ import {MerkleProofProcessor} from "./MerkleProofProcessor.sol";
  * @dev Provides static validation functions for P256 signatures with SmartAccount compatibility
  */
 library PasskeyValidatorLib {
+    // the length of the Passkey signature with public key
+    uint256 constant PASSKEY_PUBKEY_LENGTH = 64;
+
     // Simplified struct for direct P256 signature verification
-    struct PasskeySignature {
+    struct PasskeyPubKey {
         uint256 pubKeyX;
         uint256 pubKeyY;
-        uint256 r;
-        uint256 s;
     }
 
     /**
@@ -34,39 +36,37 @@ library PasskeyValidatorLib {
         bytes32 messageHash,
         bytes calldata validatorData
     ) internal view returns (bool) {
-        // Process Merkle proofs if present (using fixed signature length approach)
-        (
-            bytes32 processedMessageHash,
-            bytes memory signatureData
-        ) = MerkleProofProcessor.processWithMerkleProof(
-                validatorData,
-                messageHash,
-                128 // Standard r1 signature length
-            );
+        if (validatorData.length < PASSKEY_PUBKEY_LENGTH) {
+            return false;
+        }
 
-        // Decode the Passkey signature data from processed signature portion
-        PasskeySignature memory sig = abi.decode(
-            signatureData,
-            (PasskeySignature)
+        // decode the Passkey signature data from the validatorData
+        PasskeyPubKey memory sig = abi.decode(
+            validatorData[:PASSKEY_PUBKEY_LENGTH],
+            (PasskeyPubKey)
         );
+
+        // decode the WebAuthn authentication data from the validatorData
+        (WebAuthn.WebAuthnAuth memory webAuthnAuth, bytes32[] memory proofs) = abi.decode(
+            validatorData[PASSKEY_PUBKEY_LENGTH:], 
+            (WebAuthn.WebAuthnAuth, bytes32[])
+        );
+
+        // Process Merkle proofs if present (using fixed signature length approach)
+        bytes32 rootHash = MerkleProofProcessor.processWithMerkleProof(proofs, messageHash);
 
         // Verify that the provided public key matches the registered keyHash
         if (keccak256(abi.encodePacked(sig.pubKeyX, sig.pubKeyY)) != keyHash) {
             return false;
         }
 
-        // Hash the processed messageHash to match crypto.createSign("RSA-SHA256") behavior
-        // This is required for compatibility with existing Passkey signing libraries
-        bytes32 hashedMessage = sha256(abi.encodePacked(processedMessageHash));
-
-        // Verify the P256 signature using the hashed message
-        return
-            P256.verify(
-                hashedMessage,
-                bytes32(sig.r),
-                bytes32(sig.s),
-                bytes32(sig.pubKeyX),
-                bytes32(sig.pubKeyY)
-            );
+        // verify the Passkey signature using the WebAuthn authentication data
+        return WebAuthn.verify({
+            challenge: abi.encode(rootHash), 
+            requireUV: false, 
+            webAuthnAuth: webAuthnAuth, 
+            x: sig.pubKeyX, 
+            y: sig.pubKeyY
+        });
     }
 }

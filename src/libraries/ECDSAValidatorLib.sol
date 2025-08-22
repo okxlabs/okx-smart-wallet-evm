@@ -12,6 +12,8 @@ import {MerkleProofProcessor} from "./MerkleProofProcessor.sol";
 library ECDSAValidatorLib {
     using ECDSA for bytes32;
 
+    uint256 constant ECDSA_SIGNATURE_LENGTH = 65;
+
     /**
      * @notice Validates a signature by checking if the recovered signer's hash matches keyHash
      * @dev Uses ECDSA recovery to verify the signature matches the message hash
@@ -25,18 +27,14 @@ library ECDSAValidatorLib {
         bytes32 messageHash,
         bytes calldata validatorData
     ) internal pure returns (bool) {
-        // Process Merkle proofs if present (ECDSA signatures are 65 bytes)
-        (
-            bytes32 processedMessageHash,
-            bytes memory signature
-        ) = MerkleProofProcessor.processWithMerkleProof(
-                validatorData,
-                messageHash,
-                65 // Standard ECDSA signature length
-            );
+        bytes memory signature = validatorData[:ECDSA_SIGNATURE_LENGTH];
+        if(validatorData.length > ECDSA_SIGNATURE_LENGTH) {
+            (bytes32[] memory proofs) = abi.decode(validatorData[ECDSA_SIGNATURE_LENGTH:], (bytes32[]));
+            messageHash = MerkleProofProcessor.processWithMerkleProof(proofs, messageHash);
+        } 
 
         // Recover signer and verify against keyHash
-        (address recoveredSigner, , ) = processedMessageHash.tryRecover(
+        (address recoveredSigner, , ) = messageHash.tryRecover(
             signature
         );
         return keccak256(abi.encodePacked(recoveredSigner)) == keyHash;
