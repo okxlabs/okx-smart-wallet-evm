@@ -51,7 +51,7 @@ contract Base is Test {
         deployFactory = new DeployFactory();
         bytes32 deployFactorySalt = vm.envBytes32("DEPLOY_FACTORY_SALT");
 
-        (_ecdsaValidator, _smartWallet, _factory) = DeployInitHelper
+        (_ecdsaValidator, _smartWallet, _factory, ) = DeployInitHelper
             .deployContracts(deployFactory, deployFactorySalt);
 
         _setCodeToEOA(address(_smartWallet), _alice);

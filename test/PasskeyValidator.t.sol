@@ -14,7 +14,7 @@ import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {P256} from "@openzeppelin/contracts/utils/cryptography/P256.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {ERC712} from "src/ERC712.sol";
-import {Helper} from "src/test/Helper.sol";
+import {HelperLib} from "src/test/Helper.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {Base64} from "@openzeppelin/contracts/utils/Base64.sol";
 
@@ -46,7 +46,7 @@ contract PasskeyValidatorTest is Base {
         passkeyValidator = new PasskeyValidator();
 
         // Use the generated keyHash
-        testKeyHash = REAL_KEY_HASH;
+        testKeyHash = keccak256(abi.encode([TEST_PUBKEY_X, TEST_PUBKEY_Y]));
 
         // Add PasskeyValidator for Alice's wallet
         _executeAddValidator(
@@ -69,7 +69,7 @@ contract PasskeyValidatorTest is Base {
     }
 
     function test_webauthn_signature_directly() public view {
-        WebAuthn.WebAuthnAuth memory auth = Helper.getWebAuthnAuth(
+        WebAuthn.WebAuthnAuth memory auth = HelperLib.getWebAuthnAuth(
             SIGNED_MESSAGE_HASH,
             TEST_SIG_R,
             TEST_SIG_S
@@ -87,7 +87,7 @@ contract PasskeyValidatorTest is Base {
 
     function test_real_passkey_signature_validates() public view {
         // Test with the signed message hash directly
-        WebAuthn.WebAuthnAuth memory auth = Helper.getWebAuthnAuth(
+        WebAuthn.WebAuthnAuth memory auth = HelperLib.getWebAuthnAuth(
             SIGNED_MESSAGE_HASH,
             TEST_SIG_R,
             TEST_SIG_S
@@ -176,7 +176,7 @@ contract PasskeyValidatorTest is Base {
         bytes32 wrongMessageHash = keccak256("wrong message");
 
         // Test with the signed message hash directly
-        WebAuthn.WebAuthnAuth memory auth = Helper.getWebAuthnAuth(
+        WebAuthn.WebAuthnAuth memory auth = HelperLib.getWebAuthnAuth(
             wrongMessageHash,
             TEST_SIG_R,
             TEST_SIG_S
@@ -212,7 +212,7 @@ contract PasskeyValidatorTest is Base {
         uint256 wrongX = 0x1111111111111111111111111111111111111111111111111111111111111111;
         uint256 wrongY = 0x2222222222222222222222222222222222222222222222222222222222222222;
 
-        WebAuthn.WebAuthnAuth memory webAuthnAuth = Helper.getWebAuthnAuth(
+        WebAuthn.WebAuthnAuth memory webAuthnAuth = HelperLib.getWebAuthnAuth(
             SIGNED_MESSAGE_HASH,
             TEST_SIG_R,
             TEST_SIG_S
@@ -247,7 +247,7 @@ contract PasskeyValidatorTest is Base {
         // For testing, we'll create a proof where messageHash is already the root
         bytes32[] memory proofs = new bytes32[](1);
         proofs[0] = keccak256("123");
-        bytes32 rootHash = Helper.getMerkleProofRootHash(
+        bytes32 rootHash = HelperLib.getMerkleProofRootHash(
             proofs,
             SIGNED_MESSAGE_HASH
         );
@@ -255,7 +255,7 @@ contract PasskeyValidatorTest is Base {
 
         uint256 r = 115089831660395801645201494062165654030955933932905789802589562760237870153377;
         uint256 s = 9836647715005216035744379238445769602048920336947092990322163033664673154607;
-        WebAuthn.WebAuthnAuth memory auth = Helper.getWebAuthnAuth(
+        WebAuthn.WebAuthnAuth memory auth = HelperLib.getWebAuthnAuth(
             rootHash,
             r,
             s

@@ -6,6 +6,7 @@ import "src/validator/ECDSAValidator.sol";
 import "src/test/DeployFactory.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
 import "lib/forge-std/src/Test.sol";
+import {Helper} from "src/test/Helper.sol";
 
 library DeployInitHelper {
     function deployContracts(
@@ -16,7 +17,8 @@ library DeployInitHelper {
         returns (
             ECDSAValidator ecdsaValidatorImpl,
             SmartWallet smartWalletImpl,
-            SmartWalletFactory factoryImpl
+            SmartWalletFactory factoryImpl,
+            Helper helperImpl
         )
     {
         // deploy ECDSAValidator
@@ -35,6 +37,11 @@ library DeployInitHelper {
 
         factoryImpl = SmartWalletFactory(deployFactory.deploy(
             type(SmartWalletFactory).creationCode,
+            deployFactorySalt
+        ));
+
+        helperImpl = Helper(deployFactory.deploy(
+            type(Helper).creationCode,
             deployFactorySalt
         ));
     }
