@@ -23,7 +23,7 @@ interface ISmartWallet is IERC165 {
         address validator,
         bytes calldata validatorData
     ) external;
-    
+
     function isValidSignature(
         bytes32 hash,
         bytes calldata signature

@@ -28,15 +28,19 @@ library ECDSAValidatorLib {
         bytes calldata validatorData
     ) internal pure returns (bool) {
         bytes memory signature = validatorData[:ECDSA_SIGNATURE_LENGTH];
-        if(validatorData.length > ECDSA_SIGNATURE_LENGTH) {
-            (bytes32[] memory proofs) = abi.decode(validatorData[ECDSA_SIGNATURE_LENGTH:], (bytes32[]));
-            messageHash = MerkleProofProcessor.processWithMerkleProof(proofs, messageHash);
-        } 
+        if (validatorData.length > ECDSA_SIGNATURE_LENGTH) {
+            bytes32[] memory proofs = abi.decode(
+                validatorData[ECDSA_SIGNATURE_LENGTH:],
+                (bytes32[])
+            );
+            messageHash = MerkleProofProcessor.processWithMerkleProof(
+                proofs,
+                messageHash
+            );
+        }
 
         // Recover signer and verify against keyHash
-        (address recoveredSigner, , ) = messageHash.tryRecover(
-            signature
-        );
+        (address recoveredSigner, , ) = messageHash.tryRecover(signature);
         return keccak256(abi.encodePacked(recoveredSigner)) == keyHash;
     }
 }

@@ -12,9 +12,12 @@ library Helper {
     uint256 constant CHALLENGE_LOCATION = 23;
     uint256 constant TYPE_INDEX = 1;
 
-    string constant CLIENT_DATA_JSON_PRE = '{"type":"webauthn.get","challenge":"';
-    string constant CLIENT_DATA_JSON_POST = '","origin":"http://localhost:8000","crossOrigin":false}';
-    bytes constant AUTHENTICATOR_DATA = hex"49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631900000000";
+    string constant CLIENT_DATA_JSON_PRE =
+        '{"type":"webauthn.get","challenge":"';
+    string constant CLIENT_DATA_JSON_POST =
+        '","origin":"http://localhost:8000","crossOrigin":false}';
+    bytes constant AUTHENTICATOR_DATA =
+        hex"49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631900000000";
 
     using UserOperationLib for PackedUserOperation;
 
@@ -23,14 +26,7 @@ library Helper {
         uint256 chainid,
         PackedUserOperation calldata userOp
     ) internal pure returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    userOp.hash(),
-                    entryPoint,
-                    chainid
-                )
-            );
+        return keccak256(abi.encode(userOp.hash(), entryPoint, chainid));
     }
 
     function getPubkeyHash(
@@ -57,9 +53,7 @@ library Helper {
             bytes32 messageHash
         )
     {
-        string memory challengeB64url = Base64.encodeURL(
-            abi.encode(challenge)
-        );
+        string memory challengeB64url = Base64.encodeURL(abi.encode(challenge));
 
         clientDataJSON = string.concat(
             CLIENT_DATA_JSON_PRE,
@@ -83,13 +77,19 @@ library Helper {
             bytes memory message,
             bytes32 messageHash
         )
-    {   
+    {
         clientDataJSON = string.concat(
-                '{"type":"webauthn.get","challenge":"', Base64.encodeURL(abi.encode(challenge)), '","origin":"http://localhost:3005"}');
+            '{"type":"webauthn.get","challenge":"',
+            Base64.encodeURL(abi.encode(challenge)),
+            '","origin":"http://localhost:3005"}'
+        );
 
         bytes32 clientDataHash = sha256(bytes(clientDataJSON));
 
-        message = bytes.concat(hex"49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97630500000101", clientDataHash);
+        message = bytes.concat(
+            hex"49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97630500000101",
+            clientDataHash
+        );
         messageHash = sha256(message);
     }
 
@@ -114,7 +114,9 @@ library Helper {
         uint256 r,
         uint256 s
     ) internal pure returns (WebAuthn.WebAuthnAuth memory webAuthnAuth) {
-        (string memory clientDataJSON, , ) = getCoinbasePasskeyMessageHash(challenge);
+        (string memory clientDataJSON, , ) = getCoinbasePasskeyMessageHash(
+            challenge
+        );
         webAuthnAuth = WebAuthn.WebAuthnAuth({
             authenticatorData: hex"49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97630500000101",
             clientDataJSON: clientDataJSON,
@@ -132,14 +134,12 @@ library Helper {
         uint256 x,
         uint256 y
     ) internal view returns (bool) {
-        WebAuthn.WebAuthnAuth memory webAuthnAuth = getCoinbaseWebAuthnAuth(challenge, r, s);
-        return WebAuthn.verify(
-            abi.encode(challenge),
-            false,
-            webAuthnAuth,
-            x,
-            y
+        WebAuthn.WebAuthnAuth memory webAuthnAuth = getCoinbaseWebAuthnAuth(
+            challenge,
+            r,
+            s
         );
+        return
+            WebAuthn.verify(abi.encode(challenge), false, webAuthnAuth, x, y);
     }
-
 }

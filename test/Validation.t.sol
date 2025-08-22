@@ -199,39 +199,53 @@ contract ValidationTest is Base {
         // Add Bob as owner with 1 day expiration
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         uint40 expiry = uint40(block.timestamp + 1 days);
-        
-        _executeAddValidator(_alice, bobKeyHash, address(_ecdsaValidator), false, expiry, address(0));
-        
+
+        _executeAddValidator(
+            _alice,
+            bobKeyHash,
+            address(_ecdsaValidator),
+            false,
+            expiry,
+            address(0)
+        );
+
         // Create a simple call
         Call[] memory calls = constructCallsData();
-        
+
         // Bob can execute before expiration
         vm.prank(_bob);
         ISmartWallet(_alice).execute(calls);
         assertEq(address(_bob).balance, 1 ether);
-        
+
         // Fast forward past expiration
         vm.warp(block.timestamp + 2 days);
-        
+
         // Bob should be rejected after expiration
         vm.prank(_bob);
         vm.expectRevert(Errors.OwnerExpired.selector);
         ISmartWallet(_alice).execute(calls);
     }
-    
+
     function test_execute_allows_non_expired_owner() public {
         // Add Bob as owner with 7 days expiration
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         uint40 expiry = uint40(block.timestamp + 7 days);
-        
-        _executeAddValidator(_alice, bobKeyHash, address(_ecdsaValidator), false, expiry, address(0));
-        
+
+        _executeAddValidator(
+            _alice,
+            bobKeyHash,
+            address(_ecdsaValidator),
+            false,
+            expiry,
+            address(0)
+        );
+
         // Fast forward but still within expiration
         vm.warp(block.timestamp + 6 days);
-        
-        // Create a simple call  
+
+        // Create a simple call
         Call[] memory calls = constructCallsData();
-        
+
         // Bob should still be able to execute
         vm.prank(_bob);
         ISmartWallet(_alice).execute(calls);
