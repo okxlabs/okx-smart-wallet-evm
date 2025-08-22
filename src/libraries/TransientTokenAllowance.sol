@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.29;
 
 /// @notice Library for managing transient ERC20 token allowances
 /// @dev Uses transient storage for temporary token approvals that clear after transaction

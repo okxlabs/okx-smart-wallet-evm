@@ -61,7 +61,7 @@ contract SmartWallet is
     }
 
     /**
-     * @notice Initializes the wallet core with initial owners
+     * @notice Initializes the SmartWallet with initial owners
      * @dev Storage is now integrated directly into SmartWallet
      * @param initialOwners Array of tuples containing keyHash and validator address pairs
      */

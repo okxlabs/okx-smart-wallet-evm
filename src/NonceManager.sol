@@ -16,12 +16,14 @@ abstract contract NonceManager is INonceManager {
     /**
      * @notice Validates the provided nonce matches the stored value and increments it
      * @dev Returns true if nonce is valid, false otherwise. Always updates nonce and emits event.
-     * @param fullNonce The full nonce containing nonceKey (upper 192 bits) and expectedNonce (lower 64 bits)
+     * @param packedNonce The packed nonce containing nonceKey (upper 192 bits) and expectedNonce (lower 64 bits)
      * @return bool True if nonce validation passed, false if nonce was invalid
      */
-    function validateAndUpdateNonce(uint256 fullNonce) internal returns (bool) {
-        uint192 key = uint192(fullNonce >> 64);
-        uint64 expectedNonce = uint64(fullNonce);
+    function validateAndUpdateNonce(
+        uint256 packedNonce
+    ) internal returns (bool) {
+        uint192 key = uint192(packedNonce >> 64);
+        uint64 expectedNonce = uint64(packedNonce);
         uint64 currentNonce = _nonces[key];
 
         unchecked {

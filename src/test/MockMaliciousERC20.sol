@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.29;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-/* Mock of malicous token which may launch an attack to relayer */
+/* Mock of malicious token which may launch an attack to relayer */
 contract MockMaliciousERC20 is ERC20 {
     uint256 gasDrainingAttackHeight;
     uint256 largeBlobAttackHeight;
