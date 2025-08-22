@@ -117,7 +117,7 @@ contract PasskeyValidatorTest is Base {
 
     function test_get_real_typed_data_hash() public view {
         // Create test calls
-        Call[] memory calls = _construct_calls_data();
+        Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: _getNonce(_alice),
@@ -136,7 +136,7 @@ contract PasskeyValidatorTest is Base {
 
     function test_executeWithRelayer_with_mock_passkey() public view {
         // Create test calls
-        Call[] memory calls = _construct_calls_data();
+        Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: _getNonce(_alice),

@@ -553,7 +553,7 @@ contract SimulationTest is Base {
         );
         deal(address(maliciousToken), _alice, MAX_DEAL);
 
-        Call[] memory tempCalls = _construct_relayer_call(1, usdc);
+        Call[] memory tempCalls = constructRelayerCall(1, usdc);
         // Clear existing storage array
         delete relayerCalls;
         // Push elements individually
@@ -568,7 +568,7 @@ contract SimulationTest is Base {
         require(len <= recipients.length);
         calls = new Call[](len);
         for (uint256 i; i < len; i++) {
-            calls[i] = _construct_erc20_transfer_call(
+            calls[i] = constructErc20TransferCall(
                 usdc,
                 recipients[i],
                 (i + 1) * 100
@@ -586,11 +586,7 @@ contract SimulationTest is Base {
             if (i == len - 1) {
                 value = MAX_DEAL + 1; // exceed the max minted amount
             }
-            calls[i] = _construct_erc20_transfer_call(
-                usdc,
-                recipients[i],
-                value
-            );
+            calls[i] = constructErc20TransferCall(usdc, recipients[i], value);
         }
     }
 
@@ -604,7 +600,7 @@ contract SimulationTest is Base {
             if (i == len - 1) {
                 token = maliciousToken;
             }
-            calls[i] = _construct_erc20_transfer_call(
+            calls[i] = constructErc20TransferCall(
                 token,
                 recipients[i],
                 (i + 1) * 100
@@ -638,10 +634,10 @@ contract SimulationTest is Base {
     }
 
     function test_simulate_executeFromRelayer() public {
-        Call[] memory calls = _construct_calls_data();
+        Call[] memory calls = constructCallsData();
 
         bytes32 hash = _getValidationTypedHash(_alice, calls);
-        bytes memory validatorData = _construct_validatorData(
+        bytes memory validatorData = constructValidatorData(
             _alice,
             _alicePk,
             hash
@@ -682,9 +678,9 @@ contract SimulationTest is Base {
         _addValidator(_alice);
 
         // Setup common data for both tests
-        Call[] memory calls = _construct_calls_data();
+        Call[] memory calls = constructCallsData();
         bytes32 hash = _getValidationTypedHash(_alice, calls);
-        bytes memory validatorData = _construct_validatorData(
+        bytes memory validatorData = constructValidatorData(
             _alice,
             _alicePk,
             hash

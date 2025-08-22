@@ -23,9 +23,9 @@ contract SmartWalletFactory is
     }
 
     /// @notice create smart account with owners and validators
-    /// @param implementation: implementation address
-    /// @param initialOwners: initial owners
-    /// @param salt: salt
+    /// @param implementation implementation address
+    /// @param initialOwners initial owners
+    /// @param salt salt
     function createAccount(
         address implementation,
         InitialOwner[] calldata initialOwners,
@@ -47,9 +47,9 @@ contract SmartWalletFactory is
     }
 
     /// @notice predict deterministic address
-    /// @param implementation: implementation address
-    /// @param initialOwners: initial owners
-    /// @param salt: salt
+    /// @param implementation implementation address
+    /// @param initialOwners initial owners
+    /// @param salt salt
     function getAddress(
         address implementation,
         InitialOwner[] calldata initialOwners,
@@ -64,8 +64,8 @@ contract SmartWalletFactory is
     }
 
     /// @notice get account salt
-    /// @param initialOwners: initial owners
-    /// @param salt: salt
+    /// @param initialOwners initial owners
+    /// @param salt salt
     function _getSalt(
         InitialOwner[] calldata initialOwners,
         uint256 salt

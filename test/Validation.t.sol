@@ -2,10 +2,10 @@
 pragma solidity ^0.8.23;
 
 import {Base} from "./Base.t.sol";
-import {OwnersManager} from "src/OwnersManager.sol";
 import {Errors} from "src/libraries/Errors.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
+import {INonceManager} from "src/interfaces/INonceManager.sol";
 
 contract ValidationTest is Base {
     event NonceConsumed(uint192 key, uint64 nonce);
@@ -15,11 +15,11 @@ contract ValidationTest is Base {
     }
 
     function test_executeFromRelayer_reverts_for_invalid_signature() public {
-        Call[] memory calls = _construct_calls_data();
+        Call[] memory calls = constructCallsData();
         _addValidator(_alice);
 
         bytes32 hash = _getValidationTypedHash(_alice, calls);
-        bytes memory validatorData = _construct_validatorData(
+        bytes memory validatorData = constructValidatorData(
             _alice,
             _bobPk, // Wrong private key for invalid signature test
             hash
@@ -38,12 +38,12 @@ contract ValidationTest is Base {
     }
 
     function test_executeFromRelayer_reverts_for_invalid_keyHash() public {
-        Call[] memory calls = _construct_calls_data();
+        Call[] memory calls = constructCallsData();
 
         // Use a keyHash that doesn't exist (bob's keyHash, but bob is not a validator)
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         bytes32 hash = _getValidationTypedHash(_alice, calls);
-        bytes memory validatorData = _construct_validatorData(
+        bytes memory validatorData = constructValidatorData(
             _bob, // Use bob's address for keyHash
             _bobPk, // Use bob's private key for signing
             hash
@@ -62,7 +62,7 @@ contract ValidationTest is Base {
     }
 
     function test_executeFromRelayer_reverts_for_removed_validator() public {
-        Call[] memory calls = _construct_calls_data();
+        Call[] memory calls = constructCallsData();
 
         // Use _bob instead of _alice to avoid EIP-7702 fallback collision
         // (In test environment, address(this) == _alice due to setCode)
@@ -72,7 +72,7 @@ contract ValidationTest is Base {
         _executeRemoveValidator(_alice, bobKeyHash);
 
         bytes32 hash = _getValidationTypedHash(_alice, calls);
-        bytes memory validatorData = _construct_validatorData(
+        bytes memory validatorData = constructValidatorData(
             _alice,
             _bob, // Using _bob's address
             _bobPk, // Using _bob's private key
@@ -97,13 +97,13 @@ contract ValidationTest is Base {
 
         vm.prank(_alice);
         uint256 nonce = _getNonce(_alice);
-        Call[] memory calls = _construct_calls_data();
+        Call[] memory calls = constructCallsData();
 
         vm.expectEmit();
         emit NonceConsumed(uint192(0), uint64(nonce));
 
         bytes32 hash = _getValidationTypedHash(_alice, calls);
-        bytes memory validatorData = _construct_validatorData(
+        bytes memory validatorData = constructValidatorData(
             _alice,
             _alicePk,
             hash
@@ -120,6 +120,48 @@ contract ValidationTest is Base {
         assertEq(address(_bob).balance, 1 ether);
     }
 
+    function test_nonce_unchanged_after_invalid_signature_revert() public {
+        // Add validator
+        _addValidator(_alice);
+
+        // Get initial nonce
+        uint192 nonceKey = uint192(
+            uint256(keccak256(abi.encodePacked(_alice))) >> 64
+        );
+        uint64 initialNonce = INonceManager(_alice).getNonce(nonceKey);
+
+        // Construct call data
+        Call[] memory calls = constructCallsData();
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: (uint256(nonceKey) << 64) | uint256(initialNonce),
+            expiry: 0
+        });
+
+        // Create validatorData with invalid signature
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes memory invalidSignature = new bytes(65); // All zeros - invalid signature
+        bytes memory validatorData = abi.encodePacked(
+            aliceKeyHash,
+            invalidSignature
+        );
+
+        // Execute transaction that should revert
+        vm.prank(_alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+        );
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+
+        // Verify nonce hasn't changed
+        uint64 nonceAfterRevert = INonceManager(_alice).getNonce(nonceKey);
+        assertEq(
+            nonceAfterRevert,
+            initialNonce,
+            "Nonce should not change after reverted transaction"
+        );
+    }
+
     function test_isValidSignature_fails_with_invalid_signer() public view {
         bytes32 hash = keccak256("test");
 
@@ -131,18 +173,23 @@ contract ValidationTest is Base {
         assertEq(result, bytes4(0xffffffff));
     }
 
-
     function test_isValidSignature_signature_length_boundaries() public view {
         bytes32 hash = keccak256("test");
 
         // Test empty signature
         bytes memory emptySignature = bytes("");
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, emptySignature);
+        bytes4 result = ISmartWallet(_alice).isValidSignature(
+            hash,
+            emptySignature
+        );
         assertEq(result, bytes4(0xffffffff));
 
         // Test oversized signature (100 bytes)
         bytes memory oversizedSignature = bytes(new bytes(100));
-        result = ISmartWallet(_alice).isValidSignature(hash, oversizedSignature);
+        result = ISmartWallet(_alice).isValidSignature(
+            hash,
+            oversizedSignature
+        );
         assertEq(result, bytes4(0xffffffff));
     }
 

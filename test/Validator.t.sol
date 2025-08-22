@@ -37,7 +37,7 @@ contract ValidatorTest is Base {
         (_charlie, _charliePk) = makeAddrAndKey("charlie");
         (_dave, _davePk) = makeAddrAndKey("dave");
         super.setUp();
-        
+
         // Deploy external validator contracts
         externalEcdsaValidator = new ECDSAValidator();
         externalPasskeyValidator = new PasskeyValidator();
@@ -131,11 +131,11 @@ contract ValidatorTest is Base {
         // Deploy and add validator using helper
         _addValidator(_alice, _charlie);
 
-        Call[] memory calls = _construct_calls_data();
+        Call[] memory calls = constructCallsData();
 
         // Relayer executes with Charlie signature
         bytes32 hash = _getValidationTypedHash(_alice, calls);
-        bytes memory validatorData = _construct_validatorData(
+        bytes memory validatorData = constructValidatorData(
             _alice,
             _charlie,
             _charliePk,
@@ -476,7 +476,7 @@ contract ValidatorTest is Base {
         });
 
         // Sign with non-admin signer (_bob)
-        bytes memory signature = _construct_signature(
+        bytes memory signature = constructSignature(
             batchedCall,
             _alice,
             _bobPk
@@ -527,7 +527,7 @@ contract ValidatorTest is Base {
         });
 
         // Sign with non-admin signer (_bob)
-        bytes memory signature = _construct_signature(
+        bytes memory signature = constructSignature(
             batchedCall,
             _alice,
             _bobPk
@@ -576,7 +576,7 @@ contract ValidatorTest is Base {
         });
 
         // Sign with admin signer (default initial owner is admin)
-        bytes memory signature = _construct_signature(
+        bytes memory signature = constructSignature(
             batchedCall,
             _alice,
             _alicePk
@@ -636,7 +636,7 @@ contract ValidatorTest is Base {
         });
 
         // Sign with admin signer
-        bytes memory signature = _construct_signature(
+        bytes memory signature = constructSignature(
             batchedCall,
             _alice,
             _alicePk
@@ -682,7 +682,7 @@ contract ValidatorTest is Base {
             expiry: 0
         });
 
-        bytes memory signature = _construct_signature(
+        bytes memory signature = constructSignature(
             batchedCall,
             _alice,
             _alicePk
@@ -732,7 +732,7 @@ contract ValidatorTest is Base {
             expiry: 0
         });
 
-        bytes memory signature = _construct_signature(
+        bytes memory signature = constructSignature(
             batchedCall,
             _alice,
             _alicePk
@@ -824,7 +824,7 @@ contract ValidatorTest is Base {
             expiry: 0
         });
 
-        bytes memory signature = _construct_signature(
+        bytes memory signature = constructSignature(
             batchedCall,
             freshWallet,
             _alicePk
@@ -858,35 +858,38 @@ contract ValidatorTest is Base {
             0,
             address(0)
         );
-        
+
         // Verify validator was added
-        address addedValidator = IOwnersManager(_alice).ownerValidators(charlieKeyHash);
+        address addedValidator = IOwnersManager(_alice).ownerValidators(
+            charlieKeyHash
+        );
         assertEq(addedValidator, address(externalEcdsaValidator));
-        
+
         // Test executing transaction with external validator
-        Call[] memory calls = _construct_calls_data();
+        Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: _getNonce(_alice),
             expiry: uint48(block.timestamp + 1 hours)
         });
-        
-        bytes32 typedDataHash = ERC712(_alice).hashTypedData(BatchedCallLib.hash(batchedCall));
+
+        bytes32 typedDataHash = ERC712(_alice).hashTypedData(
+            BatchedCallLib.hash(batchedCall)
+        );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_charliePk, typedDataHash);
-        
+
         bytes memory validatorData = abi.encodePacked(
             charlieKeyHash,
             abi.encodePacked(r, s, v)
         );
-        
+
         vm.prank(_bob);
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
         ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
-        
+
         assertEq(address(_bob).balance, 1 ether);
     }
-
 
     function test_mock_validator_integration_success() public {
         bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
@@ -898,26 +901,26 @@ contract ValidatorTest is Base {
             0,
             address(0)
         );
-        
+
         mockValidator.setValidationResult(true);
-        
-        Call[] memory calls = _construct_calls_data();
+
+        Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: _getNonce(_alice),
             expiry: uint48(block.timestamp + 1 hours)
         });
-        
+
         bytes memory validatorData = abi.encodePacked(
             charlieKeyHash,
             "mock signature data"
         );
-        
+
         vm.prank(_bob);
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
         ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
-        
+
         assertEq(address(_bob).balance, 1 ether);
     }
 
@@ -931,23 +934,25 @@ contract ValidatorTest is Base {
             0,
             address(0)
         );
-        
+
         mockValidator.setValidationResult(false);
-        
-        Call[] memory calls = _construct_calls_data();
+
+        Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: _getNonce(_alice),
             expiry: uint48(block.timestamp + 1 hours)
         });
-        
+
         bytes memory validatorData = abi.encodePacked(
             charlieKeyHash,
             "mock signature data"
         );
-        
+
         vm.prank(_bob);
-        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidSignature.selector));
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+        );
         ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
     }
 
@@ -963,61 +968,91 @@ contract ValidatorTest is Base {
             0,
             address(0)
         );
-        
-        Call[] memory calls = _construct_calls_data();
+
+        Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: _getNonce(_alice),
             expiry: uint48(block.timestamp + 1 hours)
         });
-        
+
         // Test 1: Empty signature should fail
-        bytes memory emptyValidatorData = abi.encodePacked(charlieKeyHash, bytes(""));
+        bytes memory emptyValidatorData = abi.encodePacked(
+            charlieKeyHash,
+            bytes("")
+        );
         vm.prank(_bob);
-        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidSignature.selector));
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, emptyValidatorData);
-        
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+        );
+        ISmartWallet(_alice).executeWithRelayer(
+            batchedCall,
+            emptyValidatorData
+        );
+
         // Test 2: Oversized signature should fail
         bytes memory oversizedSignature = new bytes(1000);
         for (uint256 i = 0; i < 1000; i++) {
             oversizedSignature[i] = bytes1(uint8(i % 256));
         }
-        bytes memory oversizedValidatorData = abi.encodePacked(charlieKeyHash, oversizedSignature);
+        bytes memory oversizedValidatorData = abi.encodePacked(
+            charlieKeyHash,
+            oversizedSignature
+        );
         vm.prank(_bob);
-        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidSignature.selector));
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, oversizedValidatorData);
-        
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+        );
+        ISmartWallet(_alice).executeWithRelayer(
+            batchedCall,
+            oversizedValidatorData
+        );
+
         // Test 3: Insufficient signature data should fail
         bytes memory insufficientValidatorData = abi.encodePacked(
             charlieKeyHash,
-            bytes32(0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef)
+            bytes32(
+                0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+            )
         );
         vm.prank(_bob);
-        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidSignature.selector));
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, insufficientValidatorData);
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+        );
+        ISmartWallet(_alice).executeWithRelayer(
+            batchedCall,
+            insufficientValidatorData
+        );
     }
 
     function test_validator_invalid_keyhash() public {
         // Use zero keyHash (invalid)
         bytes32 invalidKeyHash = bytes32(0);
-        
-        Call[] memory calls = _construct_calls_data();
+
+        Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: _getNonce(_alice),
             expiry: uint48(block.timestamp + 1 hours)
         });
-        
-        bytes32 typedDataHash = ERC712(_alice).hashTypedData(BatchedCallLib.hash(batchedCall));
+
+        bytes32 typedDataHash = ERC712(_alice).hashTypedData(
+            BatchedCallLib.hash(batchedCall)
+        );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_charliePk, typedDataHash);
-        
+
         bytes memory validatorData = abi.encodePacked(
             invalidKeyHash, // Invalid keyHash
             abi.encodePacked(r, s, v)
         );
-        
+
         vm.prank(_bob);
-        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidKeyHash.selector, invalidKeyHash));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Errors.InvalidKeyHash.selector,
+                invalidKeyHash
+            )
+        );
         ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
     }
 
@@ -1025,7 +1060,7 @@ contract ValidatorTest is Base {
 
     function test_validateUserOp_signature_too_short() public {
         vm.prank(_alice);
-        
+
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
@@ -1037,9 +1072,9 @@ contract ValidatorTest is Base {
             initialOwners,
             0
         );
-        
+
         vm.deal(address(account), 1 ether);
-        
+
         vm.etch(
             IERC4337Account(account).entryPoint(),
             address(new MockEntryPoint()).code
@@ -1047,14 +1082,16 @@ contract ValidatorTest is Base {
         MockEntryPoint ep = MockEntryPoint(
             payable(IERC4337Account(account).entryPoint())
         );
-        
+
         PackedUserOperation memory userOp;
         // Signature too short (less than 32 bytes)
-        userOp.signature = abi.encodePacked(bytes16(0x1234567890abcdef1234567890abcdef));
-        
+        userOp.signature = abi.encodePacked(
+            bytes16(0x1234567890abcdef1234567890abcdef)
+        );
+
         bytes32 userOpHash = keccak256("test");
         uint256 missingAccountFunds = 100;
-        
+
         // Should revert due to array bounds error when trying to access signature[0:32]
         vm.expectRevert();
         ep.validateUserOp(
@@ -1067,7 +1104,7 @@ contract ValidatorTest is Base {
 
     function test_validateUserOp_empty_signature() public {
         vm.prank(_alice);
-        
+
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
@@ -1079,9 +1116,9 @@ contract ValidatorTest is Base {
             initialOwners,
             0
         );
-        
+
         vm.deal(address(account), 1 ether);
-        
+
         vm.etch(
             IERC4337Account(account).entryPoint(),
             address(new MockEntryPoint()).code
@@ -1089,14 +1126,14 @@ contract ValidatorTest is Base {
         MockEntryPoint ep = MockEntryPoint(
             payable(IERC4337Account(account).entryPoint())
         );
-        
+
         PackedUserOperation memory userOp;
         // Empty signature
         userOp.signature = bytes("");
-        
+
         bytes32 userOpHash = keccak256("test");
         uint256 missingAccountFunds = 100;
-        
+
         // Should revert due to array bounds error when trying to access signature[0:32]
         vm.expectRevert();
         ep.validateUserOp(
@@ -1109,7 +1146,7 @@ contract ValidatorTest is Base {
 
     function test_validateUserOp_malformed_keyhash_in_signature() public {
         vm.prank(_alice);
-        
+
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
@@ -1121,9 +1158,9 @@ contract ValidatorTest is Base {
             initialOwners,
             0
         );
-        
+
         vm.deal(address(account), 1 ether);
-        
+
         vm.etch(
             IERC4337Account(account).entryPoint(),
             address(new MockEntryPoint()).code
@@ -1131,10 +1168,10 @@ contract ValidatorTest is Base {
         MockEntryPoint ep = MockEntryPoint(
             payable(IERC4337Account(account).entryPoint())
         );
-        
+
         PackedUserOperation memory userOp;
         bytes32 userOpHash = keccak256("test");
-        
+
         // Use invalid keyHash (not registered)
         bytes32 invalidKeyHash = keccak256(abi.encodePacked(address(0xdead)));
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
@@ -1142,9 +1179,9 @@ contract ValidatorTest is Base {
             invalidKeyHash,
             abi.encodePacked(r, s, v)
         );
-        
+
         uint256 missingAccountFunds = 100;
-        
+
         // Should return SIG_VALIDATION_FAILED (1 << 96)
         uint256 result = ep.validateUserOp(
             address(account),

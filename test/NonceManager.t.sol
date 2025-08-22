@@ -350,7 +350,6 @@ contract NonceManagerTest is Test {
         assertEq(interface_reference.getNonce(testKey), 1);
     }
 
-
     // ============ Cross-Contract Usage Patterns ============
 
     function test_multiple_contracts_independent_nonces() public {
