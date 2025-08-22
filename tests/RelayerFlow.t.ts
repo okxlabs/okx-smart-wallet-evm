@@ -1,8 +1,11 @@
 import { expect } from "chai";
 import { ethers } from "ethers";
-import { Signer } from "ethers";
 import * as dotenv from "dotenv";
-import axios, { AxiosInstance, AxiosResponse } from "axios";
+import axios from "axios";
+import type { AxiosInstance, AxiosResponse } from "axios";
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
 
 dotenv.config();
 
@@ -180,6 +183,9 @@ describe("RelayerFlow Integration Tests", function () {
 
     beforeEach(async function () {
         try {
+            // Get the directory path for ES modules
+            const currentDir = path.dirname(new URL(import.meta.url).pathname);
+            
             // Reset Anvil state to ensure clean environment
             console.log("Resetting Anvil state...");
             provider = new ethers.JsonRpcProvider(ANVIL_RPC_URL);
@@ -229,15 +235,12 @@ describe("RelayerFlow Integration Tests", function () {
             let deploymentNonce = await provider.getTransactionCount(aliceAddress);
 
             // Load contract artifacts with error handling
-            const fs = require('fs');
-            const path = require('path');
-
             let ecdsaValidatorArtifact, smartWalletArtifact, mockERC20Artifact;
 
             try {
-                ecdsaValidatorArtifact = JSON.parse(fs.readFileSync(path.join(__dirname, '../out/ECDSAValidator.sol/ECDSAValidator.json'), 'utf8'));
-                smartWalletArtifact = JSON.parse(fs.readFileSync(path.join(__dirname, '../out/SmartWallet.sol/SmartWallet.json'), 'utf8'));
-                mockERC20Artifact = JSON.parse(fs.readFileSync(path.join(__dirname, '../out/MockERC20.sol/MockERC20.json'), 'utf8'));
+                ecdsaValidatorArtifact = JSON.parse(fs.readFileSync(path.join(currentDir, '../out/ECDSAValidator.sol/ECDSAValidator.json'), 'utf8'));
+                smartWalletArtifact = JSON.parse(fs.readFileSync(path.join(currentDir, '../out/SmartWallet.sol/SmartWallet.json'), 'utf8'));
+                mockERC20Artifact = JSON.parse(fs.readFileSync(path.join(currentDir, '../out/MockERC20.sol/MockERC20.json'), 'utf8'));
             } catch (error) {
                 throw new Error(`Failed to load contract artifacts. Run 'forge build' first. Error: ${error.message}`);
             }
@@ -255,7 +258,7 @@ describe("RelayerFlow Integration Tests", function () {
             console.log(`SmartWallet implementation deployed at: ${await smartWalletImpl.getAddress()}`);
 
             // Deploy SmartWalletFactory with explicit nonce
-            const factoryArtifact = JSON.parse(fs.readFileSync(path.join(__dirname, '../out/SmartWalletFactory.sol/SmartWalletFactory.json'), 'utf8'));
+            const factoryArtifact = JSON.parse(fs.readFileSync(path.join(currentDir, '../out/SmartWalletFactory.sol/SmartWalletFactory.json'), 'utf8'));
             const FactoryFactory = new ethers.ContractFactory(factoryArtifact.abi, factoryArtifact.bytecode, alice);
             const factory: any = await FactoryFactory.deploy({ nonce: deploymentNonce++ });
             await factory.waitForDeployment();
@@ -410,7 +413,7 @@ describe("RelayerFlow Integration Tests", function () {
     }
 
     function generateNonce(): bigint {
-        const crypto = require('crypto');
+        //const crypto = require('crypto');
         const randomBytes = crypto.randomBytes(24);
         const zeroBytes = Buffer.alloc(8, 0);
 
@@ -446,6 +449,7 @@ describe("RelayerFlow Integration Tests", function () {
             mockValidatorData,
         ]);
 
+        // TODO; need to fix and conform to EIP
         const requestBody = {
             jsonrpc: "2.0",
             method: "relayer_getQuote",
@@ -492,6 +496,7 @@ describe("RelayerFlow Integration Tests", function () {
             validationData,
         ]);
 
+        // TODO: conform to EIP
         const requestBody = {
             jsonrpc: "2.0",
             method: "relayer_sendTransaction",
