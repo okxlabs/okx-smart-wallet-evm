@@ -3,7 +3,7 @@ pragma solidity ^0.8.29;
 
 import {P256} from "@openzeppelin/contracts/utils/cryptography/P256.sol";
 import {MerkleProofProcessor} from "./MerkleProofProcessor.sol";
-import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
+import {WebAuthn} from "webauthn-sol/src/WebAuthn.sol";
 
 /**
  * @title PasskeyValidatorLib
