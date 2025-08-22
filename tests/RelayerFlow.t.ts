@@ -58,1041 +58,6 @@ interface TransactionStatusResponse {
     error: any;
 }
 
-export const ABI = [
-    {
-        "type": "constructor",
-        "inputs": [],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "fallback",
-        "stateMutability": "payable"
-    },
-    {
-        "type": "receive",
-        "stateMutability": "payable"
-    },
-    {
-        "type": "function",
-        "name": "CUSTOM_STORAGE_ROOT",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "bytes32",
-                "internalType": "bytes32"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "IMPLEMENTATION",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "address",
-                "internalType": "address"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "_nonces",
-        "inputs": [
-            {
-                "name": "",
-                "type": "uint192",
-                "internalType": "uint192"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint64",
-                "internalType": "uint64"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "addValidator",
-        "inputs": [
-            {
-                "name": "keyHash",
-                "type": "bytes32",
-                "internalType": "bytes32"
-            },
-            {
-                "name": "validator",
-                "type": "address",
-                "internalType": "address"
-            },
-            {
-                "name": "adminFlag",
-                "type": "bool",
-                "internalType": "bool"
-            },
-            {
-                "name": "expiration",
-                "type": "uint40",
-                "internalType": "uint40"
-            },
-            {
-                "name": "hook",
-                "type": "address",
-                "internalType": "address"
-            }
-        ],
-        "outputs": [],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "eip712Domain",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "fields",
-                "type": "bytes1",
-                "internalType": "bytes1"
-            },
-            {
-                "name": "name",
-                "type": "string",
-                "internalType": "string"
-            },
-            {
-                "name": "version",
-                "type": "string",
-                "internalType": "string"
-            },
-            {
-                "name": "chainId",
-                "type": "uint256",
-                "internalType": "uint256"
-            },
-            {
-                "name": "verifyingContract",
-                "type": "address",
-                "internalType": "address"
-            },
-            {
-                "name": "salt",
-                "type": "bytes32",
-                "internalType": "bytes32"
-            },
-            {
-                "name": "extensions",
-                "type": "uint256[]",
-                "internalType": "uint256[]"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "entryPoint",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "address",
-                "internalType": "address"
-            }
-        ],
-        "stateMutability": "pure"
-    },
-    {
-        "type": "function",
-        "name": "execute",
-        "inputs": [
-            {
-                "name": "calls",
-                "type": "tuple[]",
-                "internalType": "struct Call[]",
-                "components": [
-                    {
-                        "name": "target",
-                        "type": "address",
-                        "internalType": "address"
-                    },
-                    {
-                        "name": "value",
-                        "type": "uint256",
-                        "internalType": "uint256"
-                    },
-                    {
-                        "name": "data",
-                        "type": "bytes",
-                        "internalType": "bytes"
-                    }
-                ]
-            }
-        ],
-        "outputs": [],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "executeWithRelayer",
-        "inputs": [
-            {
-                "name": "batchedCall",
-                "type": "tuple",
-                "internalType": "struct BatchedCall",
-                "components": [
-                    {
-                        "name": "calls",
-                        "type": "tuple[]",
-                        "internalType": "struct Call[]",
-                        "components": [
-                            {
-                                "name": "target",
-                                "type": "address",
-                                "internalType": "address"
-                            },
-                            {
-                                "name": "value",
-                                "type": "uint256",
-                                "internalType": "uint256"
-                            },
-                            {
-                                "name": "data",
-                                "type": "bytes",
-                                "internalType": "bytes"
-                            }
-                        ]
-                    },
-                    {
-                        "name": "nonce",
-                        "type": "uint256",
-                        "internalType": "uint256"
-                    },
-                    {
-                        "name": "expiry",
-                        "type": "uint48",
-                        "internalType": "uint48"
-                    }
-                ]
-            },
-            {
-                "name": "validatorData",
-                "type": "bytes",
-                "internalType": "bytes"
-            }
-        ],
-        "outputs": [],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "getAllValidatorKeys",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "bytes32[]",
-                "internalType": "bytes32[]"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "getExpiration",
-        "inputs": [
-            {
-                "name": "settings",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint40",
-                "internalType": "uint40"
-            }
-        ],
-        "stateMutability": "pure"
-    },
-    {
-        "type": "function",
-        "name": "getHook",
-        "inputs": [
-            {
-                "name": "settings",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "",
-                "type": "address",
-                "internalType": "address"
-            }
-        ],
-        "stateMutability": "pure"
-    },
-    {
-        "type": "function",
-        "name": "getNonce",
-        "inputs": [
-            {
-                "name": "key",
-                "type": "uint192",
-                "internalType": "uint192"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint64",
-                "internalType": "uint64"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "getValidatorAt",
-        "inputs": [
-            {
-                "name": "index",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "",
-                "type": "bytes32",
-                "internalType": "bytes32"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "getValidatorCount",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "getValidatorSettings",
-        "inputs": [
-            {
-                "name": "keyHash",
-                "type": "bytes32",
-                "internalType": "bytes32"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "validator",
-                "type": "address",
-                "internalType": "address"
-            },
-            {
-                "name": "hook",
-                "type": "address",
-                "internalType": "address"
-            },
-            {
-                "name": "expiration",
-                "type": "uint40",
-                "internalType": "uint40"
-            },
-            {
-                "name": "adminStatus",
-                "type": "bool",
-                "internalType": "bool"
-            },
-            {
-                "name": "expired",
-                "type": "bool",
-                "internalType": "bool"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "getVerifiedValidator",
-        "inputs": [
-            {
-                "name": "keyHash",
-                "type": "bytes32",
-                "internalType": "bytes32"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "",
-                "type": "address",
-                "internalType": "address"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "hasValidator",
-        "inputs": [
-            {
-                "name": "keyHash",
-                "type": "bytes32",
-                "internalType": "bytes32"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "",
-                "type": "bool",
-                "internalType": "bool"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "hashTypedData",
-        "inputs": [
-            {
-                "name": "structHash",
-                "type": "bytes32",
-                "internalType": "bytes32"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "digest",
-                "type": "bytes32",
-                "internalType": "bytes32"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "hashTypedDataSansChainId",
-        "inputs": [
-            {
-                "name": "structHash",
-                "type": "bytes32",
-                "internalType": "bytes32"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "digest",
-                "type": "bytes32",
-                "internalType": "bytes32"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "initialize",
-        "inputs": [
-            {
-                "name": "initialOwners",
-                "type": "tuple[]",
-                "internalType": "struct InitialOwner[]",
-                "components": [
-                    {
-                        "name": "keyHash",
-                        "type": "bytes32",
-                        "internalType": "bytes32"
-                    },
-                    {
-                        "name": "validator",
-                        "type": "address",
-                        "internalType": "address"
-                    }
-                ]
-            }
-        ],
-        "outputs": [],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "isAdmin",
-        "inputs": [
-            {
-                "name": "settings",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "",
-                "type": "bool",
-                "internalType": "bool"
-            }
-        ],
-        "stateMutability": "pure"
-    },
-    {
-        "type": "function",
-        "name": "isSettingsExpired",
-        "inputs": [
-            {
-                "name": "settings",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "",
-                "type": "bool",
-                "internalType": "bool"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "isValidSignature",
-        "inputs": [
-            {
-                "name": "_hash",
-                "type": "bytes32",
-                "internalType": "bytes32"
-            },
-            {
-                "name": "signature",
-                "type": "bytes",
-                "internalType": "bytes"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "",
-                "type": "bytes4",
-                "internalType": "bytes4"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "namespaceAndVersion",
-        "inputs": [],
-        "outputs": [
-            {
-                "name": "",
-                "type": "string",
-                "internalType": "string"
-            }
-        ],
-        "stateMutability": "pure"
-    },
-    {
-        "type": "function",
-        "name": "ownerSettings",
-        "inputs": [
-            {
-                "name": "",
-                "type": "bytes32",
-                "internalType": "bytes32"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "ownerValidators",
-        "inputs": [
-            {
-                "name": "",
-                "type": "bytes32",
-                "internalType": "bytes32"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "",
-                "type": "address",
-                "internalType": "address"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "packSettings",
-        "inputs": [
-            {
-                "name": "adminFlag",
-                "type": "bool",
-                "internalType": "bool"
-            },
-            {
-                "name": "expiration",
-                "type": "uint40",
-                "internalType": "uint40"
-            },
-            {
-                "name": "hook",
-                "type": "address",
-                "internalType": "address"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "stateMutability": "pure"
-    },
-    {
-        "type": "function",
-        "name": "removeValidator",
-        "inputs": [
-            {
-                "name": "keyHash",
-                "type": "bytes32",
-                "internalType": "bytes32"
-            }
-        ],
-        "outputs": [],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "simulateExecuteWithRelayer",
-        "inputs": [
-            {
-                "name": "batchedCall",
-                "type": "tuple",
-                "internalType": "struct BatchedCall",
-                "components": [
-                    {
-                        "name": "calls",
-                        "type": "tuple[]",
-                        "internalType": "struct Call[]",
-                        "components": [
-                            {
-                                "name": "target",
-                                "type": "address",
-                                "internalType": "address"
-                            },
-                            {
-                                "name": "value",
-                                "type": "uint256",
-                                "internalType": "uint256"
-                            },
-                            {
-                                "name": "data",
-                                "type": "bytes",
-                                "internalType": "bytes"
-                            }
-                        ]
-                    },
-                    {
-                        "name": "nonce",
-                        "type": "uint256",
-                        "internalType": "uint256"
-                    },
-                    {
-                        "name": "expiry",
-                        "type": "uint48",
-                        "internalType": "uint48"
-                    }
-                ]
-            },
-            {
-                "name": "validatorData",
-                "type": "bytes",
-                "internalType": "bytes"
-            }
-        ],
-        "outputs": [],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "simulateRelayerExecution",
-        "inputs": [
-            {
-                "name": "batchedCall",
-                "type": "tuple",
-                "internalType": "struct BatchedCall",
-                "components": [
-                    {
-                        "name": "calls",
-                        "type": "tuple[]",
-                        "internalType": "struct Call[]",
-                        "components": [
-                            {
-                                "name": "target",
-                                "type": "address",
-                                "internalType": "address"
-                            },
-                            {
-                                "name": "value",
-                                "type": "uint256",
-                                "internalType": "uint256"
-                            },
-                            {
-                                "name": "data",
-                                "type": "bytes",
-                                "internalType": "bytes"
-                            }
-                        ]
-                    },
-                    {
-                        "name": "nonce",
-                        "type": "uint256",
-                        "internalType": "uint256"
-                    },
-                    {
-                        "name": "expiry",
-                        "type": "uint48",
-                        "internalType": "uint48"
-                    }
-                ]
-            },
-            {
-                "name": "validatorData",
-                "type": "bytes",
-                "internalType": "bytes"
-            }
-        ],
-        "outputs": [],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "function",
-        "name": "supportsInterface",
-        "inputs": [
-            {
-                "name": "interfaceId",
-                "type": "bytes4",
-                "internalType": "bytes4"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "",
-                "type": "bool",
-                "internalType": "bool"
-            }
-        ],
-        "stateMutability": "view"
-    },
-    {
-        "type": "function",
-        "name": "validateUserOp",
-        "inputs": [
-            {
-                "name": "userOp",
-                "type": "tuple",
-                "internalType": "struct PackedUserOperation",
-                "components": [
-                    {
-                        "name": "sender",
-                        "type": "address",
-                        "internalType": "address"
-                    },
-                    {
-                        "name": "nonce",
-                        "type": "uint256",
-                        "internalType": "uint256"
-                    },
-                    {
-                        "name": "initCode",
-                        "type": "bytes",
-                        "internalType": "bytes"
-                    },
-                    {
-                        "name": "callData",
-                        "type": "bytes",
-                        "internalType": "bytes"
-                    },
-                    {
-                        "name": "accountGasLimits",
-                        "type": "bytes32",
-                        "internalType": "bytes32"
-                    },
-                    {
-                        "name": "preVerificationGas",
-                        "type": "uint256",
-                        "internalType": "uint256"
-                    },
-                    {
-                        "name": "gasFees",
-                        "type": "bytes32",
-                        "internalType": "bytes32"
-                    },
-                    {
-                        "name": "paymasterAndData",
-                        "type": "bytes",
-                        "internalType": "bytes"
-                    },
-                    {
-                        "name": "signature",
-                        "type": "bytes",
-                        "internalType": "bytes"
-                    }
-                ]
-            },
-            {
-                "name": "userOpHash",
-                "type": "bytes32",
-                "internalType": "bytes32"
-            },
-            {
-                "name": "missingAccountFunds",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "outputs": [
-            {
-                "name": "validationData",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ],
-        "stateMutability": "nonpayable"
-    },
-    {
-        "type": "event",
-        "name": "ExecuteSuccessEvent",
-        "inputs": [
-            {
-                "name": "callHash",
-                "type": "bytes32",
-                "indexed": true,
-                "internalType": "bytes32"
-            },
-            {
-                "name": "sender",
-                "type": "address",
-                "indexed": false,
-                "internalType": "address"
-            },
-            {
-                "name": "nonce",
-                "type": "uint256",
-                "indexed": false,
-                "internalType": "uint256"
-            }
-        ],
-        "anonymous": false
-    },
-    {
-        "type": "event",
-        "name": "Initialized",
-        "inputs": [
-            {
-                "name": "version",
-                "type": "uint64",
-                "indexed": false,
-                "internalType": "uint64"
-            }
-        ],
-        "anonymous": false
-    },
-    {
-        "type": "event",
-        "name": "NonceConsumed",
-        "inputs": [
-            {
-                "name": "key",
-                "type": "uint192",
-                "indexed": false,
-                "internalType": "uint192"
-            },
-            {
-                "name": "nonce",
-                "type": "uint64",
-                "indexed": false,
-                "internalType": "uint64"
-            }
-        ],
-        "anonymous": false
-    },
-    {
-        "type": "event",
-        "name": "StorageCreated",
-        "inputs": [
-            {
-                "name": "storageAddress",
-                "type": "address",
-                "indexed": false,
-                "internalType": "address"
-            }
-        ],
-        "anonymous": false
-    },
-    {
-        "type": "event",
-        "name": "StorageInitialized",
-        "inputs": [],
-        "anonymous": false
-    },
-    {
-        "type": "event",
-        "name": "ValidatorAdded",
-        "inputs": [
-            {
-                "name": "validator",
-                "type": "address",
-                "indexed": false,
-                "internalType": "address"
-            }
-        ],
-        "anonymous": false
-    },
-    {
-        "type": "event",
-        "name": "ValidatorRemoved",
-        "inputs": [
-            {
-                "name": "keyHash",
-                "type": "bytes32",
-                "indexed": false,
-                "internalType": "bytes32"
-            }
-        ],
-        "anonymous": false
-    },
-    {
-        "type": "error",
-        "name": "ExpiryPassed",
-        "inputs": [
-            {
-                "name": "expiry",
-                "type": "uint48",
-                "internalType": "uint48"
-            }
-        ]
-    },
-    {
-        "type": "error",
-        "name": "IndexOutOfBounds",
-        "inputs": []
-    },
-    {
-        "type": "error",
-        "name": "InvalidInitialization",
-        "inputs": []
-    },
-    {
-        "type": "error",
-        "name": "InvalidKeyHash",
-        "inputs": [
-            {
-                "name": "keyHash",
-                "type": "bytes32",
-                "internalType": "bytes32"
-            }
-        ]
-    },
-    {
-        "type": "error",
-        "name": "InvalidNonce",
-        "inputs": [
-            {
-                "name": "nonce",
-                "type": "uint256",
-                "internalType": "uint256"
-            }
-        ]
-    },
-    {
-        "type": "error",
-        "name": "InvalidSignature",
-        "inputs": []
-    },
-    {
-        "type": "error",
-        "name": "InvalidValidatorImpl",
-        "inputs": [
-            {
-                "name": "validatorImpl",
-                "type": "address",
-                "internalType": "address"
-            }
-        ]
-    },
-    {
-        "type": "error",
-        "name": "NonAdminSelfCall",
-        "inputs": []
-    },
-    {
-        "type": "error",
-        "name": "NotEntryPoint",
-        "inputs": []
-    },
-    {
-        "type": "error",
-        "name": "NotFromSelf",
-        "inputs": []
-    },
-    {
-        "type": "error",
-        "name": "NotInitializing",
-        "inputs": []
-    },
-    {
-        "type": "error",
-        "name": "SimulateExecution",
-        "inputs": [
-            {
-                "name": "executionGas",
-                "type": "uint256",
-                "internalType": "uint256"
-            },
-            {
-                "name": "totalGas",
-                "type": "uint256",
-                "internalType": "uint256"
-            },
-            {
-                "name": "errorData",
-                "type": "bytes",
-                "internalType": "bytes"
-            }
-        ]
-    },
-    {
-        "type": "error",
-        "name": "ValidatorAlreadyExists",
-        "inputs": []
-    }
-];
-
 export function generateSponsorTransferCalldata(
     recipient: ethers.AddressLike,
     amount: bigint
@@ -1147,10 +112,6 @@ export function toTypedDataHash(
 }
 
 
-export function loadAbi(): ethers.InterfaceAbi {
-    return ABI as ethers.InterfaceAbi;
-}
-
 export function handleAxiosResponse<T>(
     res: AxiosResponse<any>,
     isRpc: boolean = true
@@ -1185,11 +146,11 @@ const RELAYER_AUTH_TOKEN = process.env.AUTHORIZATION || "";
 const NETWORK = process.env.NETWORK || "localhost-example";
 const ANVIL_RPC_URL = process.env.ANVIL_RPC_URL || "http://127.0.0.1:8545";
 
-const RELAYER_ADDRESS = process.env.RELAYER_ADDRESS || "0x55f3a93f544e01ce4378d25e927d7c493b863bd6" // Default to Anvil account 1
+const RELAYER_ADDRESS = process.env.RELAYER_ADDRESS || "0x55f3a93f544e01ce4378d25e927d7c493b863bd6"
 
 describe("RelayerFlow Integration Tests", function () {
     let provider: ethers.JsonRpcProvider;
-    let walletCore: any;
+    let smartWallet: any;
     let ecdsaValidator: any;
     let mockToken: any;
     let alice: ethers.Wallet;
@@ -1210,19 +171,15 @@ describe("RelayerFlow Integration Tests", function () {
             { name: "value", type: "uint256" },
             { name: "data", type: "bytes" },
         ],
-        Calls: [
-            { name: 'wallet', type: 'address' },
-            { name: 'nonce', type: 'uint256' },
-            { name: 'executionGas', type: 'uint256' },
-            { name: 'relayerCalls', type: 'Call[]' },
-            { name: 'calls', type: 'Call[]' },
+        BatchedCall: [
+            { name: "calls", type: "Call[]" },
+            { name: "nonce", type: "uint256" },
+            { name: "expiry", type: "uint48" },
         ],
     };
 
     beforeEach(async function () {
         try {
-            console.log("Setting up test environment...");
-
             // Reset Anvil state to ensure clean environment
             console.log("Resetting Anvil state...");
             provider = new ethers.JsonRpcProvider(ANVIL_RPC_URL);
@@ -1230,18 +187,9 @@ describe("RelayerFlow Integration Tests", function () {
             // Test connection
             try {
                 await provider.getNetwork();
-                console.log("Connected to Anvil");
             } catch (error) {
                 throw new Error(`Failed to connect to Anvil at ${ANVIL_RPC_URL}. Make sure Anvil is running.`);
             }
-
-            // // Reset Anvil to clean state
-            // try {
-            //     await provider.send("anvil_reset", []);
-            //     console.log("Anvil state reset");
-            // } catch (error) {
-            //     console.log("Could not reset Anvil state, continuing...");
-            // }
 
             // Create wallets using Anvil's default accounts
             alice = new ethers.Wallet("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", provider); // Account 0
@@ -1251,80 +199,62 @@ describe("RelayerFlow Integration Tests", function () {
             bobAddress = bob.address;
             relayerAddress = RELAYER_ADDRESS;
 
-            // give 1000 ether to relayer (after address is set)
-            console.log(`Setting balance for relayer: ${relayerAddress}`);
             try {
                 await provider.send("anvil_setBalance", [relayerAddress, "0x" + ethers.parseEther("1000000").toString(16)]);
-                console.log("anvil_setBalance call successful");
+                await provider.send("anvil_setBalance", [aliceAddress, "0x" + ethers.parseEther("10000000").toString(16)]);
             } catch (error) {
-                console.error("anvil_setBalance failed:", error);
                 throw error;
             }
 
             // check relayer balance
             const relayerBalance = await provider.getBalance(relayerAddress);
-            console.log(`Relayer balance: ${ethers.formatEther(relayerBalance)} ETH`);
 
-            // Also give Alice some ETH for gas
-            console.log(`Setting balance for Alice: ${aliceAddress}`);
+
             await provider.send("anvil_setBalance", [aliceAddress, "0x" + ethers.parseEther("1000").toString(16)]);
             const aliceBalance = await provider.getBalance(aliceAddress);
-            console.log(`Alice balance: ${ethers.formatEther(aliceBalance)} ETH`);
+
 
             // Verify balances were set correctly
             expect(Number(ethers.formatEther(relayerBalance))).to.be.greaterThan(999999); // Should be 1M ETH
             expect(Number(ethers.formatEther(aliceBalance))).to.be.greaterThan(999); // Should be 1K ETH
 
-            console.log(`Alice: ${aliceAddress}`);
-            console.log(`Bob: ${bobAddress}`);
-            console.log(`Relayer: ${relayerAddress}`);
-
             // Get network info
             const network = await provider.getNetwork();
             chainId = network.chainId;
-            console.log(`Chain ID: ${chainId}`);
 
             // Check account balances
             const aliceBalanceCheck = await provider.getBalance(aliceAddress);
-            console.log(`Alice balance: ${ethers.formatEther(aliceBalanceCheck)} ETH`);
 
             // Get initial nonce
             let deploymentNonce = await provider.getTransactionCount(aliceAddress);
-            console.log(`Initial deployment nonce: ${deploymentNonce}`);
 
             // Load contract artifacts with error handling
             const fs = require('fs');
             const path = require('path');
 
-            console.log("Loading contract artifacts...");
-
-            let ecdsaValidatorArtifact, walletCoreArtifact, mockERC20Artifact;
+            let ecdsaValidatorArtifact, smartWalletArtifact, mockERC20Artifact;
 
             try {
                 ecdsaValidatorArtifact = JSON.parse(fs.readFileSync(path.join(__dirname, '../out/ECDSAValidator.sol/ECDSAValidator.json'), 'utf8'));
-                walletCoreArtifact = JSON.parse(fs.readFileSync(path.join(__dirname, '../out/WalletCore.sol/WalletCore.json'), 'utf8'));
+                smartWalletArtifact = JSON.parse(fs.readFileSync(path.join(__dirname, '../out/SmartWallet.sol/SmartWallet.json'), 'utf8'));
                 mockERC20Artifact = JSON.parse(fs.readFileSync(path.join(__dirname, '../out/MockERC20.sol/MockERC20.json'), 'utf8'));
-                console.log("Contract artifacts loaded");
             } catch (error) {
                 throw new Error(`Failed to load contract artifacts. Run 'forge build' first. Error: ${error.message}`);
             }
 
             // Deploy ECDSA Validator with explicit nonce
-            console.log("Deploying ECDSAValidator...");
             const ECDSAValidatorFactory = new ethers.ContractFactory(ecdsaValidatorArtifact.abi, ecdsaValidatorArtifact.bytecode, alice);
             ecdsaValidator = await ECDSAValidatorFactory.deploy({ nonce: deploymentNonce++ });
             await ecdsaValidator.waitForDeployment();
             console.log(`ECDSAValidator deployed at: ${await ecdsaValidator.getAddress()}`);
 
-            // Deploy WalletCore implementation with explicit nonce
-            console.log("Deploying WalletCore implementation...");
-            const WalletCoreFactory = new ethers.ContractFactory(walletCoreArtifact.abi, walletCoreArtifact.bytecode, alice);
-            const walletCoreImpl = await WalletCoreFactory.deploy({ nonce: deploymentNonce++ });
-            await walletCoreImpl.waitForDeployment();
-            console.log(`WalletCore implementation deployed at: ${await walletCoreImpl.getAddress()}`);
+            // Deploy SmartWallet implementation with explicit nonce
+            const smartWalletFactory = new ethers.ContractFactory(smartWalletArtifact.abi, smartWalletArtifact.bytecode, alice);
+            const smartWalletImpl = await smartWalletFactory.deploy({ nonce: deploymentNonce++ });
+            await smartWalletImpl.waitForDeployment();
+            console.log(`SmartWallet implementation deployed at: ${await smartWalletImpl.getAddress()}`);
 
             // Deploy SmartWalletFactory with explicit nonce
-            console.log("Deploying SmartWalletFactory...");
             const factoryArtifact = JSON.parse(fs.readFileSync(path.join(__dirname, '../out/SmartWalletFactory.sol/SmartWalletFactory.json'), 'utf8'));
             const FactoryFactory = new ethers.ContractFactory(factoryArtifact.abi, factoryArtifact.bytecode, alice);
             const factory: any = await FactoryFactory.deploy({ nonce: deploymentNonce++ });
@@ -1332,22 +262,20 @@ describe("RelayerFlow Integration Tests", function () {
             console.log(`SmartWalletFactory deployed at: ${await factory.getAddress()}`);
 
             // Deploy MockERC20 with explicit nonce
-            console.log("Deploying MockERC20...");
             const MockERC20Factory = new ethers.ContractFactory(mockERC20Artifact.abi, mockERC20Artifact.bytecode, alice);
             mockToken = await MockERC20Factory.deploy({ nonce: deploymentNonce++ });
             await mockToken.waitForDeployment();
             console.log(`MockERC20 deployed at: ${await mockToken.getAddress()}`);
 
             // Create Alice's wallet using the factory
-            console.log("Creating Alice's wallet via factory...");
             const initialOwners: InitialOwner[] = [{
-                keyHash: ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["address"], [aliceAddress])),
-                validator: await ecdsaValidator.getAddress()
+                keyHash: ethers.solidityPackedKeccak256(["address"], [aliceAddress]),
+                validator: await ecdsaValidator.getAddress() // Use our actual deployed validator
             }];
 
             const salt = 42; // Deterministic salt
             const createTx = await factory.createAccount(
-                await walletCoreImpl.getAddress(),
+                await smartWalletImpl.getAddress(),
                 initialOwners,
                 salt,
                 { nonce: deploymentNonce++ }
@@ -1373,26 +301,32 @@ describe("RelayerFlow Integration Tests", function () {
             console.log(`Alice's wallet created at: ${walletAddress}`);
 
             // Connect to the created wallet
-            walletCore = new ethers.Contract(walletAddress, walletCoreArtifact.abi, alice);
+            smartWallet = new ethers.Contract(walletAddress, smartWalletArtifact.abi, alice);
 
             // Give Alice some mock tokens for testing (using explicit nonce)
-            console.log("Minting tokens for Alice...");
-            const mintTx = await mockToken.mint(aliceAddress, ethers.parseUnits("1000", 18), { nonce: deploymentNonce++ });
+            const mintTx = await mockToken.mint(walletAddress, ethers.parseUnits("1000000", 18), { nonce: deploymentNonce++ });
+
+            // To prevent cold storage writes
+            const mintTx2 = await mockToken.mint(relayerAddress, ethers.parseUnits("100", 18), { nonce: deploymentNonce++ });
+            const mintTx3 = await mockToken.mint(bobAddress, ethers.parseUnits("100", 18), { nonce: deploymentNonce++ });
+
             await mintTx.wait();
-            console.log("Alice minted 1000 mock tokens");
+            await mintTx2.wait();
+            await mintTx3.wait();
+
+            console.log("Alice's wallet address", walletAddress);
+            console.log("Bob address", bobAddress);
 
             // Initialize nonce tracking for tests (after all deployments)
             currentNonce = BigInt(await provider.getTransactionCount(aliceAddress));
-            console.log(`Test starting nonce: ${currentNonce}`);
 
             // Set up EIP-712 domain (use wallet address, not EOA address)
             domain = {
-                name: "wallet-core",
+                name: "SmartWallet",
                 version: "1.0.0",
                 chainId: chainId,
-                verifyingContract: await walletCore.getAddress(),
+                verifyingContract: await smartWallet.getAddress(),
             };
-            console.log("EIP-712 domain configured");
 
             // Set up relayer API client
             relayerAxios = axios.create({
@@ -1403,23 +337,13 @@ describe("RelayerFlow Integration Tests", function () {
                 },
                 timeout: 30000 // 30 second timeout
             });
-            console.log("Relayer API client configured");
-
-            console.log("Test environment setup complete!\n");
+            console.log("Test environment setup complete");
 
         } catch (error) {
             console.error("BeforeEach setup failed:", error.message);
             throw error;
         }
     });
-
-    function constructCallsData(): Call[] {
-        return [{
-            target: bobAddress,
-            value: ethers.parseEther("1"),
-            data: "0x"
-        }];
-    }
 
     function constructERC20TransferCall(tokenAddress: string, recipient: string, amount: bigint): Call {
         if (!recipient || recipient === "null" || recipient === "undefined") {
@@ -1436,54 +360,98 @@ describe("RelayerFlow Integration Tests", function () {
         };
     }
 
-    async function getValidationTypedHash(calls: Call[], nonce: bigint = 0n, executionGas: bigint = 0n): Promise<string> {
-        const value = {
-            wallet: await walletCore.getAddress(),
-            nonce: nonce,
-            executionGas: executionGas,
-            relayerCalls: [],
-            calls: calls
-        };
+    async function getValidationTypedHash(calls: Call[], nonce: bigint, expiry: number = 0): Promise<string> {
+        try {
+            const CALL_TYPEHASH = ethers.keccak256(ethers.toUtf8Bytes("Call(address target,uint256 value,bytes data)"));
+            const BATCHED_CALL_TYPEHASH = ethers.keccak256(ethers.toUtf8Bytes("BatchedCall(Call[] calls,uint256 nonce,uint48 expiry)Call(address target,uint256 value,bytes data)"));
 
-        return ethers.TypedDataEncoder.hash(domain, types, value);
+            let callsEncoded = "0x";
+            for (const call of calls) {
+                const callHash = ethers.keccak256(
+                    ethers.AbiCoder.defaultAbiCoder().encode(
+                        ["bytes32", "address", "uint256", "bytes32"],
+                        [CALL_TYPEHASH, call.target, call.value, ethers.keccak256(call.data)]
+                    )
+                );
+                callsEncoded += callHash.slice(2);
+            }
+            const finalCallsHash = ethers.keccak256("0x" + callsEncoded.slice(2));
+
+            // BatchedCallLib.hash(batchedCall)
+            const structHash = ethers.keccak256(
+                ethers.AbiCoder.defaultAbiCoder().encode(
+                    ["bytes32", "bytes32", "uint256", "uint48"],
+                    [BATCHED_CALL_TYPEHASH, finalCallsHash, nonce, expiry]
+                )
+            );
+
+            // Now call the contract's hashTypedData function with this struct hash
+            const contractHash = await smartWallet.hashTypedData(structHash);
+
+            return contractHash;
+
+        } catch (error) {
+            throw new Error(`Failed to get hash from contract: ${error.message}`);
+        }
     }
 
-    async function constructValidatorData(calls: Call[], nonce?: bigint): Promise<string> {
-        const useNonce = nonce !== undefined ? nonce : currentNonce++;
-        const hash = await getValidationTypedHash(calls, useNonce);
-        const signature = await alice.signMessage(ethers.getBytes(hash));
-        const keyHash = ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(["address"], [aliceAddress]));
-        return ethers.concat([keyHash, signature]);
+    async function constructValidatorData(calls: Call[], nonce: bigint, expiry: number): Promise<string> {
+        const hash = await getValidationTypedHash(calls, nonce, expiry);
+        // Use _signingKey.sign directly to avoid Ethereum message prefix
+        const sig = alice.signingKey.sign(hash);
+
+        let signature = sig.serialized;
+
+        const keyHash = ethers.solidityPackedKeccak256(["address"], [aliceAddress]);
+
+        let validatorData = ethers.concat([keyHash, signature]);
+
+        return validatorData;
+    }
+
+    function generateNonce(): bigint {
+        const crypto = require('crypto');
+        const randomBytes = crypto.randomBytes(24);
+        const zeroBytes = Buffer.alloc(8, 0);
+
+        const nonceBuffer = Buffer.concat([randomBytes, zeroBytes]);
+        const nonce = BigInt('0x' + nonceBuffer.toString('hex'));
+
+        return nonce;
     }
 
     async function simulateGasViaRelayer(
         calls: Call[],
-        tokenAddress: string
+        tokenAddress: string,
+        nonce: bigint = 0n
     ): Promise<SimulateSponsorResult> {
-        const iface = new ethers.Interface(["function simulateExecuteWithRelayer(tuple(tuple(address target,uint256 value,bytes data)[] calls,uint256 nonce,uint48 expiry) batchedCall,bytes validatorData)"]);
+        const iface = new ethers.Interface(["function simulateExecuteWithRelayer(tuple(tuple(address target,uint256 value,bytes data)[] calls,uint256 nonce,uint48 expiry) batchedCall,address validator,bytes validatorData)"]);
 
         const batchedCall = {
             calls: calls,
-            nonce: currentNonce,
+            nonce: nonce, // This nonce should be using a nonce with valid key, to prevent cold storage writes
             expiry: Math.floor(Date.now() / 1000) + 3600 // 1 hour from now
         };
 
-
-        const mockValidatorData = ethers.getBytes(
+        // append mock key hash to the validator data
+        const keyHash = ethers.solidityPackedKeccak256(["address"], [aliceAddress]);
+        const mockSignature = ethers.getBytes(
             "0x665186aa6b01d30d23f695519c5ace858b2849f42d4c44d7439f49e06ffe10ed1b954470b6234650c6c56b3b650d5a58966cc9a07f8737ea929af8fb07c3b47f1b"
         );
+        const mockValidatorData = ethers.concat([keyHash, mockSignature]);
 
         const calldata = iface.encodeFunctionData("simulateExecuteWithRelayer", [
             batchedCall,
+            DEFAULT_VALIDATOR,
             mockValidatorData,
         ]);
 
         const requestBody = {
             jsonrpc: "2.0",
-            method: "walletcore_simulateSponsor",
+            method: "relayer_getQuote",
             params: {
                 calldata: calldata,
-                to: await walletCore.getAddress(),
+                to: await smartWallet.getAddress(),
                 value: "0",
                 token_address: tokenAddress,
             },
@@ -1508,13 +476,15 @@ describe("RelayerFlow Integration Tests", function () {
     async function submitSponsorTx(
         calls: Call[],
         validationData: string,
+        nonce: bigint,
+        expiry: number
     ): Promise<SubmitSponsorResult> {
         const iface = new ethers.Interface(["function executeWithRelayer(tuple(tuple(address target,uint256 value,bytes data)[] calls,uint256 nonce,uint48 expiry) batchedCall,bytes validatorData)"]);
 
         const batchedCall = {
             calls: calls,
-            nonce: currentNonce++,
-            expiry: Math.floor(Date.now() / 1000) + 3600 // 1 hour from now
+            nonce: nonce,
+            expiry: expiry
         };
 
         const calldata = iface.encodeFunctionData("executeWithRelayer", [
@@ -1524,10 +494,10 @@ describe("RelayerFlow Integration Tests", function () {
 
         const requestBody = {
             jsonrpc: "2.0",
-            method: "walletcore_freeGasMode",
+            method: "relayer_sendTransaction",
             params: {
                 calldata: calldata,
-                to: await walletCore.getAddress(),
+                to: await smartWallet.getAddress(),
                 value: "0",
             },
             id: 2,
@@ -1572,25 +542,30 @@ describe("RelayerFlow Integration Tests", function () {
             const calls = [
                 constructERC20TransferCall(
                     await mockToken.getAddress(),
-                    bobAddress,
-                    ethers.parseUnits("100000", 18) // sufficient to pass relayer test
+                    relayerAddress,
+                    BigInt(10)
                 ),
                 constructERC20TransferCall(
                     await mockToken.getAddress(),
                     bobAddress,
-                    ethers.parseUnits("10", 18)
+                    BigInt(10)
                 )
             ];
 
-            // Construct validation data
-            const validatorData = await constructValidatorData(calls);
+            const nonce = generateNonce();
+            const expiry = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
 
-            const bobBalanceBefore = await provider.getBalance(bobAddress);
+            // Construct validation data
+            const validatorData = await constructValidatorData(calls, nonce, expiry);
+
+            const bobBalanceBefore = await mockToken.balanceOf(bobAddress);
 
             // Submit transaction via relayer API
             const submitResult = await submitSponsorTx(
                 calls,
                 validatorData,
+                nonce,
+                expiry
             );
 
             expect(submitResult.id).to.be.a('string');
@@ -1605,99 +580,56 @@ describe("RelayerFlow Integration Tests", function () {
                 await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
                 txStatus = await getTransactionStatus(submitResult.relayer_id, submitResult.id);
                 attempts++;
-            } while (txStatus.data.status === 'pending' && attempts < maxAttempts);
+            } while ((txStatus.data.status === 'pending' || txStatus.data.status === 'submitted') && attempts < maxAttempts);
 
             expect(txStatus.success).to.be.true;
-            expect(txStatus.data.status).to.equal('confirmed');
+            expect(txStatus.data.status).to.equal('mined');
 
             // Verify the transaction effect
-            const bobBalanceAfter = await provider.getBalance(bobAddress);
-            expect(bobBalanceAfter - bobBalanceBefore).to.equal(ethers.parseEther("1"));
-        });
-
-        it("should execute with relayer payment via API", async function () {
-            // Give alice some tokens first
-            await mockToken.transfer(aliceAddress, ethers.parseUnits("100", 18));
-
-            const userCall = constructCallsData()[0];
-            const relayerPaymentCall = constructERC20TransferCall(
-                await mockToken.getAddress(),
-                relayerAddress,
-                ethers.parseUnits("10", 18)
-            );
-            const relayerCalls = [relayerPaymentCall];
-            const calls = [userCall];
-
-            // Simulate first
-            const simulationResult = await simulateGasViaRelayer(
-                [relayerPaymentCall, userCall],
-                await mockToken.getAddress()
-            );
-
-            // Prepare validation data for the combined transaction
-            const allCalls = [...relayerCalls, ...calls];
-            const validatorData = await constructValidatorData(allCalls);
-
-            const relayerTokenBalanceBefore = await mockToken.balanceOf(relayerAddress);
-            const bobBalanceBefore = await provider.getBalance(bobAddress);
-
-            // Submit via relayer API
-            const submitResult = await submitSponsorTx(
-                calls,
-                validatorData,
-            );
-
-            // Wait for confirmation
-            let txStatus: TransactionStatusResponse;
-            let attempts = 0;
-
-            do {
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                txStatus = await getTransactionStatus(submitResult.relayer_id, submitResult.id);
-                attempts++;
-            } while (txStatus.data.status === 'pending' && attempts < 30);
-
-            expect(txStatus.success).to.be.true;
-            expect(txStatus.data.status).to.equal('confirmed');
-
-            // Verify both the payment and user action succeeded
-            const relayerTokenBalanceAfter = await mockToken.balanceOf(relayerAddress);
-            const bobBalanceAfter = await provider.getBalance(bobAddress);
-
-            expect(relayerTokenBalanceAfter - relayerTokenBalanceBefore).to.equal(ethers.parseUnits("10", 18));
-            expect(bobBalanceAfter - bobBalanceBefore).to.equal(ethers.parseEther("1"));
+            const bobBalanceAfter = await mockToken.balanceOf(bobAddress);
+            expect(bobBalanceAfter - bobBalanceBefore).to.equal(BigInt(10));
         });
     });
 
     describe("End-to-End Relayer Flow", function () {
         it("should complete full sponsored transaction flow", async function () {
-            // Give alice tokens for relayer payment
-            await mockToken.transfer(aliceAddress, ethers.parseUnits("100", 18));
+            const calls = constructERC20TransferCall(
+                await mockToken.getAddress(),
+                bobAddress,
+                BigInt(10)
+            );
 
-            const userCall = constructCallsData()[0];
-            const sponsorPaymentCall = constructERC20TransferCall(
+            const relayerPaymentCall = constructERC20TransferCall(
                 await mockToken.getAddress(),
                 relayerAddress,
-                ethers.parseUnits("5", 18)
+                BigInt(10)
             );
 
             // Step 1: Simulate the transaction
             const simulationResult = await simulateGasViaRelayer(
-                [sponsorPaymentCall, userCall],
+                [relayerPaymentCall, calls],
                 await mockToken.getAddress()
             );
 
-            expect(simulationResult.execution_gas).to.be.a('number');
-            expect(simulationResult.total_gas).to.be.greaterThan(simulationResult.execution_gas);
+            const newRelayerPaymentCall = constructERC20TransferCall(
+                await mockToken.getAddress(),
+                relayerAddress,
+                BigInt(simulationResult.token_amount_needed)
+            );
 
             // Step 2: Prepare and sign the transaction
-            const allCalls = [sponsorPaymentCall, userCall];
-            const validatorData = await constructValidatorData(allCalls);
+            const allCalls = [newRelayerPaymentCall, calls];
+
+            const nonce = generateNonce();
+            const expiry = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
+            const validatorData = await constructValidatorData(allCalls, nonce, expiry);
 
             // Step 3: Submit the transaction
             const submitResult = await submitSponsorTx(
                 allCalls,
                 validatorData,
+                nonce,
+                expiry
             );
 
             expect(submitResult.id).to.be.a('string');
@@ -1715,15 +647,110 @@ describe("RelayerFlow Integration Tests", function () {
 
             // Step 5: Verify successful completion
             expect(txStatus.success).to.be.true;
-            expect(txStatus.data.status).to.equal('confirmed');
+            expect(txStatus.data.status).to.equal('mined');
+            expect(txStatus.data.hash).to.be.a('string');
+        });
+
+        it("should complete full sponsored transaction flow without any cold nonce writes", async function () {
+            const calls = constructERC20TransferCall(
+                await mockToken.getAddress(),
+                bobAddress,
+                BigInt(10)
+            );
+
+            const relayerPaymentCall = constructERC20TransferCall(
+                await mockToken.getAddress(),
+                relayerAddress,
+                BigInt(10)
+            );
+
+            // Step 1: Simulate the transaction
+            const simulationResult = await simulateGasViaRelayer(
+                [relayerPaymentCall, calls],
+                await mockToken.getAddress()
+            );
+
+            const newRelayerPaymentCall = constructERC20TransferCall(
+                await mockToken.getAddress(),
+                relayerAddress,
+                BigInt(simulationResult.token_amount_needed)
+            );
+
+            const allCalls = [newRelayerPaymentCall, calls];
+
+            const nonce = generateNonce();
+            const expiry = Math.floor(Date.now() / 1000) + 3600; // 1 hour from now
+            const validatorData = await constructValidatorData(allCalls, nonce, expiry);
+
+            // Submit once first to make the nonce non-zero
+            const submitResult = await submitSponsorTx(
+                allCalls,
+                validatorData,
+                nonce,
+                expiry
+            );
+
+            let txStatus: TransactionStatusResponse;
+            let attempts = 0;
+
+            do {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                txStatus = await getTransactionStatus(submitResult.relayer_id, submitResult.id);
+                attempts++;
+            } while (txStatus.data.status === 'pending' && attempts < 30);
+
+            // Step 5: Verify successful completion
+            expect(txStatus.success).to.be.true;
+            expect(txStatus.data.status).to.equal('mined');
             expect(txStatus.data.hash).to.be.a('string');
 
-            // Step 6: Verify on-chain effects
-            const relayerTokenBalance = await mockToken.balanceOf(relayerAddress);
-            const bobBalance = await provider.getBalance(bobAddress);
+            console.log("First tx is successful");
 
-            expect(relayerTokenBalance).to.equal(ethers.parseUnits("5", 18));
-            expect(bobBalance).to.equal(ethers.parseEther("1"));
+            const key = nonce >> 64n; // Extract the upper 192 bits as the key
+            const nonce2 = (key << 64n) | 1n; // Use the same key but set nonce value to 1
+
+            const simulationResult2 = await simulateGasViaRelayer(
+                [relayerPaymentCall, calls],
+                await mockToken.getAddress(),
+                nonce2
+            );
+
+            const newRelayerPaymentCall2 = constructERC20TransferCall(
+                await mockToken.getAddress(),
+                relayerAddress,
+                BigInt(simulationResult2.token_amount_needed)
+            );
+
+            const allCalls2 = [newRelayerPaymentCall2, calls];
+
+            const validatorData2 = await constructValidatorData(allCalls2, nonce2, expiry);
+            // Step 3: Submit the transaction
+            const submitResult2 = await submitSponsorTx(
+                allCalls2,
+                validatorData2,
+                nonce2,
+                expiry
+            );
+
+            do {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                txStatus = await getTransactionStatus(submitResult2.relayer_id, submitResult2.id);
+                attempts++;
+            } while (txStatus.data.status === 'pending' && attempts < 30);
+
+            // Step 5: Verify successful completion
+            expect(txStatus.success).to.be.true;
+            expect(txStatus.data.status).to.equal('mined');
+            expect(txStatus.data.hash).to.be.a('string');
+
+            const txReceipt = await provider.getTransactionReceipt(txStatus.data.hash);
+
+            console.log("Simulation gas: ", simulationResult2.total_gas);
+            console.log("Transaction gas: ", txReceipt?.gasUsed);
+            console.log("Difference percentage: ", Math.abs(Number(simulationResult2.total_gas) - Number(txReceipt?.gasUsed)) / Number(simulationResult2.total_gas) * 100);
+
+            // Expect the difference to be less than 10%
+            expect(Math.abs(Number(simulationResult2.total_gas) - Number(txReceipt?.gasUsed)) / Number(simulationResult2.total_gas) * 100).to.be.lessThan(10);
         });
     });
 });

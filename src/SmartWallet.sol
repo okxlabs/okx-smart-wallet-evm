@@ -152,6 +152,7 @@ contract SmartWallet is
      */
     function simulateExecuteWithRelayer(
         BatchedCall calldata batchedCall,
+        address validator,
         bytes calldata validatorData
     ) external {
         // Check transaction expiry

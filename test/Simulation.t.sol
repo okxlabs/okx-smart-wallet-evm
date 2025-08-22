@@ -652,6 +652,7 @@ contract SimulationTest is Base {
         try
             ISmartWallet(_alice).simulateExecuteWithRelayer(
                 BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+                address(1),
                 validatorData
             )
         {
@@ -703,6 +704,7 @@ contract SimulationTest is Base {
         try
             ISmartWallet(_alice).simulateExecuteWithRelayer(
                 batchedCall,
+                address(1),
                 validatorData
             )
         {
