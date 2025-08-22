@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.29;
 
-import {Call, BatchedCall} from "../Types.sol";
+import {BatchedCall} from "../Types.sol";
 import {CallLib} from "./CallLib.sol";
 
 library BatchedCallLib {

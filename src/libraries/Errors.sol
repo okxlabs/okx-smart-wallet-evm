@@ -22,12 +22,7 @@ library Errors {
     // ECDSAValidator related
     error InvalidSignature();
 
-    // SmartWallet related
-    error NameTooLong();
-    error VersionTooLong();
-
     // Simulation related
-    error GasEstimates(uint256 executionGas, bytes errorData);
     error SimulateExecution();
 
     error InvalidOwnersAndValidatorsLength();

@@ -2,7 +2,6 @@
 pragma solidity ^0.8.29;
 
 import {Call} from "./Types.sol";
-import {Errors} from "./libraries/Errors.sol";
 
 abstract contract ExecutionLogic {
     event ExecuteSuccessEvent(
@@ -46,29 +45,4 @@ abstract contract ExecutionLogic {
         }
     }
 
-    function _tryCall(
-        Call calldata call
-    ) internal returns (bool success, bytes memory result) {
-        address target = call.target;
-        uint256 value = call.value;
-        bytes calldata data = call.data;
-        /// @solidity memory-safe-assembly
-        assembly {
-            result := mload(0x40)
-            calldatacopy(result, data.offset, data.length)
-            success := call(
-                gas(),
-                target,
-                value,
-                result,
-                data.length,
-                codesize(),
-                0x00
-            )
-            mstore(result, returndatasize()) // Store the length.
-            let o := add(result, 0x20)
-            returndatacopy(o, 0x00, returndatasize()) // Copy the returndata.
-            mstore(0x40, add(o, returndatasize())) // Allocate the memory.
-        }
-    }
 }

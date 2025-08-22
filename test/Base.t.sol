@@ -2,21 +2,16 @@
 pragma solidity ^0.8.23;
 
 import {Test} from "forge-std/Test.sol";
-import "forge-std/console.sol";
+import {console} from "forge-std/console.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
 import {OwnersManager} from "src/OwnersManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
-import {IValidation} from "src/interfaces/IValidation.sol";
-import {IValidator} from "src/interfaces/IValidator.sol";
-import {ValidationLogic} from "src/ValidationLogic.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
 import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
-import {Errors} from "src/libraries/Errors.sol";
 import {DeployInitHelper, DeployFactory} from "scripts/DeployInitHelper.sol";
-import {ERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {Static} from "src/libraries/Static.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {ERC712} from "src/ERC712.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
@@ -382,5 +377,43 @@ contract Base is Test {
 
         vm.prank(wallet);
         ISmartWallet(wallet).execute(calls);
+    }
+}
+
+// ============ Mock Contracts for Testing ============
+
+contract MockComplexContract {
+    uint256 public counter;
+    bool public functionCalled;
+    
+    receive() external payable {}
+    
+    function complexFunction(uint256 _number, string memory _text, bool _flag) external payable returns (bytes memory) {
+        functionCalled = true;
+        return abi.encode(_number, _text, _flag, msg.value, block.timestamp);
+    }
+    
+    function simpleIncrement() external {
+        counter++;
+    }
+    
+    function returnLargeData(uint256 size) external pure returns (bytes memory) {
+        return new bytes(size);
+    }
+}
+
+contract MockRevertingContract {
+    function alwaysReverts() external pure {
+        revert("Always reverts");
+    }
+}
+
+contract MockSelfDestructContract {
+    function destroyContract(address payable recipient) external {
+        selfdestruct(recipient);
+    }
+    
+    function someFunction() external pure returns (uint256) {
+        return 42;
     }
 }

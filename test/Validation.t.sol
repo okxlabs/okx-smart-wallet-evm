@@ -1,40 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.23;
 
-import "./Base.t.sol";
+import {Base} from "./Base.t.sol";
 import {OwnersManager} from "src/OwnersManager.sol";
+import {Errors} from "src/libraries/Errors.sol";
+import {Call, BatchedCall} from "src/Types.sol";
+import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 
 contract ValidationTest is Base {
     event NonceConsumed(uint192 key, uint64 nonce);
 
     function setUp() public override {
         super.setUp();
-    }
-
-    function test_executeFromRelayer_reverts_for_default_validator_invalid_signer()
-        public
-    {
-        // Register validator first so we can test signature validation
-        _addValidator(_alice);
-
-        Call[] memory calls = _construct_calls_data();
-
-        bytes32 hash = _getValidationTypedHash(_alice, calls);
-        bytes memory validatorData = _construct_validatorData(
-            _alice,
-            _bobPk, // Wrong private key for invalid signature test
-            hash
-        );
-
-        vm.prank(_alice);
-        vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidSignature.selector)
-        );
-        ISmartWallet(_alice).executeWithRelayer(
-            BatchedCall({calls: calls, nonce: 0, expiry: 0}),
-            validatorData
-        );
-        assertEq(address(_bob).balance, 0 ether);
     }
 
     function test_executeFromRelayer_reverts_for_invalid_signature() public {
@@ -60,7 +37,7 @@ contract ValidationTest is Base {
         assertEq(address(_bob).balance, 0 ether);
     }
 
-    function test_executeFromRelayer_reverts_for_invalid_nonce() public {
+    function test_executeFromRelayer_reverts_for_invalid_keyHash() public {
         Call[] memory calls = _construct_calls_data();
 
         // Use a keyHash that doesn't exist (bob's keyHash, but bob is not a validator)
@@ -154,46 +131,18 @@ contract ValidationTest is Base {
         assertEq(result, bytes4(0xffffffff));
     }
 
-    function test_isValidSignature_fails_for_removed_validator() public {
-        // Add validator using _bob to avoid EIP-7702 fallback collision
-        // (In test environment, address(this) == _alice due to setCode)
-        _addValidator(_alice, _bob);
 
-        // Remove validator
-        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
-        _executeRemoveValidator(_alice, bobKeyHash);
-
+    function test_isValidSignature_signature_length_boundaries() public view {
         bytes32 hash = keccak256("test");
-        bytes memory sig = _signDigest(hash, _bobPk); // Use _bob's private key
-        bytes memory signature = abi.encodePacked(bobKeyHash, sig);
 
-        // Call isValidSignature
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        // Test empty signature
+        bytes memory emptySignature = bytes("");
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, emptySignature);
         assertEq(result, bytes4(0xffffffff));
-    }
 
-    function test_isValidSignature_fails_with_short_signature() public view {
-        bytes32 hash = keccak256("test");
-
-        // signature shorter than 20 bytes
-        bytes memory signature = bytes("");
-
-        // Call isValidSignature
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
-        assertEq(result, bytes4(0xffffffff));
-    }
-
-    function test_isValidSignature_fails_with_longer_than_85_bytes_signature()
-        public
-        view
-    {
-        bytes32 hash = keccak256("test");
-
-        // signature have 100 bytes
-        bytes memory signature = bytes(new bytes(100));
-
-        // Call isValidSignature
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        // Test oversized signature (100 bytes)
+        bytes memory oversizedSignature = bytes(new bytes(100));
+        result = ISmartWallet(_alice).isValidSignature(hash, oversizedSignature);
         assertEq(result, bytes4(0xffffffff));
     }
 

@@ -16,7 +16,8 @@ import {Errors} from "./libraries/Errors.sol";
 import {Static} from "./libraries/Static.sol";
 import {IHook} from "./interfaces/IHook.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {ERC4337Account, PackedUserOperation} from "./ERC4337Account.sol";
+import {ERC4337Account} from "./ERC4337Account.sol";
+import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 import {BatchedCallLib} from "./libraries/BatchedCallLib.sol";
 import {AllowanceManager} from "./AllowanceManager.sol";
 
