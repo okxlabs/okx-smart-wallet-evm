@@ -167,7 +167,7 @@ contract SmartWallet is
 
         // Extract keyHash and validate validator
         bytes32 keyHash = bytes32(validatorData[:32]);
-        address validator = getVerifiedValidator(keyHash);
+        address mockValidator = getVerifiedValidator(keyHash);
 
         if (validator == address(0)) {
             // revert Errors.InvalidKeyHash(keyHash);
