@@ -2,42 +2,55 @@
 pragma solidity ^0.8.29;
 
 import {IAllowanceManager} from "./interfaces/IAllowanceManager.sol";
-import {ERC7914} from "./ERC7914.sol";
-import {TransientTokenAllowance} from "./libraries/TransientTokenAllowance.sol";
+import {OwnersManager} from "./OwnersManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title AllowanceManager
  * @notice Abstract contract providing allowance management for both native ETH and ERC20 tokens
- * @dev Extends ERC7914 with ERC20 token support and transient storage capabilities
+ * @dev Provides persistent allowance management for both native ETH and ERC20 tokens
  */
-abstract contract AllowanceManager is IAllowanceManager, ERC7914 {
+abstract contract AllowanceManager is IAllowanceManager, OwnersManager {
     using SafeERC20 for IERC20;
+
+    /// @notice Mapping of spender => allowance for persistent native ETH allowances
+    mapping(address spender => uint256 allowance) public nativeAllowance;
 
     /// @notice Mapping of token => spender => allowance for persistent ERC20 allowances
     mapping(address token => mapping(address spender => uint256 allowance))
         public tokenAllowance;
+
+    /// @notice Approve a spender to use native ETH (persistent)
+    function approveNative(
+        address spender,
+        uint256 amount
+    ) external onlySelf returns (bool) {
+        nativeAllowance[spender] = amount;
+        emit ApproveNative(address(this), spender, amount);
+        return true;
+    }
 
     /// @notice Approve a spender to use ERC20 tokens (persistent)
     function approveToken(
         address token,
         address spender,
         uint256 amount
-    ) external onlyOwnerOrEntryPoint returns (bool) {
+    ) external onlySelf returns (bool) {
         tokenAllowance[token][spender] = amount;
         emit ApproveToken(token, spender, amount);
         return true;
     }
 
-    /// @notice Approve a spender to use ERC20 tokens (transient)
-    function approveTokenTransient(
-        address token,
-        address spender,
+    /// @notice Transfer native ETH from this contract using persistent allowance
+    function transferFromNative(
+        address from,
+        address recipient,
         uint256 amount
-    ) external onlyOwnerOrEntryPoint returns (bool) {
-        TransientTokenAllowance.set(token, spender, amount);
-        emit ApproveTokenTransient(token, spender, amount);
+    ) external returns (bool) {
+        if (amount == 0) return true;
+        _transferFromNative(from, recipient, amount);
+        emit TransferFromNative(address(this), recipient, amount);
         return true;
     }
 
@@ -49,30 +62,42 @@ abstract contract AllowanceManager is IAllowanceManager, ERC7914 {
         uint256 amount
     ) external returns (bool) {
         if (amount == 0) return true;
-        _transferFromToken(token, from, recipient, amount, false);
+        _transferFromToken(token, from, recipient, amount);
         emit TransferFromToken(token, recipient, amount);
         return true;
     }
 
-    /// @notice Transfer tokens from this contract using transient allowance
-    function transferFromTokenTransient(
-        address token,
+    /// @dev Internal function to validate and execute native ETH transfers
+    /// @param from The address to transfer from
+    /// @param recipient The address to receive the funds
+    /// @param amount The amount to transfer
+    function _transferFromNative(
         address from,
         address recipient,
         uint256 amount
-    ) external returns (bool) {
-        if (amount == 0) return true;
-        _transferFromToken(token, from, recipient, amount, true);
-        emit TransferFromTokenTransient(token, recipient, amount);
-        return true;
-    }
+    ) internal {
+        // Validate inputs
+        if (from != address(this)) revert IncorrectSender();
 
-    /// @notice Get the current transient token allowance
-    function transientTokenAllowance(
-        address token,
-        address spender
-    ) external view returns (uint256) {
-        return TransientTokenAllowance.get(token, spender);
+        // Check allowance
+        uint256 currentAllowance = nativeAllowance[msg.sender];
+        if (currentAllowance < amount) revert NativeAllowanceExceeded();
+
+        // Update allowance
+        if (currentAllowance < type(uint256).max) {
+            uint256 newAllowance;
+            unchecked {
+                newAllowance = currentAllowance - amount;
+            }
+            nativeAllowance[msg.sender] = newAllowance;
+            emit NativeAllowanceUpdated(msg.sender, newAllowance);
+        }
+
+        // Execute transfer
+        (bool success,) = payable(recipient).call{value: amount}("");
+        if (!success) {
+            revert TransferNativeFailed();
+        }
     }
 
     /// @dev Internal function to validate and execute token transfers
@@ -80,22 +105,17 @@ abstract contract AllowanceManager is IAllowanceManager, ERC7914 {
     /// @param from The address to transfer from
     /// @param recipient The address to receive the tokens
     /// @param amount The amount to transfer
-    /// @param isTransient Whether this is transient allowance or not
     function _transferFromToken(
         address token,
         address from,
         address recipient,
-        uint256 amount,
-        bool isTransient
+        uint256 amount
     ) internal {
         // Validate inputs
         if (from != address(this)) revert IncorrectSender();
 
         // Check allowance
-        uint256 currentAllowance = isTransient
-            ? TransientTokenAllowance.get(token, msg.sender)
-            : tokenAllowance[token][msg.sender];
-
+        uint256 currentAllowance = tokenAllowance[token][msg.sender];
         if (currentAllowance < amount) revert TokenAllowanceExceeded();
 
         // Update allowance
@@ -104,12 +124,8 @@ abstract contract AllowanceManager is IAllowanceManager, ERC7914 {
             unchecked {
                 newAllowance = currentAllowance - amount;
             }
-            if (isTransient) {
-                TransientTokenAllowance.set(token, msg.sender, newAllowance);
-            } else {
-                tokenAllowance[token][msg.sender] = newAllowance;
-                emit TokenAllowanceUpdated(token, msg.sender, newAllowance);
-            }
+            tokenAllowance[token][msg.sender] = newAllowance;
+            emit TokenAllowanceUpdated(token, msg.sender, newAllowance);
         }
 
         // Execute transfer

@@ -47,7 +47,7 @@ contract SmartWallet is
         _disableInitializers();
     }
 
-    modifier onlyOwnerOrEntryPoint() override {
+    modifier onlyOwnerOrEntryPoint() {
         bytes32 keyHash = keccak256(abi.encodePacked(msg.sender));
         if (
             _ownerKeys.contains(keyHash) ||
