@@ -10,6 +10,7 @@ import {InitialOwner} from "src/Types.sol";
 contract AllowanceManagerTest is Test {
     SmartWallet public wallet;
     MockERC20 public mockToken;
+    MockERC20 public mockToken2;
     address public spender;
     address public recipient;
     address payable public _alice;
@@ -40,10 +41,7 @@ contract AllowanceManagerTest is Test {
         uint256 amount
     );
 
-    event NativeAllowanceUpdated(
-        address indexed spender,
-        uint256 newAllowance
-    );
+    event NativeAllowanceUpdated(address indexed spender, uint256 newAllowance);
 
     event TokenAllowanceUpdated(
         address indexed token,
@@ -59,28 +57,33 @@ contract AllowanceManagerTest is Test {
         recipient = makeAddr("recipient");
         unauthorized = makeAddr("unauthorized");
 
-        // Deploy mock token
+        // Deploy mock tokens
         mockToken = new MockERC20();
-        
-        // Mint tokens to Alice
-        mockToken.mint(_alice, 1000 * 10 ** 18);
-        
-        // Deploy wallet and set up EIP-7702
-        wallet = new SmartWallet();
-        _setCodeToEOA(address(wallet), _alice);
-        
+        mockToken2 = new MockERC20();
+
+        // Deploy wallet implementation
+        SmartWallet implementation = new SmartWallet();
+
+        // Set up EIP-7702: Alice's EOA gets the wallet code
+        _setCodeToEOA(address(implementation), _alice);
+        wallet = SmartWallet(payable(_alice));
+
         // Initialize wallet with Alice as owner
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
             keyHash: keccak256(abi.encodePacked(_alice)),
-            validator: _alice
+            validator: address(0x1) // Mock validator address
         });
-        
+
         vm.prank(_alice);
-        SmartWallet(_alice).initialize(initialOwners);
-        
-        // Fund Alice with ETH
-        vm.deal(_alice, 100 ether);
+        wallet.initialize(initialOwners);
+
+        // Transfer tokens to wallet
+        mockToken.transfer(address(wallet), 1000 * 10 ** 18);
+        mockToken2.transfer(address(wallet), 1000 * 10 ** 18);
+
+        // Fund wallet with ETH
+        vm.deal(address(wallet), 100 ether);
     }
 
     function _setCodeToEOA(address contractCode, address eoa) internal {
@@ -92,64 +95,60 @@ contract AllowanceManagerTest is Test {
 
     function test_ApproveNative_Success() public {
         uint256 amount = 1 ether;
-        
+
         vm.expectEmit(true, true, false, true);
-        emit ApproveNative(address(SmartWallet(_alice)), spender, amount);
-        
+        emit ApproveNative(address(wallet), spender, amount);
+
         vm.prank(_alice);
-        bool success = SmartWallet(_alice).approveNative(spender, amount);
-        
+        bool success = wallet.approveNative(spender, amount);
+
         assertTrue(success);
-        assertEq(SmartWallet(_alice).nativeAllowance(spender), amount);
+        assertEq(wallet.nativeAllowance(spender), amount);
     }
 
     function test_ApproveNative_OnlySelf() public {
         uint256 amount = 1 ether;
-        
+
         // Should fail for unauthorized user
         vm.prank(unauthorized);
         vm.expectRevert();
-        SmartWallet(_alice).approveNative(spender, amount);
-        
+        wallet.approveNative(spender, amount);
+
         // Should fail for external address (Bob)
         vm.prank(_bob);
         vm.expectRevert();
-        SmartWallet(_alice).approveNative(spender, amount);
-        
+        wallet.approveNative(spender, amount);
+
         // Should succeed for wallet owner (Alice) - since Alice IS the wallet in EIP-7702
         vm.prank(_alice);
-        SmartWallet(_alice).approveNative(spender, amount * 2);
-        assertEq(SmartWallet(_alice).nativeAllowance(spender), amount * 2);
+        wallet.approveNative(spender, amount * 2);
+        assertEq(wallet.nativeAllowance(spender), amount * 2);
     }
 
     function test_TransferFromNative_Success() public {
         uint256 allowanceAmount = 2 ether;
         uint256 transferAmount = 1 ether;
-        
+
         // Set up allowance
         vm.prank(_alice);
-        SmartWallet(_alice).approveNative(spender, allowanceAmount);
-        
+        wallet.approveNative(spender, allowanceAmount);
+
         uint256 initialBalance = recipient.balance;
-        
+
         vm.expectEmit(true, true, false, true);
-        emit TransferFromNative(
-            address(SmartWallet(_alice)),
-            recipient,
-            transferAmount
-        );
-        
+        emit TransferFromNative(address(wallet), recipient, transferAmount);
+
         vm.prank(spender);
-        bool success = SmartWallet(_alice).transferFromNative(
+        bool success = wallet.transferFromNative(
             _alice,
             recipient,
             transferAmount
         );
-        
+
         assertTrue(success);
         assertEq(recipient.balance, initialBalance + transferAmount);
         assertEq(
-            SmartWallet(_alice).nativeAllowance(spender),
+            wallet.nativeAllowance(spender),
             allowanceAmount - transferAmount
         );
     }
@@ -157,27 +156,23 @@ contract AllowanceManagerTest is Test {
     function test_TransferFromNative_InsufficientAllowance() public {
         uint256 allowanceAmount = 1 ether;
         uint256 transferAmount = 2 ether;
-        
+
         // Set up insufficient allowance
         vm.prank(_alice);
-        SmartWallet(_alice).approveNative(spender, allowanceAmount);
-        
+        wallet.approveNative(spender, allowanceAmount);
+
         vm.prank(spender);
         vm.expectRevert(IAllowanceManager.NativeAllowanceExceeded.selector);
-        SmartWallet(_alice).transferFromNative(
-            _alice,
-            recipient,
-            transferAmount
-        );
+        wallet.transferFromNative(_alice, recipient, transferAmount);
     }
 
     function test_TransferFromNative_IncorrectSender() public {
         vm.prank(_alice);
-        SmartWallet(_alice).approveNative(spender, 100 ether);
-        
+        wallet.approveNative(spender, 100 ether);
+
         vm.prank(spender);
         vm.expectRevert(IAllowanceManager.IncorrectSender.selector);
-        SmartWallet(_alice).transferFromNative(
+        wallet.transferFromNative(
             _bob, // Wrong sender - should be _alice (the wallet address)
             recipient,
             50 ether
@@ -186,76 +181,65 @@ contract AllowanceManagerTest is Test {
 
     function test_TransferFromNative_ZeroAmount() public {
         vm.prank(spender);
-        bool success = SmartWallet(_alice).transferFromNative(
-            _alice,
-            recipient,
-            0
-        );
+        bool success = wallet.transferFromNative(_alice, recipient, 0);
         assertTrue(success);
     }
 
     function test_TransferFromNative_UnlimitedAllowance() public {
         uint256 transferAmount = 1 ether;
-        
+
         // Set up unlimited allowance
         vm.prank(_alice);
-        SmartWallet(_alice).approveNative(spender, type(uint256).max);
-        
+        wallet.approveNative(spender, type(uint256).max);
+
         uint256 initialBalance = recipient.balance;
-        
+
         vm.prank(spender);
-        bool success = SmartWallet(_alice).transferFromNative(
+        bool success = wallet.transferFromNative(
             _alice,
             recipient,
             transferAmount
         );
-        
+
         assertTrue(success);
         assertEq(recipient.balance, initialBalance + transferAmount);
         // Unlimited allowance should remain unchanged
-        assertEq(SmartWallet(_alice).nativeAllowance(spender), type(uint256).max);
+        assertEq(wallet.nativeAllowance(spender), type(uint256).max);
     }
 
     // ============ ERC20 Token Tests ============
 
     function test_ApproveToken_Success() public {
         uint256 amount = 100 * 10 ** 18;
-        
+
         vm.expectEmit(true, true, false, true);
         emit ApproveToken(address(mockToken), spender, amount);
-        
+
         vm.prank(_alice);
-        bool success = SmartWallet(_alice).approveToken(
-            address(mockToken),
-            spender,
-            amount
-        );
-        
+        bool success = wallet.approveToken(address(mockToken), spender, amount);
+
         assertTrue(success);
-        assertEq(
-            SmartWallet(_alice).tokenAllowance(address(mockToken), spender),
-            amount
-        );
+        assertEq(wallet.tokenAllowance(address(mockToken), spender), amount);
     }
 
     function test_ApproveToken_OnlySelf() public {
         uint256 amount = 100 * 10 ** 18;
-        
+
         // Should fail for unauthorized user
         vm.prank(unauthorized);
         vm.expectRevert();
-        SmartWallet(_alice).approveToken(address(mockToken), spender, amount);
-        
+        wallet.approveToken(address(mockToken), spender, amount);
+
         // Should fail for external address (Bob)
         vm.prank(_bob);
         vm.expectRevert();
-        SmartWallet(_alice).approveToken(address(mockToken), spender, amount);
-        
+        wallet.approveToken(address(mockToken), spender, amount);
+
         // Should succeed for wallet owner (Alice) - since Alice IS the wallet in EIP-7702
         vm.prank(_alice);
-        SmartWallet(_alice).approveToken(address(mockToken), spender, amount * 2);
+        wallet.approveToken(address(mockToken), spender, amount * 2);
         assertEq(
-            SmartWallet(_alice).tokenAllowance(address(mockToken), spender),
+            wallet.tokenAllowance(address(mockToken), spender),
             amount * 2
         );
     }
@@ -263,39 +247,31 @@ contract AllowanceManagerTest is Test {
     function test_TransferFromToken_Success() public {
         uint256 allowanceAmount = 200 * 10 ** 18;
         uint256 transferAmount = 100 * 10 ** 18;
-        
+
         // Set up allowance
         vm.prank(_alice);
-        SmartWallet(_alice).approveToken(
-            address(mockToken),
-            spender,
-            allowanceAmount
-        );
-        
+        wallet.approveToken(address(mockToken), spender, allowanceAmount);
+
         uint256 initialBalance = mockToken.balanceOf(recipient);
-        
+
         vm.expectEmit(true, true, false, true);
-        emit TransferFromToken(
-            address(mockToken),
-            recipient,
-            transferAmount
-        );
-        
+        emit TransferFromToken(address(mockToken), recipient, transferAmount);
+
         vm.prank(spender);
-        bool success = SmartWallet(_alice).transferFromToken(
+        bool success = wallet.transferFromToken(
             address(mockToken),
             _alice,
             recipient,
             transferAmount
         );
-        
+
         assertTrue(success);
         assertEq(
             mockToken.balanceOf(recipient),
             initialBalance + transferAmount
         );
         assertEq(
-            SmartWallet(_alice).tokenAllowance(address(mockToken), spender),
+            wallet.tokenAllowance(address(mockToken), spender),
             allowanceAmount - transferAmount
         );
     }
@@ -303,18 +279,14 @@ contract AllowanceManagerTest is Test {
     function test_TransferFromToken_InsufficientAllowance() public {
         uint256 allowanceAmount = 100 * 10 ** 18;
         uint256 transferAmount = 200 * 10 ** 18;
-        
+
         // Set up insufficient allowance
         vm.prank(_alice);
-        SmartWallet(_alice).approveToken(
-            address(mockToken),
-            spender,
-            allowanceAmount
-        );
-        
+        wallet.approveToken(address(mockToken), spender, allowanceAmount);
+
         vm.prank(spender);
         vm.expectRevert(IAllowanceManager.TokenAllowanceExceeded.selector);
-        SmartWallet(_alice).transferFromToken(
+        wallet.transferFromToken(
             address(mockToken),
             _alice,
             recipient,
@@ -324,15 +296,11 @@ contract AllowanceManagerTest is Test {
 
     function test_TransferFromToken_IncorrectSender() public {
         vm.prank(_alice);
-        SmartWallet(_alice).approveToken(
-            address(mockToken),
-            spender,
-            100 * 10 ** 18
-        );
-        
+        wallet.approveToken(address(mockToken), spender, 100 * 10 ** 18);
+
         vm.prank(spender);
         vm.expectRevert(IAllowanceManager.IncorrectSender.selector);
-        SmartWallet(_alice).transferFromToken(
+        wallet.transferFromToken(
             address(mockToken),
             _bob, // Wrong sender - should be _alice (the wallet address)
             recipient,
@@ -342,7 +310,7 @@ contract AllowanceManagerTest is Test {
 
     function test_TransferFromToken_ZeroAmount() public {
         vm.prank(spender);
-        bool success = SmartWallet(_alice).transferFromToken(
+        bool success = wallet.transferFromToken(
             address(mockToken),
             _alice,
             recipient,
@@ -353,25 +321,21 @@ contract AllowanceManagerTest is Test {
 
     function test_TransferFromToken_UnlimitedAllowance() public {
         uint256 transferAmount = 100 * 10 ** 18;
-        
+
         // Set up unlimited allowance
         vm.prank(_alice);
-        SmartWallet(_alice).approveToken(
-            address(mockToken),
-            spender,
-            type(uint256).max
-        );
-        
+        wallet.approveToken(address(mockToken), spender, type(uint256).max);
+
         uint256 initialBalance = mockToken.balanceOf(recipient);
-        
+
         vm.prank(spender);
-        bool success = SmartWallet(_alice).transferFromToken(
+        bool success = wallet.transferFromToken(
             address(mockToken),
             _alice,
             recipient,
             transferAmount
         );
-        
+
         assertTrue(success);
         assertEq(
             mockToken.balanceOf(recipient),
@@ -379,7 +343,7 @@ contract AllowanceManagerTest is Test {
         );
         // Unlimited allowance should remain unchanged
         assertEq(
-            SmartWallet(_alice).tokenAllowance(address(mockToken), spender),
+            wallet.tokenAllowance(address(mockToken), spender),
             type(uint256).max
         );
     }
@@ -390,103 +354,74 @@ contract AllowanceManagerTest is Test {
         address spender2 = makeAddr("spender2");
         uint256 amount1 = 50 * 10 ** 18;
         uint256 amount2 = 75 * 10 ** 18;
-        
+
         // Approve different amounts for different spenders
         vm.prank(_alice);
-        SmartWallet(_alice).approveToken(address(mockToken), spender, amount1);
-        
+        wallet.approveToken(address(mockToken), spender, amount1);
+
         vm.prank(_alice);
-        SmartWallet(_alice).approveToken(address(mockToken), spender2, amount2);
-        
+        wallet.approveToken(address(mockToken), spender2, amount2);
+
         // Verify allowances are independent
-        assertEq(
-            SmartWallet(_alice).tokenAllowance(address(mockToken), spender),
-            amount1
-        );
-        assertEq(
-            SmartWallet(_alice).tokenAllowance(address(mockToken), spender2),
-            amount2
-        );
+        assertEq(wallet.tokenAllowance(address(mockToken), spender), amount1);
+        assertEq(wallet.tokenAllowance(address(mockToken), spender2), amount2);
     }
 
     function test_MultipleTokens() public {
-        MockERC20 mockToken2 = new MockERC20();
+        // mockToken2 is already deployed in setUp()
+        // Just mint tokens to alice
         mockToken2.mint(_alice, 1000 * 10 ** 18);
-        
+
         uint256 amount1 = 100 * 10 ** 18;
         uint256 amount2 = 200 * 10 ** 18;
-        
+
         // Approve different amounts for different tokens
         vm.prank(_alice);
-        SmartWallet(_alice).approveToken(address(mockToken), spender, amount1);
-        
+        wallet.approveToken(address(mockToken), spender, amount1);
+
         vm.prank(_alice);
-        SmartWallet(_alice).approveToken(address(mockToken2), spender, amount2);
-        
+        wallet.approveToken(address(mockToken2), spender, amount2);
+
         // Verify allowances are independent
-        assertEq(
-            SmartWallet(_alice).tokenAllowance(address(mockToken), spender),
-            amount1
-        );
-        assertEq(
-            SmartWallet(_alice).tokenAllowance(address(mockToken2), spender),
-            amount2
-        );
+        assertEq(wallet.tokenAllowance(address(mockToken), spender), amount1);
+        assertEq(wallet.tokenAllowance(address(mockToken2), spender), amount2);
     }
 
     function test_OverwriteAllowances() public {
         uint256 initialAmount = 100 * 10 ** 18;
         uint256 newAmount = 200 * 10 ** 18;
-        
+
         // Set initial allowance
         vm.prank(_alice);
-        SmartWallet(_alice).approveToken(
-            address(mockToken),
-            spender,
-            initialAmount
-        );
-        
+        wallet.approveToken(address(mockToken), spender, initialAmount);
+
         // Overwrite with new amount
         vm.prank(_alice);
-        SmartWallet(_alice).approveToken(
-            address(mockToken),
-            spender,
-            newAmount
-        );
-        
-        assertEq(
-            SmartWallet(_alice).tokenAllowance(address(mockToken), spender),
-            newAmount
-        );
+        wallet.approveToken(address(mockToken), spender, newAmount);
+
+        assertEq(wallet.tokenAllowance(address(mockToken), spender), newAmount);
     }
 
     // ============ Fuzz Tests ============
 
     function testFuzz_ApproveNative(uint256 amount) public {
         vm.assume(amount <= type(uint128).max); // Reasonable bounds
-        
+
         vm.prank(_alice);
-        bool success = SmartWallet(_alice).approveNative(spender, amount);
-        
+        bool success = wallet.approveNative(spender, amount);
+
         assertTrue(success);
-        assertEq(SmartWallet(_alice).nativeAllowance(spender), amount);
+        assertEq(wallet.nativeAllowance(spender), amount);
     }
 
     function testFuzz_ApproveToken(uint256 amount) public {
         vm.assume(amount <= type(uint128).max); // Reasonable bounds
-        
+
         vm.prank(_alice);
-        bool success = SmartWallet(_alice).approveToken(
-            address(mockToken),
-            spender,
-            amount
-        );
-        
+        bool success = wallet.approveToken(address(mockToken), spender, amount);
+
         assertTrue(success);
-        assertEq(
-            SmartWallet(_alice).tokenAllowance(address(mockToken), spender),
-            amount
-        );
+        assertEq(wallet.tokenAllowance(address(mockToken), spender), amount);
     }
 
     function testFuzz_TransferFromToken(
@@ -496,29 +431,25 @@ contract AllowanceManagerTest is Test {
         vm.assume(allowanceAmount <= mockToken.balanceOf(_alice));
         vm.assume(transferAmount <= allowanceAmount);
         vm.assume(transferAmount > 0);
-        
+
         // Set up allowance
         vm.prank(_alice);
-        SmartWallet(_alice).approveToken(
-            address(mockToken),
-            spender,
-            allowanceAmount
-        );
-        
+        wallet.approveToken(address(mockToken), spender, allowanceAmount);
+
         vm.prank(spender);
-        bool success = SmartWallet(_alice).transferFromToken(
+        bool success = wallet.transferFromToken(
             address(mockToken),
             _alice,
             recipient,
             transferAmount
         );
-        
+
         assertTrue(success);
         assertEq(mockToken.balanceOf(recipient), transferAmount);
-        
+
         if (allowanceAmount < type(uint256).max) {
             assertEq(
-                SmartWallet(_alice).tokenAllowance(address(mockToken), spender),
+                wallet.tokenAllowance(address(mockToken), spender),
                 allowanceAmount - transferAmount
             );
         }
@@ -531,24 +462,24 @@ contract AllowanceManagerTest is Test {
         vm.assume(allowanceAmount <= _alice.balance);
         vm.assume(transferAmount <= allowanceAmount);
         vm.assume(transferAmount > 0);
-        
+
         // Set up allowance
         vm.prank(_alice);
-        SmartWallet(_alice).approveNative(spender, allowanceAmount);
-        
+        wallet.approveNative(spender, allowanceAmount);
+
         vm.prank(spender);
-        bool success = SmartWallet(_alice).transferFromNative(
+        bool success = wallet.transferFromNative(
             _alice,
             recipient,
             transferAmount
         );
-        
+
         assertTrue(success);
         assertEq(recipient.balance, transferAmount);
-        
+
         if (allowanceAmount < type(uint256).max) {
             assertEq(
-                SmartWallet(_alice).nativeAllowance(spender),
+                wallet.nativeAllowance(spender),
                 allowanceAmount - transferAmount
             );
         }

@@ -1,21 +1,24 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.25;
+pragma solidity ^0.8.29;
 
 import {EntryPoint} from "account-abstraction/core/EntryPoint.sol";
 import {Base64} from "openzeppelin-contracts/contracts/utils/Base64.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/IAccount.sol";
 import {UserOperationLib} from "account-abstraction/core/UserOperationLib.sol";
-import {WebAuthn} from "webauthn-sol/src/WebAuthn.sol";
-import {Utils, WebAuthnInfo} from "webauthn-sol/test/Utils.sol";
+import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
+import {Utils, WebAuthnInfo} from "webauthn-sol/../test/Utils.sol";
 import {MerkleProof} from "openzeppelin-contracts/contracts/utils/cryptography/MerkleProof.sol";
 
 library Helper {
     uint256 constant CHALLENGE_LOCATION = 23;
     uint256 constant TYPE_INDEX = 1;
 
-    string constant CLIENT_DATA_JSON_PRE = '{"type":"webauthn.get","challenge":"';
-    string constant CLIENT_DATA_JSON_POST = '","origin":"http://localhost:8000","crossOrigin":false}';
-    bytes constant AUTHENTICATOR_DATA = hex"49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631900000000";
+    string constant CLIENT_DATA_JSON_PRE =
+        '{"type":"webauthn.get","challenge":"';
+    string constant CLIENT_DATA_JSON_POST =
+        '","origin":"http://localhost:8000","crossOrigin":false}';
+    bytes constant AUTHENTICATOR_DATA =
+        hex"49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97631900000000";
 
     using UserOperationLib for PackedUserOperation;
 
@@ -24,14 +27,7 @@ library Helper {
         uint256 chainid,
         PackedUserOperation calldata userOp
     ) internal pure returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    userOp.hash(),
-                    entryPoint,
-                    chainid
-                )
-            );
+        return keccak256(abi.encode(userOp.hash(), entryPoint, chainid));
     }
 
     function getPubkeyHash(
@@ -58,9 +54,7 @@ library Helper {
             bytes32 messageHash
         )
     {
-        string memory challengeB64url = Base64.encodeURL(
-            abi.encode(challenge)
-        );
+        string memory challengeB64url = Base64.encodeURL(abi.encode(challenge));
 
         clientDataJSON = string.concat(
             CLIENT_DATA_JSON_PRE,
@@ -73,7 +67,6 @@ library Helper {
         message = bytes.concat(AUTHENTICATOR_DATA, clientDataHash);
         messageHash = sha256(message);
     }
-
 
     function getWebAuthnAuth(
         bytes32 challenge,
@@ -98,14 +91,13 @@ library Helper {
         uint256 x,
         uint256 y
     ) internal view returns (bool) {
-        WebAuthn.WebAuthnAuth memory webAuthnAuth = getWebAuthnAuth(challenge, r, s);
-        return WebAuthn.verify(
-            abi.encode(challenge),
-            false,
-            webAuthnAuth,
-            x,
-            y
+        WebAuthn.WebAuthnAuth memory webAuthnAuth = getWebAuthnAuth(
+            challenge,
+            r,
+            s
         );
+        return
+            WebAuthn.verify(abi.encode(challenge), false, webAuthnAuth, x, y);
     }
 
     function getMerkleProofRootHash(
@@ -114,5 +106,4 @@ library Helper {
     ) internal pure returns (bytes32) {
         return MerkleProof.processProof(proofs, leaf);
     }
-
 }

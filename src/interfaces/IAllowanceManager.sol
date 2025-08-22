@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.29;
 
 /// @title IAllowanceManager
 /// @notice Interface for managing both native ETH and ERC20 token allowances
@@ -33,10 +33,7 @@ interface IAllowanceManager {
     );
 
     /// @notice Emitted when a native ETH allowance is updated
-    event NativeAllowanceUpdated(
-        address indexed spender,
-        uint256 newAllowance
-    );
+    event NativeAllowanceUpdated(address indexed spender, uint256 newAllowance);
 
     /// @notice Emitted when a token allowance is updated
     event TokenAllowanceUpdated(

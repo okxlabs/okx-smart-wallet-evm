@@ -3,7 +3,7 @@ pragma solidity ^0.8.29;
 
 import {P256} from "@openzeppelin/contracts/utils/cryptography/P256.sol";
 import {MerkleProofProcessor} from "./MerkleProofProcessor.sol";
-import {WebAuthn} from "webauthn-sol/src/WebAuthn.sol";
+import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 
 /**
  * @title PasskeyValidatorLib
@@ -47,13 +47,19 @@ library PasskeyValidatorLib {
         );
 
         // decode the WebAuthn authentication data from the validatorData
-        (WebAuthn.WebAuthnAuth memory webAuthnAuth, bytes32[] memory proofs) = abi.decode(
-            validatorData[PASSKEY_PUBKEY_LENGTH:], 
-            (WebAuthn.WebAuthnAuth, bytes32[])
-        );
+        (
+            WebAuthn.WebAuthnAuth memory webAuthnAuth,
+            bytes32[] memory proofs
+        ) = abi.decode(
+                validatorData[PASSKEY_PUBKEY_LENGTH:],
+                (WebAuthn.WebAuthnAuth, bytes32[])
+            );
 
         // Process Merkle proofs if present (using fixed signature length approach)
-        bytes32 rootHash = MerkleProofProcessor.processWithMerkleProof(proofs, messageHash);
+        bytes32 rootHash = MerkleProofProcessor.processWithMerkleProof(
+            proofs,
+            messageHash
+        );
 
         // Verify that the provided public key matches the registered keyHash
         if (keccak256(abi.encodePacked(sig.pubKeyX, sig.pubKeyY)) != keyHash) {
@@ -61,12 +67,13 @@ library PasskeyValidatorLib {
         }
 
         // verify the Passkey signature using the WebAuthn authentication data
-        return WebAuthn.verify({
-            challenge: abi.encode(rootHash), 
-            requireUV: false, 
-            webAuthnAuth: webAuthnAuth, 
-            x: sig.pubKeyX, 
-            y: sig.pubKeyY
-        });
+        return
+            WebAuthn.verify({
+                challenge: abi.encode(rootHash),
+                requireUV: false,
+                webAuthnAuth: webAuthnAuth,
+                x: sig.pubKeyX,
+                y: sig.pubKeyY
+            });
     }
 }

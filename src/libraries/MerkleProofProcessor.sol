@@ -9,7 +9,6 @@ import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProo
  * @dev Provides unified Merkle proof processing for all validators that support batch operations
  */
 library MerkleProofProcessor {
-    
     // process merkle proofs and return the root hash
     // if proofs is empty, return the message hash
     // if proofs is not empty, return the computed root hash
@@ -19,11 +18,7 @@ library MerkleProofProcessor {
     function processWithMerkleProof(
         bytes32[] memory proofs,
         bytes32 messageHash
-    )
-        internal
-        pure
-        returns (bytes32 rootHash)
-    {
+    ) internal pure returns (bytes32 rootHash) {
         uint256 len = proofs.length;
         if (len > 0) {
             // Compute Merkle root using the provided proofs and messageHash as leaf

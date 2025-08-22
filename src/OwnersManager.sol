@@ -19,7 +19,6 @@ abstract contract OwnersManager is IOwnersManager {
     EnumerableSetLib.Bytes32Set internal _ownerKeys; // Set of all owner keyHashes
     mapping(bytes32 => address) public ownerValidators; // keyHash => validator address for this owner
     mapping(bytes32 => uint256) public ownerSettings; // keyHash => packed settings (isAdmin + expiration + hook)
-    // TODO: add whitelistedBundlers
 
     // ============ Modifiers ============
 
@@ -188,12 +187,12 @@ abstract contract OwnersManager is IOwnersManager {
     }
 
     // ============ Public Pure Functions (Settings Management) ============
-    // Bit layout for settings (following Calibur's layout)
+    // Bit layout for settings
     // Layout: 6 bytes UNUSED | 1 byte isAdmin | 5 bytes expiration | 20 bytes hook
     // Bits:   [255-208]       | [207-200]      | [199-160]        | [159-0]
 
     /**
-     * @notice Pack settings into uint256 following Calibur's layout
+     * @notice Pack settings into uint256
      * @param adminFlag Admin flag
      * @param expiration Unix timestamp (0 = never expires)
      * @param hook Hook address (address(0) = no hook)

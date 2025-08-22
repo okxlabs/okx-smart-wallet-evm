@@ -1,16 +1,32 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.23;
 
-import "./Base.t.sol";
+import {Base} from "./Base.t.sol";
+import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
+import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
 import {OwnersManager} from "src/OwnersManager.sol";
-import {IValidation} from "src/interfaces/IValidation.sol";
-import "src/libraries/Errors.sol";
+import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
+import {IERC4337Account} from "src/interfaces/IERC4337Account.sol";
+import {Errors} from "src/libraries/Errors.sol";
 import {Static} from "src/libraries/Static.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
+import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
+import {MockEntryPoint} from "./ValidateUserOp.t.sol";
+import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
+import {ERC712} from "src/ERC712.sol";
+import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
+import {IValidator} from "src/interfaces/IValidator.sol";
 
 contract ValidatorTest is Base {
     address internal _charlie;
     uint256 internal _charliePk;
+    address internal _dave;
+    uint256 internal _davePk;
+
+    // External validators for testing
+    ECDSAValidator internal externalEcdsaValidator;
+    PasskeyValidator internal externalPasskeyValidator;
+    MockValidator internal mockValidator;
 
     event OwnerAdded(address validator);
     event OwnerRemoved(bytes32 keyHash);
@@ -19,7 +35,13 @@ contract ValidatorTest is Base {
 
     function setUp() public override {
         (_charlie, _charliePk) = makeAddrAndKey("charlie");
+        (_dave, _davePk) = makeAddrAndKey("dave");
         super.setUp();
+
+        // Deploy external validator contracts
+        externalEcdsaValidator = new ECDSAValidator();
+        externalPasskeyValidator = new PasskeyValidator();
+        mockValidator = new MockValidator();
     }
 
     function test_addValidator_reverts_for_non_owner() public {
@@ -109,11 +131,11 @@ contract ValidatorTest is Base {
         // Deploy and add validator using helper
         _addValidator(_alice, _charlie);
 
-        Call[] memory calls = _construct_calls_data();
+        Call[] memory calls = constructCallsData();
 
         // Relayer executes with Charlie signature
         bytes32 hash = _getValidationTypedHash(_alice, calls);
-        bytes memory validatorData = _construct_validatorData(
+        bytes memory validatorData = constructValidatorData(
             _alice,
             _charlie,
             _charliePk,
@@ -454,7 +476,7 @@ contract ValidatorTest is Base {
         });
 
         // Sign with non-admin signer (_bob)
-        bytes memory signature = _construct_signature(
+        bytes memory signature = constructSignature(
             batchedCall,
             _alice,
             _bobPk
@@ -505,7 +527,7 @@ contract ValidatorTest is Base {
         });
 
         // Sign with non-admin signer (_bob)
-        bytes memory signature = _construct_signature(
+        bytes memory signature = constructSignature(
             batchedCall,
             _alice,
             _bobPk
@@ -554,7 +576,7 @@ contract ValidatorTest is Base {
         });
 
         // Sign with admin signer (default initial owner is admin)
-        bytes memory signature = _construct_signature(
+        bytes memory signature = constructSignature(
             batchedCall,
             _alice,
             _alicePk
@@ -614,7 +636,7 @@ contract ValidatorTest is Base {
         });
 
         // Sign with admin signer
-        bytes memory signature = _construct_signature(
+        bytes memory signature = constructSignature(
             batchedCall,
             _alice,
             _alicePk
@@ -660,7 +682,7 @@ contract ValidatorTest is Base {
             expiry: 0
         });
 
-        bytes memory signature = _construct_signature(
+        bytes memory signature = constructSignature(
             batchedCall,
             _alice,
             _alicePk
@@ -710,7 +732,7 @@ contract ValidatorTest is Base {
             expiry: 0
         });
 
-        bytes memory signature = _construct_signature(
+        bytes memory signature = constructSignature(
             batchedCall,
             _alice,
             _alicePk
@@ -802,7 +824,7 @@ contract ValidatorTest is Base {
             expiry: 0
         });
 
-        bytes memory signature = _construct_signature(
+        bytes memory signature = constructSignature(
             batchedCall,
             freshWallet,
             _alicePk
@@ -817,5 +839,377 @@ contract ValidatorTest is Base {
         address registeredValidator = IOwnersManager(freshWallet)
             .getVerifiedValidator(selfKeyHash);
         assertEq(registeredValidator, address(_ecdsaValidator));
+    }
+
+    // ============ External Validator Tests ============
+
+    function test_external_ecdsa_validator_deployment() public view {
+        assertEq(address(externalEcdsaValidator).code.length > 0, true);
+    }
+
+    function test_external_ecdsa_validator_integration() public {
+        // Add charlie as validator using external ECDSA validator
+        bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
+        _executeAddValidator(
+            _alice,
+            charlieKeyHash,
+            address(externalEcdsaValidator),
+            false,
+            0,
+            address(0)
+        );
+
+        // Verify validator was added
+        address addedValidator = IOwnersManager(_alice).ownerValidators(
+            charlieKeyHash
+        );
+        assertEq(addedValidator, address(externalEcdsaValidator));
+
+        // Test executing transaction with external validator
+        Call[] memory calls = constructCallsData();
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: _getNonce(_alice),
+            expiry: uint48(block.timestamp + 1 hours)
+        });
+
+        bytes32 typedDataHash = ERC712(_alice).hashTypedData(
+            BatchedCallLib.hash(batchedCall)
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_charliePk, typedDataHash);
+
+        bytes memory validatorData = abi.encodePacked(
+            charlieKeyHash,
+            abi.encodePacked(r, s, v)
+        );
+
+        vm.prank(_bob);
+        vm.expectEmit(true, true, true, true);
+        emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+
+        assertEq(address(_bob).balance, 1 ether);
+    }
+
+    function test_mock_validator_integration_success() public {
+        bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
+        _executeAddValidator(
+            _alice,
+            charlieKeyHash,
+            address(mockValidator),
+            false,
+            0,
+            address(0)
+        );
+
+        mockValidator.setValidationResult(true);
+
+        Call[] memory calls = constructCallsData();
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: _getNonce(_alice),
+            expiry: uint48(block.timestamp + 1 hours)
+        });
+
+        bytes memory validatorData = abi.encodePacked(
+            charlieKeyHash,
+            "mock signature data"
+        );
+
+        vm.prank(_bob);
+        vm.expectEmit(true, true, true, true);
+        emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+
+        assertEq(address(_bob).balance, 1 ether);
+    }
+
+    function test_mock_validator_integration_failure() public {
+        bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
+        _executeAddValidator(
+            _alice,
+            charlieKeyHash,
+            address(mockValidator),
+            false,
+            0,
+            address(0)
+        );
+
+        mockValidator.setValidationResult(false);
+
+        Call[] memory calls = constructCallsData();
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: _getNonce(_alice),
+            expiry: uint48(block.timestamp + 1 hours)
+        });
+
+        bytes memory validatorData = abi.encodePacked(
+            charlieKeyHash,
+            "mock signature data"
+        );
+
+        vm.prank(_bob);
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+        );
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+    }
+
+    // ============ Edge Case Tests ============
+
+    function test_validator_signature_boundaries() public {
+        bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
+        _executeAddValidator(
+            _alice,
+            charlieKeyHash,
+            address(externalEcdsaValidator),
+            false,
+            0,
+            address(0)
+        );
+
+        Call[] memory calls = constructCallsData();
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: _getNonce(_alice),
+            expiry: uint48(block.timestamp + 1 hours)
+        });
+
+        // Test 1: Empty signature should fail
+        bytes memory emptyValidatorData = abi.encodePacked(
+            charlieKeyHash,
+            bytes("")
+        );
+        vm.prank(_bob);
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+        );
+        ISmartWallet(_alice).executeWithRelayer(
+            batchedCall,
+            emptyValidatorData
+        );
+
+        // Test 2: Oversized signature should fail
+        bytes memory oversizedSignature = new bytes(1000);
+        for (uint256 i = 0; i < 1000; i++) {
+            oversizedSignature[i] = bytes1(uint8(i % 256));
+        }
+        bytes memory oversizedValidatorData = abi.encodePacked(
+            charlieKeyHash,
+            oversizedSignature
+        );
+        vm.prank(_bob);
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+        );
+        ISmartWallet(_alice).executeWithRelayer(
+            batchedCall,
+            oversizedValidatorData
+        );
+
+        // Test 3: Insufficient signature data should fail
+        bytes memory insufficientValidatorData = abi.encodePacked(
+            charlieKeyHash,
+            bytes32(
+                0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+            )
+        );
+        vm.prank(_bob);
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+        );
+        ISmartWallet(_alice).executeWithRelayer(
+            batchedCall,
+            insufficientValidatorData
+        );
+    }
+
+    function test_validator_invalid_keyhash() public {
+        // Use zero keyHash (invalid)
+        bytes32 invalidKeyHash = bytes32(0);
+
+        Call[] memory calls = constructCallsData();
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: _getNonce(_alice),
+            expiry: uint48(block.timestamp + 1 hours)
+        });
+
+        bytes32 typedDataHash = ERC712(_alice).hashTypedData(
+            BatchedCallLib.hash(batchedCall)
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_charliePk, typedDataHash);
+
+        bytes memory validatorData = abi.encodePacked(
+            invalidKeyHash, // Invalid keyHash
+            abi.encodePacked(r, s, v)
+        );
+
+        vm.prank(_bob);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Errors.InvalidKeyHash.selector,
+                invalidKeyHash
+            )
+        );
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+    }
+
+    // ============ UserOp Edge Case Tests ============
+
+    function test_validateUserOp_signature_too_short() public {
+        vm.prank(_alice);
+
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: aliceKeyHash,
+            validator: address(externalEcdsaValidator)
+        });
+        address account = _factory.createAccount(
+            address(_smartWallet),
+            initialOwners,
+            0
+        );
+
+        vm.deal(address(account), 1 ether);
+
+        vm.etch(
+            IERC4337Account(account).entryPoint(),
+            address(new MockEntryPoint()).code
+        );
+        MockEntryPoint ep = MockEntryPoint(
+            payable(IERC4337Account(account).entryPoint())
+        );
+
+        PackedUserOperation memory userOp;
+        // Signature too short (less than 32 bytes)
+        userOp.signature = abi.encodePacked(
+            bytes16(0x1234567890abcdef1234567890abcdef)
+        );
+
+        bytes32 userOpHash = keccak256("test");
+        uint256 missingAccountFunds = 100;
+
+        // Should revert due to array bounds error when trying to access signature[0:32]
+        vm.expectRevert();
+        ep.validateUserOp(
+            address(account),
+            userOp,
+            userOpHash,
+            missingAccountFunds
+        );
+    }
+
+    function test_validateUserOp_empty_signature() public {
+        vm.prank(_alice);
+
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: aliceKeyHash,
+            validator: address(externalEcdsaValidator)
+        });
+        address account = _factory.createAccount(
+            address(_smartWallet),
+            initialOwners,
+            0
+        );
+
+        vm.deal(address(account), 1 ether);
+
+        vm.etch(
+            IERC4337Account(account).entryPoint(),
+            address(new MockEntryPoint()).code
+        );
+        MockEntryPoint ep = MockEntryPoint(
+            payable(IERC4337Account(account).entryPoint())
+        );
+
+        PackedUserOperation memory userOp;
+        // Empty signature
+        userOp.signature = bytes("");
+
+        bytes32 userOpHash = keccak256("test");
+        uint256 missingAccountFunds = 100;
+
+        // Should revert due to array bounds error when trying to access signature[0:32]
+        vm.expectRevert();
+        ep.validateUserOp(
+            address(account),
+            userOp,
+            userOpHash,
+            missingAccountFunds
+        );
+    }
+
+    function test_validateUserOp_malformed_keyhash_in_signature() public {
+        vm.prank(_alice);
+
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: aliceKeyHash,
+            validator: address(externalEcdsaValidator)
+        });
+        address account = _factory.createAccount(
+            address(_smartWallet),
+            initialOwners,
+            0
+        );
+
+        vm.deal(address(account), 1 ether);
+
+        vm.etch(
+            IERC4337Account(account).entryPoint(),
+            address(new MockEntryPoint()).code
+        );
+        MockEntryPoint ep = MockEntryPoint(
+            payable(IERC4337Account(account).entryPoint())
+        );
+
+        PackedUserOperation memory userOp;
+        bytes32 userOpHash = keccak256("test");
+
+        // Use invalid keyHash (not registered)
+        bytes32 invalidKeyHash = keccak256(abi.encodePacked(address(0xdead)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
+        userOp.signature = abi.encodePacked(
+            invalidKeyHash,
+            abi.encodePacked(r, s, v)
+        );
+
+        uint256 missingAccountFunds = 100;
+
+        // Should return SIG_VALIDATION_FAILED (1 << 96)
+        uint256 result = ep.validateUserOp(
+            address(account),
+            userOp,
+            userOpHash,
+            missingAccountFunds
+        );
+        assertEq(result, 1 << 96);
+    }
+}
+
+/**
+ * @title MockValidator
+ * @notice Mock validator for testing external validator contracts
+ * @dev Returns configurable validation results for testing purposes
+ */
+contract MockValidator is IValidator {
+    bool private validationResult = true;
+
+    function setValidationResult(bool result) external {
+        validationResult = result;
+    }
+
+    function validateSignature(
+        bytes32, // keyHash
+        bytes32, // messageHash
+        bytes calldata // validatorData
+    ) external view returns (bool) {
+        return validationResult;
     }
 }

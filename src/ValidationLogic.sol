@@ -6,7 +6,6 @@ import {IValidator} from "./interfaces/IValidator.sol";
 import {ECDSAValidatorLib} from "./libraries/ECDSAValidatorLib.sol";
 import {PasskeyValidatorLib} from "./libraries/PasskeyValidatorLib.sol";
 
-import {Call, BatchedCall} from "./Types.sol";
 import {Static} from "./libraries/Static.sol";
 
 abstract contract ValidationLogic is IValidation {

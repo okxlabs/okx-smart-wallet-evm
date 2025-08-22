@@ -8,6 +8,7 @@ library Errors {
 
     // Account related
     error NotFromSelf();
+    error OwnerExpired();
 
     // Call related
     error CallFailed(uint256 index, uint256 originalLength, bytes returnData);
@@ -22,12 +23,7 @@ library Errors {
     // ECDSAValidator related
     error InvalidSignature();
 
-    // SmartWallet related
-    error NameTooLong();
-    error VersionTooLong();
-
     // Simulation related
-    error GasEstimates(uint256 executionGas, bytes errorData);
     error SimulateExecution();
 
     error InvalidOwnersAndValidatorsLength();

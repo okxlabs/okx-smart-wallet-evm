@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.29;
 
-import {IAccount, PackedUserOperation} from "account-abstraction/interfaces/IAccount.sol";
+import {IAccount} from "account-abstraction/interfaces/IAccount.sol";
 
 interface IERC4337Account is IAccount {
     /// @notice Returns the EntryPoint address

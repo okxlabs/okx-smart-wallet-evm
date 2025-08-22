@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import "./Base.t.sol";
-import {MockEntryPoint, PackedUserOperation} from "./mocks/MockEntryPoint.sol";
+import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 import {IERC4337Account} from "src/interfaces/IERC4337Account.sol";
 import {Errors} from "src/libraries/Errors.sol";
 
@@ -92,5 +92,37 @@ contract ValidateUserOpTest is Base {
             t.userOpHash,
             t.missingAccountFunds
         );
+    }
+}
+
+// Mock contract moved from mocks/MockEntryPoint.sol
+contract MockEntryPoint {
+    mapping(address => uint256) public balanceOf;
+
+    function depositTo(address to) public payable {
+        balanceOf[to] += msg.value;
+    }
+
+    function withdrawTo(address to, uint256 amount) public payable {
+        balanceOf[msg.sender] -= amount;
+        (bool success, ) = payable(to).call{value: amount}("");
+        require(success);
+    }
+
+    function validateUserOp(
+        address account,
+        PackedUserOperation memory userOp,
+        bytes32 userOpHash,
+        uint256 missingAccountFunds
+    ) public payable returns (uint256 validationData) {
+        validationData = IERC4337Account(payable(account)).validateUserOp(
+            userOp,
+            userOpHash,
+            missingAccountFunds
+        );
+    }
+
+    receive() external payable {
+        depositTo(msg.sender);
     }
 }

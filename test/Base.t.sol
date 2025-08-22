@@ -2,21 +2,16 @@
 pragma solidity ^0.8.23;
 
 import {Test} from "forge-std/Test.sol";
-import "forge-std/console.sol";
+import {console} from "forge-std/console.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
 import {OwnersManager} from "src/OwnersManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
-import {IValidation} from "src/interfaces/IValidation.sol";
-import {IValidator} from "src/interfaces/IValidator.sol";
-import {ValidationLogic} from "src/ValidationLogic.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
 import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
-import {Errors} from "src/libraries/Errors.sol";
 import {DeployInitHelper, DeployFactory} from "scripts/DeployInitHelper.sol";
-import {ERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {Static} from "src/libraries/Static.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {ERC712} from "src/ERC712.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
@@ -79,7 +74,7 @@ contract Base is Test {
         vm.etch(eoa, code);
     }
 
-    function _construct_signature(
+    function constructSignature(
         address account,
         uint256 signerPk,
         Call[] memory calls
@@ -88,7 +83,7 @@ contract Base is Test {
         return _signHash(signerPk, hash);
     }
 
-    function _construct_signature(
+    function constructSignature(
         uint256 nonce,
         uint256 signerPk,
         Call[] memory calls
@@ -97,7 +92,7 @@ contract Base is Test {
         return _signHash(signerPk, hash);
     }
 
-    function _construct_signature_with_nonce(
+    function constructSignatureWithNonce(
         uint256 nonce,
         address account,
         uint256 signerPk,
@@ -107,13 +102,13 @@ contract Base is Test {
         return _signHash(signerPk, hash);
     }
 
-    function _construct_calls_data() public view returns (Call[] memory) {
+    function constructCallsData() public view returns (Call[] memory) {
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _bob, value: 1 ether, data: ""});
         return calls;
     }
 
-    function _construct_erc20_transfer_call(
+    function constructErc20TransferCall(
         IERC20 token,
         address recipient,
         uint256 amount
@@ -225,23 +220,21 @@ contract Base is Test {
         return address(_ecdsaValidator);
     }
 
-    function _construct_relayer_call(
+    function constructRelayerCall(
         uint256 len,
         IERC20 token
     ) internal view returns (Call[] memory calls) {
         calls = new Call[](len);
         for (uint256 i; i < len; i++) {
-            calls[i] = _construct_erc20_transfer_call(token, _alice, 100);
+            calls[i] = constructErc20TransferCall(token, _alice, 100);
         }
     }
 
-    function _get_execution_gas(
-        uint256 callSize
-    ) internal pure returns (uint256) {
+    function getExecutionGas(uint256 callSize) internal pure returns (uint256) {
         return 31532 + 2210 * callSize + 25160 * callSize;
     }
 
-    function _construct_signature(
+    function constructSignature(
         uint256 privateKey,
         bytes32 hash
     ) internal pure returns (bytes memory) {
@@ -249,37 +242,37 @@ contract Base is Test {
         return abi.encodePacked(r, s, v);
     }
 
-    function _construct_validatorData(
+    function constructValidatorData(
         address /* wallet */,
         address signer,
         uint256 privateKey,
         bytes32 hash
     ) internal pure returns (bytes memory) {
         bytes32 keyHash = keccak256(abi.encodePacked(signer));
-        bytes memory signature = _construct_signature(privateKey, hash);
+        bytes memory signature = constructSignature(privateKey, hash);
         return abi.encodePacked(keyHash, signature);
     }
 
-    function _construct_validatorData(
+    function constructValidatorData(
         address signer,
         uint256 privateKey,
         bytes32 hash
     ) internal pure returns (bytes memory) {
-        return _construct_validatorData(signer, signer, privateKey, hash);
+        return constructValidatorData(signer, signer, privateKey, hash);
     }
 
-    function _construct_validatorData(
+    function constructValidatorData(
         address signer,
         uint256 privateKey,
         bytes32 hash,
         uint64 /* nonce */
     ) internal pure returns (bytes memory) {
         bytes32 keyHash = keccak256(abi.encodePacked(signer));
-        bytes memory signature = _construct_signature(privateKey, hash);
+        bytes memory signature = constructSignature(privateKey, hash);
         return abi.encodePacked(keyHash, signature);
     }
 
-    function _construct_signature(
+    function constructSignature(
         BatchedCall memory batchedCall,
         address account,
         uint256 signerPk
@@ -382,5 +375,39 @@ contract Base is Test {
 
         vm.prank(wallet);
         ISmartWallet(wallet).execute(calls);
+    }
+}
+
+// ============ Mock Contracts for Testing ============
+
+contract MockComplexContract {
+    uint256 public counter;
+    bool public functionCalled;
+
+    receive() external payable {}
+
+    function complexFunction(
+        uint256 _number,
+        string memory _text,
+        bool _flag
+    ) external payable returns (bytes memory) {
+        functionCalled = true;
+        return abi.encode(_number, _text, _flag, msg.value, block.timestamp);
+    }
+
+    function simpleIncrement() external {
+        counter++;
+    }
+
+    function returnLargeData(
+        uint256 size
+    ) external pure returns (bytes memory) {
+        return new bytes(size);
+    }
+}
+
+contract MockRevertingContract {
+    function alwaysReverts() external pure {
+        revert("Always reverts");
     }
 }

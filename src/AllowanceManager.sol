@@ -94,7 +94,7 @@ abstract contract AllowanceManager is IAllowanceManager, OwnersManager {
         }
 
         // Execute transfer
-        (bool success,) = payable(recipient).call{value: amount}("");
+        (bool success, ) = payable(recipient).call{value: amount}("");
         if (!success) {
             revert TransferNativeFailed();
         }

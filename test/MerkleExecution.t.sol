@@ -49,9 +49,9 @@ contract MerkleExecutionTest is Base {
 
     function _setupMerkleTree() internal {
         // Create test BatchedCall data
-        Call[] memory calls1 = _construct_calls_data();
-        Call[] memory calls2 = _construct_calls_data();
-        Call[] memory calls3 = _construct_calls_data();
+        Call[] memory calls1 = constructCallsData();
+        Call[] memory calls2 = constructCallsData();
+        Call[] memory calls3 = constructCallsData();
 
         // Create BatchedCall structs
         BatchedCall memory batchedCall1 = _construct_batchedCall(
@@ -218,7 +218,7 @@ contract MerkleExecutionTest is Base {
         bytes32 messageHash
     ) internal pure returns (bytes memory) {
         bytes32 keyHash = keccak256(abi.encodePacked(signer));
-        bytes memory signature = _construct_signature(privateKey, messageHash);
+        bytes memory signature = constructSignature(privateKey, messageHash);
 
         // For simple ECDSA validation: keyHash + signature (65 bytes)
         // ECDSAValidator will see validatorData.length <= 65 and do simple validation
@@ -233,7 +233,7 @@ contract MerkleExecutionTest is Base {
     ) internal pure returns (bytes memory) {
         bytes32 keyHash = keccak256(abi.encodePacked(signer));
 
-        bytes memory signature = _construct_signature(privateKey, hashToSign);
+        bytes memory signature = constructSignature(privateKey, hashToSign);
 
         return abi.encodePacked(keyHash, signature, abi.encode(proofs));
     }
@@ -242,7 +242,7 @@ contract MerkleExecutionTest is Base {
 
     function test_executeWithMerkle_succeeds_with_valid_proof() public {
         // Create a valid BatchedCall that matches our first leaf
-        Call[] memory calls = _construct_calls_data();
+        Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _construct_batchedCall(calls, _alice);
 
         // Use merkle validation with proofs
@@ -266,7 +266,7 @@ contract MerkleExecutionTest is Base {
     // ============ SECURITY TEST CASES ============
 
     function test_executeWithMerkle_reverts_with_invalid_proof() public {
-        Call[] memory calls = _construct_calls_data();
+        Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _construct_batchedCall(calls, _alice);
 
         bytes memory validatorData = _construct_merkle_validator_data(
@@ -284,7 +284,7 @@ contract MerkleExecutionTest is Base {
     }
 
     function test_executeWithMerkle_reverts_with_wrong_root() public {
-        Call[] memory calls = _construct_calls_data();
+        Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _construct_batchedCall(calls, _alice);
 
         // Use wrong message hash for signature
@@ -304,7 +304,7 @@ contract MerkleExecutionTest is Base {
     }
 
     function test_executeWithMerkle_reverts_with_invalid_validator() public {
-        Call[] memory calls = _construct_calls_data();
+        Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _construct_batchedCall(calls, _alice);
 
         bytes memory validatorData = _construct_merkle_validator_data(
@@ -325,7 +325,7 @@ contract MerkleExecutionTest is Base {
     }
 
     function test_executeWithMerkle_reverts_with_invalid_nonce() public {
-        Call[] memory calls = _construct_calls_data();
+        Call[] memory calls = constructCallsData();
 
         // Create BatchedCall with wrong nonce
         uint192 nonceKey = uint192(0);
@@ -356,7 +356,7 @@ contract MerkleExecutionTest is Base {
     }
 
     function test_executeWithMerkle_reverts_with_replay_attack() public {
-        Call[] memory calls = _construct_calls_data();
+        Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _construct_batchedCall(calls, _alice);
 
         bytes memory validatorData = _construct_merkle_validator_data(
@@ -386,7 +386,7 @@ contract MerkleExecutionTest is Base {
     function test_executeWithMerkle_reverts_with_manipulated_batchedCall()
         public
     {
-        Call[] memory calls = _construct_calls_data();
+        Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _construct_batchedCall(calls, _alice);
 
         // Create manipulated BatchedCall with different calls
@@ -419,7 +419,7 @@ contract MerkleExecutionTest is Base {
     function test_executeWithMerkle_reverts_with_insufficient_signature_length()
         public
     {
-        Call[] memory calls = _construct_calls_data();
+        Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _construct_batchedCall(calls, _alice);
 
         // Create signature that's too short (missing signature part)
@@ -445,7 +445,7 @@ contract MerkleExecutionTest is Base {
         uint256 numLeaves = 16;
         bytes32[] memory largeLeaves = new bytes32[](numLeaves);
 
-        Call[] memory calls = _construct_calls_data();
+        Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _construct_batchedCall(calls, _alice);
 
         for (uint256 i = 0; i < numLeaves; i++) {
