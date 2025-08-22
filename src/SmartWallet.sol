@@ -16,8 +16,7 @@ import {Errors} from "./libraries/Errors.sol";
 import {Static} from "./libraries/Static.sol";
 import {IHook} from "./interfaces/IHook.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {ERC4337Account} from "./ERC4337Account.sol";
-import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
+import {ERC4337Account, PackedUserOperation} from "./ERC4337Account.sol";
 import {BatchedCallLib} from "./libraries/BatchedCallLib.sol";
 import {AllowanceManager} from "./AllowanceManager.sol";
 
@@ -48,19 +47,19 @@ contract SmartWallet is
         _disableInitializers();
     }
 
-    modifier onlyOwnerOrEntryPoint() override {
+    modifier onlyOwnerOrEntryPoint() {
         if (msg.sender == entryPoint() || msg.sender == address(this)) {
             _;
             return;
         }
-        
+
         bytes32 keyHash = keccak256(abi.encodePacked(msg.sender));
         address validator = ownerValidators[keyHash];
-        
+
         if (validator == address(0)) {
             revert Errors.NotFromSelf();
         }
-        
+
         uint256 settings = ownerSettings[keyHash];
         if (settings != 0 && isSettingsExpired(settings)) {
             revert Errors.OwnerExpired();
@@ -69,7 +68,7 @@ contract SmartWallet is
     }
 
     /**
-     * @notice Initializes the SmartWallet with initial owners
+     * @notice Initializes the wallet core with initial owners
      * @dev Storage is now integrated directly into SmartWallet
      * @param initialOwners Array of tuples containing keyHash and validator address pairs
      */
@@ -160,6 +159,7 @@ contract SmartWallet is
      */
     function simulateExecuteWithRelayer(
         BatchedCall calldata batchedCall,
+        address validator,
         bytes calldata validatorData
     ) external {
         // Check transaction expiry
@@ -174,7 +174,7 @@ contract SmartWallet is
 
         // Extract keyHash and validate validator
         bytes32 keyHash = bytes32(validatorData[:32]);
-        address validator = getVerifiedValidator(keyHash);
+        address mockValidator = getVerifiedValidator(keyHash);
 
         if (validator == address(0)) {
             // revert Errors.InvalidKeyHash(keyHash);

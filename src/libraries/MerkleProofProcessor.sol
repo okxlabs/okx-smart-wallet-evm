@@ -9,31 +9,23 @@ import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProo
  * @dev Provides unified Merkle proof processing for all validators that support batch operations
  */
 library MerkleProofProcessor {
-    /**
-     * @notice Processes validator data that may contain Merkle proofs
-     * @dev If validatorData contains proofs (length > signatureLength), processes them to get the Merkle root
-     * @param validatorData The complete validator data (signature + optional Merkle proofs)
-     * @param messageHash The original message hash to be processed
-     * @param signatureLength The expected length of the signature part (e.g., 65 for ECDSA)
-     * @return processedMessageHash The message hash (original or Merkle root if proofs present)
-     * @return signatureData The signature portion extracted from validatorData
-     */
+    
+    // process merkle proofs and return the root hash
+    // if proofs is empty, return the message hash
+    // if proofs is not empty, return the computed root hash
+    // @param proofs: the merkle proofs
+    // @param messageHash: the message hash
+    // @return rootHash: the root hash
     function processWithMerkleProof(
-        bytes calldata validatorData,
-        bytes32 messageHash,
-        uint256 signatureLength
+        bytes32[] memory proofs,
+        bytes32 messageHash
     )
         internal
         pure
-        returns (bytes32 processedMessageHash, bytes memory signatureData)
+        returns (bytes32 rootHash)
     {
-        if (validatorData.length > signatureLength) {
-            // Extract Merkle proofs from the end of validatorData
-            bytes32[] memory proofs = abi.decode(
-                validatorData[signatureLength:],
-                (bytes32[])
-            );
-
+        uint256 len = proofs.length;
+        if (len > 0) {
             // Compute Merkle root using the provided proofs and messageHash as leaf
             bytes32 computedRoot = MerkleProof.processProof(
                 proofs,
@@ -41,14 +33,10 @@ library MerkleProofProcessor {
             );
 
             // Use computed root as the processed message hash
-            processedMessageHash = computedRoot;
-
-            // Extract signature from the beginning of validatorData
-            signatureData = validatorData[:signatureLength];
+            rootHash = computedRoot;
         } else {
             // No proofs present, use original messageHash and entire validatorData as signature
-            processedMessageHash = messageHash;
-            signatureData = validatorData;
+            rootHash = messageHash;
         }
     }
 }

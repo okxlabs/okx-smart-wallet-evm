@@ -238,6 +238,49 @@ contract ValidationTest is Base {
         assertEq(address(_bob).balance, 1 ether);
     }
 
+    function test_isValidSignature_fails_for_removed_validator() public {
+        // Add validator using _bob to avoid EIP-7702 fallback collision
+        // (In test environment, address(this) == _alice due to setCode)
+        _addValidator(_alice, _bob);
+
+        // Remove validator
+        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        _executeRemoveValidator(_alice, bobKeyHash);
+
+        bytes32 hash = keccak256("test");
+        bytes memory sig = _signDigest(hash, _bobPk); // Use _bob's private key
+        bytes memory signature = abi.encodePacked(bobKeyHash, sig);
+
+        // Call isValidSignature
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        assertEq(result, bytes4(0xffffffff));
+    }
+
+    function test_isValidSignature_fails_with_short_signature() public view {
+        bytes32 hash = keccak256("test");
+
+        // signature shorter than 20 bytes
+        bytes memory signature = bytes("");
+
+        // Call isValidSignature
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        assertEq(result, bytes4(0xffffffff));
+    }
+
+    function test_isValidSignature_fails_with_longer_than_85_bytes_signature()
+        public
+        view
+    {
+        bytes32 hash = keccak256("test");
+
+        // signature have 100 bytes
+        bytes memory signature = bytes(new bytes(100));
+
+        // Call isValidSignature
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        assertEq(result, bytes4(0xffffffff));
+    }
+
     function test_isValidSignature_succeeds_with_default_validator()
         public
         view

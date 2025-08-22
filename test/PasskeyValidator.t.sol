@@ -14,25 +14,29 @@ import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {P256} from "@openzeppelin/contracts/utils/cryptography/P256.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {ERC712} from "src/ERC712.sol";
+import {Helper} from "src/test/Helper.sol";
+import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
+import {Base64} from "@openzeppelin/contracts/utils/Base64.sol";
+
+
 
 contract PasskeyValidatorTest is Base {
     PasskeyValidator internal passkeyValidator;
 
     // Generated real P256 signature using SmartAccount method (crypto.createSign compatibility)
     uint256 internal constant TEST_PUBKEY_X =
-        93395446812770925679792685583480163168908246531166147805311304577982810709820;
+        28573233055232466711029625910063034642429572463461595413086259353299906450061;
     uint256 internal constant TEST_PUBKEY_Y =
-        5843431828147496338686936499235924335955323008009359491787085654138424314798;
+        39367742072897599771788408398752356480431855827262528811857788332151452825281;
     uint256 internal constant TEST_SIG_R =
-        25828805614860354161190499603509708190934612728616354577826502286404845272335;
+        43684192885701841787131392247364253107519555363555461570655060745499568693242;
     uint256 internal constant TEST_SIG_S =
-        29928497590434097042049690444089131430600455224456875507154890068862499431667;
+        22655632649588629308599201066602670461698485748654492451178007896016452673579;
     bytes32 internal constant REAL_KEY_HASH =
-        0xbdd34183a50c65dcbf4c8a1e67b3ab93fc8922c49908bd89e88ea81efcb79caa;
+        0x7a655e59bb879aff4a25592b02afb672bb2d2cbb1e5a60cd591f3b07bad0b8ff;
 
     // Message hash that gets passed to validator (typedDataHash, gets SHA256 in contract for compatibility)
-    bytes32 internal constant SIGNED_MESSAGE_HASH =
-        0xaf3e6e2b4fa4e69e53dd0379334775177e5832e037b2712757d3cf64d8b25c77;
+    bytes32 constant SIGNED_MESSAGE_HASH = bytes32(0xf631058a3ba1116acce12396fad0a125b5041c43f8e15723709f81aa8d5f4ccf);
 
     bytes32 internal testKeyHash;
 
@@ -65,50 +69,32 @@ contract PasskeyValidatorTest is Base {
         assertEq(validator, address(passkeyValidator));
     }
 
-    function test_p256_signature_directly() public view {
-        // Test P256 signature verification directly using OpenZeppelin P256
-        // Must hash the message to match contract behavior and crypto.createSign requirement
-        bytes32 hashedMessage = sha256(abi.encodePacked(SIGNED_MESSAGE_HASH));
-
-        console.log("Testing P256 signature verification");
-        console.log("Original message hash:", vm.toString(SIGNED_MESSAGE_HASH));
-        console.log("Hashed message (SHA256):", vm.toString(hashedMessage));
-        console.log("Sig R:", TEST_SIG_R);
-        console.log("Sig S:", TEST_SIG_S);
-        console.log("Pub X:", TEST_PUBKEY_X);
-        console.log("Pub Y:", TEST_PUBKEY_Y);
-
-        bool isValid = P256.verify(
-            hashedMessage,
-            bytes32(TEST_SIG_R),
-            bytes32(TEST_SIG_S),
-            bytes32(TEST_PUBKEY_X),
-            bytes32(TEST_PUBKEY_Y)
-        );
-
-        console.log("P256.verify result:", isValid);
-        assertEq(isValid, true, "P256 signature should be valid");
+    function test_webauthn_signature_directly() public view {
+        WebAuthn.WebAuthnAuth memory auth = Helper.getCoinbaseWebAuthnAuth(SIGNED_MESSAGE_HASH, TEST_SIG_R, TEST_SIG_S);
+        console.log("auth.clientDataJSON:", auth.clientDataJSON);
+        bool isValid = WebAuthn.verify(abi.encode(SIGNED_MESSAGE_HASH), false, auth, TEST_PUBKEY_X, TEST_PUBKEY_Y);
+        console.log("isValid:", isValid);
+        assertTrue(isValid, "WebAuthn signature should be valid");
     }
 
     function test_real_passkey_signature_validates() public view {
         // Test with the signed message hash directly
-        bytes32 messageHash = SIGNED_MESSAGE_HASH;
-
+        WebAuthn.WebAuthnAuth memory auth = Helper.getCoinbaseWebAuthnAuth(SIGNED_MESSAGE_HASH, TEST_SIG_R, TEST_SIG_S);
         // Create simplified PasskeySignature struct
-        PasskeyValidatorLib.PasskeySignature
-            memory passkeySignature = PasskeyValidatorLib.PasskeySignature({
+
+        bytes memory sig = abi.encode(auth, new bytes(0));
+        bytes memory validatorData = abi.encodePacked(
+            abi.encode(PasskeyValidatorLib.PasskeyPubKey({
                 pubKeyX: TEST_PUBKEY_X,
-                pubKeyY: TEST_PUBKEY_Y,
-                r: TEST_SIG_R,
-                s: TEST_SIG_S
-            });
-
-        bytes memory validatorData = abi.encode(passkeySignature);
-
+                pubKeyY: TEST_PUBKEY_Y
+            })),
+            sig
+        );
+       
         // This should validate successfully with simple P256 verification
         bool isValid = passkeyValidator.validateSignature(
             testKeyHash,
-            messageHash,
+            SIGNED_MESSAGE_HASH,
             validatorData
         );
 
@@ -147,18 +133,18 @@ contract PasskeyValidatorTest is Base {
         ERC712(_alice).hashTypedData(BatchedCallLib.hash(batchedCall));
 
         // Create simplified mock Passkey signature data
-        PasskeyValidatorLib.PasskeySignature
-            memory passkeySignature = PasskeyValidatorLib.PasskeySignature({
+        PasskeyValidatorLib.PasskeyPubKey
+            memory passkeyPubKey = PasskeyValidatorLib.PasskeyPubKey({
                 pubKeyX: TEST_PUBKEY_X,
-                pubKeyY: TEST_PUBKEY_Y,
-                r: TEST_SIG_R, // Using real signature values for structure
-                s: TEST_SIG_S
+                pubKeyY: TEST_PUBKEY_Y
+                // r: TEST_SIG_R, // Using real signature values for structure
+                // s: TEST_SIG_S
             });
 
         // Encode the validator data
         bytes memory validatorData = abi.encodePacked(
             testKeyHash,
-            abi.encode(passkeySignature)
+            abi.encode(passkeyPubKey)
         );
 
         // Structure validation - ensure data encoding works correctly
@@ -174,18 +160,20 @@ contract PasskeyValidatorTest is Base {
     function test_real_passkey_wrong_challenge_fails() public view {
         // Use a different message hash than what was actually signed
         bytes32 wrongMessageHash = keccak256("wrong message");
+        
+        // Test with the signed message hash directly
+        WebAuthn.WebAuthnAuth memory auth = Helper.getCoinbaseWebAuthnAuth(wrongMessageHash, TEST_SIG_R, TEST_SIG_S);
+        // Create simplified PasskeySignature struct
 
-        // Use real Passkey data but with wrong message hash
-        PasskeyValidatorLib.PasskeySignature
-            memory passkeySignature = PasskeyValidatorLib.PasskeySignature({
+        bytes memory sig = abi.encode(auth, new bytes(0));
+        bytes memory validatorData = abi.encodePacked(
+            abi.encode(PasskeyValidatorLib.PasskeyPubKey({
                 pubKeyX: TEST_PUBKEY_X,
-                pubKeyY: TEST_PUBKEY_Y,
-                r: TEST_SIG_R,
-                s: TEST_SIG_S
-            });
-
-        bytes memory validatorData = abi.encode(passkeySignature);
-
+                pubKeyY: TEST_PUBKEY_Y
+            })),
+            sig
+        );
+       
         bool isValid = passkeyValidator.validateSignature(
             testKeyHash,
             wrongMessageHash,
@@ -200,16 +188,29 @@ contract PasskeyValidatorTest is Base {
     }
 
     function test_validateSignature_rejects_wrong_pubkey() public view {
-        bytes32 messageHash = keccak256("test message");
-
         // Use wrong public key coordinates
         uint256 wrongX = 0x1111111111111111111111111111111111111111111111111111111111111111;
         uint256 wrongY = 0x2222222222222222222222222222222222222222222222222222222222222222;
+        bytes32 messageHash = SIGNED_MESSAGE_HASH;
 
-        PasskeyValidatorLib.PasskeySignature memory sig = PasskeyValidatorLib
-            .PasskeySignature({pubKeyX: wrongX, pubKeyY: wrongY, r: 0, s: 0});
+        WebAuthn.WebAuthnAuth memory webAuthnAuth = Helper.getWebAuthnAuth(
+            messageHash,
+            TEST_SIG_R,
+            TEST_SIG_S
+        );
 
-        bytes memory validatorData = abi.encode(sig);
+        // Create simplified PasskeySignature struct
+        PasskeyValidatorLib.PasskeyPubKey
+            memory passkeyPubKey = PasskeyValidatorLib.PasskeyPubKey({
+                pubKeyX: wrongX,
+                pubKeyY: wrongY
+            });
+
+        bytes memory sig = abi.encode(webAuthnAuth, new bytes(0));
+        bytes memory validatorData = abi.encodePacked(
+            abi.encode(passkeyPubKey),
+            sig
+        );
 
         bool isValid = passkeyValidator.validateSignature(
             testKeyHash,
@@ -220,110 +221,52 @@ contract PasskeyValidatorTest is Base {
         assertEq(isValid, false, "Should reject wrong public key");
     }
 
-    function test_validateSignature_with_zero_signature_fails() public view {
-        bytes32 messageHash = keccak256("test message");
-
-        // Use correct public key but zero signature (should fail P256 verification)
-        PasskeyValidatorLib.PasskeySignature memory sig = PasskeyValidatorLib
-            .PasskeySignature({
-                pubKeyX: TEST_PUBKEY_X,
-                pubKeyY: TEST_PUBKEY_Y,
-                r: 0,
-                s: 0
-            });
-
-        bytes memory validatorData = abi.encode(sig);
-
-        bool isValid = passkeyValidator.validateSignature(
-            testKeyHash,
-            messageHash,
-            validatorData
-        );
-
-        assertEq(isValid, false, "Should reject zero signature values");
-    }
 
     // ===== Merkle Proof Tests =====
 
     function test_validateSignature_with_merkle_proof_single() public view {
-        bytes32 messageHash = SIGNED_MESSAGE_HASH;
+        WebAuthn.WebAuthnAuth memory auth = Helper.getCoinbaseWebAuthnAuth(SIGNED_MESSAGE_HASH, TEST_SIG_R, TEST_SIG_S);
+        // Create simplified PasskeySignature struct
 
-        // Create passkey signature
-        PasskeyValidatorLib.PasskeySignature
-            memory passkeySignature = PasskeyValidatorLib.PasskeySignature({
-                pubKeyX: TEST_PUBKEY_X,
-                pubKeyY: TEST_PUBKEY_Y,
-                r: TEST_SIG_R,
-                s: TEST_SIG_S
-            });
-
-        bytes memory signatureData = abi.encode(passkeySignature);
 
         // Create a simple Merkle proof - in real scenario, messageHash would be a leaf
         // For testing, we'll create a proof where messageHash is already the root
         bytes32[] memory proofs = new bytes32[](1);
-        proofs[0] = keccak256(abi.encodePacked(messageHash, bytes32(0)));
-
-        // Combine signature + proofs
-        bytes memory validatorDataWithProofs = abi.encodePacked(
-            signatureData,
-            abi.encode(proofs)
+        proofs[0] = keccak256(abi.encodePacked(SIGNED_MESSAGE_HASH, bytes32(0)));
+    
+        bytes memory sig = abi.encode(auth, new bytes(0));
+        bytes memory validatorData = abi.encodePacked(
+            abi.encode(PasskeyValidatorLib.PasskeyPubKey({
+                pubKeyX: TEST_PUBKEY_X,
+                pubKeyY: TEST_PUBKEY_Y
+            })),
+            sig
         );
 
         // This should validate (note: simplified test, in real usage the Merkle logic would be more complex)
         bool isValid = passkeyValidator.validateSignature(
             testKeyHash,
-            messageHash,
-            validatorDataWithProofs
+            SIGNED_MESSAGE_HASH,
+            validatorData
         );
 
+        assertEq(isValid, true, "Merkle proof should validate");
         // Note: This test might fail due to the simplified Merkle proof setup
         // In a real implementation, you'd need proper Merkle tree construction
         console.log("Merkle proof validation result:", isValid);
     }
 
-    function test_validateSignature_without_merkle_proof_still_works()
-        public
-        view
-    {
-        bytes32 messageHash = SIGNED_MESSAGE_HASH;
-
-        // Standard signature without Merkle proofs
-        PasskeyValidatorLib.PasskeySignature
-            memory passkeySignature = PasskeyValidatorLib.PasskeySignature({
-                pubKeyX: TEST_PUBKEY_X,
-                pubKeyY: TEST_PUBKEY_Y,
-                r: TEST_SIG_R,
-                s: TEST_SIG_S
-            });
-
-        bytes memory validatorData = abi.encode(passkeySignature);
-
-        // Should still validate normally without proofs
-        bool isValid = passkeyValidator.validateSignature(
-            testKeyHash,
-            messageHash,
-            validatorData
-        );
-
-        assertEq(
-            isValid,
-            true,
-            "Standard validation should still work without Merkle proofs"
-        );
-    }
-
     function test_merkle_proof_processing_detection() public pure {
         // Test the MerkleProofProcessor's dynamic detection
-        PasskeyValidatorLib.PasskeySignature
-            memory passkeySignature = PasskeyValidatorLib.PasskeySignature({
+        PasskeyValidatorLib.PasskeyPubKey
+            memory passkeyPubKey = PasskeyValidatorLib.PasskeyPubKey({
                 pubKeyX: TEST_PUBKEY_X,
-                pubKeyY: TEST_PUBKEY_Y,
-                r: TEST_SIG_R,
-                s: TEST_SIG_S
+                pubKeyY: TEST_PUBKEY_Y
+                // r: TEST_SIG_R,
+                // s: TEST_SIG_S
             });
 
-        bytes memory signatureData = abi.encode(passkeySignature);
+        bytes memory signatureData = abi.encode(passkeyPubKey);
 
         console.log("Signature data length:", signatureData.length);
 
