@@ -19,6 +19,7 @@ import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.s
 import {ERC4337Account, PackedUserOperation} from "./ERC4337Account.sol";
 import {BatchedCallLib} from "./libraries/BatchedCallLib.sol";
 import {AllowanceManager} from "./AllowanceManager.sol";
+import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 
 // Do not set any states in this contract
 contract SmartWallet is
@@ -32,7 +33,8 @@ contract SmartWallet is
     ERC712,
     FallbackHandler,
     Initializable,
-    AllowanceManager
+    AllowanceManager,
+    UUPSUpgradeable
 {
     using ECDSA for bytes32;
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
@@ -305,4 +307,11 @@ contract SmartWallet is
         }
         return Static.INVALID_VALUE;
     }
+
+    /// @inheritdoc UUPSUpgradeable
+    /// @dev Authorization logic is only based on the `msg.sender` being an owner of this account,
+    ///      or `address(this)`.
+    function _authorizeUpgrade(
+        address
+    ) internal view override(UUPSUpgradeable) onlyOwnerOrEntryPoint {}
 }
