@@ -85,6 +85,7 @@ async function generateInitCode(
         }
     }
 
+    sender = await factory.getFunction("getAddress")(implementationAddress, owners, salt);
     console.log("  Final sender address:", sender);
 
     // Generate factory call

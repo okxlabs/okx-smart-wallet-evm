@@ -19,6 +19,7 @@ const ADDRESSES = {
     SMART_WALLET_IMPL: process.env.SMART_WALLET_IMPL || "",
     ECDSA_VALIDATOR: process.env.ECDSA_VALIDATOR || "",
     PASSKEY_VALIDATOR: process.env.PASSKEY_VALIDATOR || "",
+    HELPER: process.env.HELPER || "",
 
     // Test token for experiments
     TEST_TOKEN: process.env.TEST_TOKEN || "",
@@ -92,6 +93,17 @@ async function getTestToken(signer?: SignerWithAddress) {
     return token;
 }
 
+/**
+ * Get helper contract instance
+ */
+async function getHelper(signer?: SignerWithAddress) {
+    if (!ADDRESSES.HELPER) {
+        throw new Error("HELPER address not set");
+    }
+    const helper = await hre.ethers.getContractAt("Helper", ADDRESSES.HELPER, signer);
+    return helper;
+}
+
 export const contracts = {
     getEntryPoint,
     getSmartWalletFactory,
@@ -99,5 +111,6 @@ export const contracts = {
     getECDSAValidator,
     getPasskeyValidator,
     getTestToken,
+    getHelper,
     ADDRESSES,
 };

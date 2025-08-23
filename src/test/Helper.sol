@@ -5,6 +5,7 @@ import {Base64} from "openzeppelin-contracts/contracts/utils/Base64.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/IAccount.sol";
 import {UserOperationLib} from "account-abstraction/core/UserOperationLib.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
+import {EntryPoint} from "account-abstraction/core/EntryPoint.sol";
 // import {MerkleProof} from "openzeppelin-contracts/contracts/utils/cryptography/MerkleProof.sol";
 
 library HelperLib {
@@ -46,7 +47,11 @@ library HelperLib {
     )
         internal
         pure
-        returns (string memory clientDataJSON, bytes32 messageHash)
+        returns (
+            string memory clientDataJSON,
+            bytes memory message,
+            bytes32 messageHash
+        )
     {
         string memory challengeB64url = Base64.encodeURL(abi.encode(challenge));
 
@@ -58,7 +63,7 @@ library HelperLib {
 
         bytes32 clientDataHash = sha256(bytes(clientDataJSON));
 
-        bytes memory message = bytes.concat(AUTHENTICATOR_DATA, clientDataHash);
+        message = bytes.concat(AUTHENTICATOR_DATA, clientDataHash);
         messageHash = sha256(message);
     }
 
@@ -67,7 +72,7 @@ library HelperLib {
         uint256 r,
         uint256 s
     ) internal pure returns (WebAuthn.WebAuthnAuth memory webAuthnAuth) {
-        (string memory clientDataJSON, ) = getPasskeyMessageHash(challenge);
+        (string memory clientDataJSON, , ) = getPasskeyMessageHash(challenge);
         webAuthnAuth = WebAuthn.WebAuthnAuth({
             authenticatorData: AUTHENTICATOR_DATA,
             clientDataJSON: clientDataJSON,
@@ -131,7 +136,11 @@ contract Helper {
     )
         external
         pure
-        returns (string memory clientDataJSON, bytes32 messageHash)
+        returns (
+            string memory clientDataJSON,
+            bytes memory message,
+            bytes32 messageHash
+        )
     {
         return HelperLib.getPasskeyMessageHash(challenge);
     }
@@ -160,4 +169,22 @@ contract Helper {
     ) external pure returns (bytes32) {
         return HelperLib.getMerkleProofRootHash(proofs, leaf);
     }
+
+    function getValidatorData(
+        bytes32 challenge,
+        uint256 r,
+        uint256 s,
+        uint256 x,
+        uint256 y
+    ) external pure returns (bytes memory) {
+        WebAuthn.WebAuthnAuth memory auth = HelperLib.getWebAuthnAuth(
+            challenge,
+            r,
+            s
+        );
+        bytes memory sig = abi.encode(auth, new bytes(0));
+        return abi.encodePacked(abi.encode(x, y), sig);
+    }
 }
+
+contract EntryPointMock is EntryPoint {}

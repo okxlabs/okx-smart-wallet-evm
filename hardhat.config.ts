@@ -27,9 +27,9 @@ const config: HardhatUserConfig = {
       chainId: 1,
       accounts: [process.env.DEPLOYER_PRIVATE_KEY || ""],
     },
-    devnet6: {
-      url: "https://rpc.pectra-devnet-6.ethpandaops.io",
-      chainId: 7072151312,
+    xlayer: {
+      url: "https://xlayerrpc.okx.com/",
+      chainId: 196,
       accounts: [process.env.DEPLOYER_PRIVATE_KEY || ""],
     },
     holesky: {

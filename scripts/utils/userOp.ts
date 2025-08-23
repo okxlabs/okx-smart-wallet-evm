@@ -130,32 +130,9 @@ async function signUserOperationWithECDSA(
     return ethers.solidityPacked(["bytes32", "bytes"], [keyHash, signature]);
 }
 
-/**
- * Generate Passkey signature for user operation
- * This is a placeholder - implement actual Passkey signing logic
- */
-async function signUserOperationWithPasskey(
-    userOp: UserOperation,
-    pubKeyX: string,
-    pubKeyY: string,
-    privateKey?: string // For testing only
-): Promise<string> {
-    // TODO: Implement actual Passkey signing
-    // For now, return a placeholder signature with keyHash
-    const keyHash = ethers.keccak256(
-        ethers.solidityPacked(["uint256", "uint256"], [pubKeyX, pubKeyY])
-    );
-
-    // Placeholder signature - replace with actual Passkey implementation
-    const placeholderSig = ethers.randomBytes(64);
-
-    return ethers.solidityPacked(["bytes32", "bytes"], [keyHash, placeholderSig]);
-}
-
 export const userOpUtils = {
     generateAccountGasLimits,
     generateGasFees,
     createUserOperation,
     signUserOperationWithECDSA,
-    signUserOperationWithPasskey,
 };
