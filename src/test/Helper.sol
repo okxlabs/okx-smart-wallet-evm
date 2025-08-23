@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.29;
 
-import {EntryPoint} from "account-abstraction/core/EntryPoint.sol";
 import {Base64} from "openzeppelin-contracts/contracts/utils/Base64.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/IAccount.sol";
 import {UserOperationLib} from "account-abstraction/core/UserOperationLib.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
-import {Utils, WebAuthnInfo} from "webauthn-sol/../test/Utils.sol";
-import {MerkleProof} from "openzeppelin-contracts/contracts/utils/cryptography/MerkleProof.sol";
+// import {MerkleProof} from "openzeppelin-contracts/contracts/utils/cryptography/MerkleProof.sol";
 
 library HelperLib {
     uint256 public constant CHALLENGE_LOCATION = 23;
@@ -100,7 +98,8 @@ library HelperLib {
         bytes32[] memory proofs,
         bytes32 leaf
     ) internal pure returns (bytes32) {
-        return MerkleProof.processProof(proofs, leaf);
+        // return MerkleProof.processProof(proofs, leaf);
+        return bytes32(0);
     }
 }
 

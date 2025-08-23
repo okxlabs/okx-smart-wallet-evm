@@ -24,6 +24,8 @@ contract Base is Test {
     uint256 internal _alicePk;
     address internal _bob;
     uint256 internal _bobPk;
+    uint256 internal _passkeyPubX;
+    uint256 internal _passkeyPubY;
     ECDSAValidator internal _ecdsaValidator; // Shared validator instance
     SmartWallet internal _smartWallet;
     SmartWalletFactory internal _factory;
@@ -47,6 +49,10 @@ contract Base is Test {
         _alice = payable(aliceAddr);
         _alicePk = alicePk;
         (_bob, _bobPk) = makeAddrAndKey("bob");
+
+        // Generated real P256 signature using SmartAccount method (crypto.createSign compatibility)
+        _passkeyPubX = 0x640c5cacef387563d0b105c7724c45ee19f8a952cb583de494a6a7ce5ed16760;
+        _passkeyPubY = 0x142b33cbf8255e9f0628ab9e250e179a3e7e8e24e0a2a4340f0b9fdeb29a1b48;
 
         deployFactory = new DeployFactory();
         bytes32 deployFactorySalt = vm.envBytes32("DEPLOY_FACTORY_SALT");
