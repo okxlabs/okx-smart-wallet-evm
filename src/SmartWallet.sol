@@ -41,8 +41,6 @@ contract SmartWallet is
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
     using BatchedCallLib for BatchedCall;
 
-    uint256 private constant SIG_VALIDATION_FAILED = 1 << 96;
-
     address public immutable IMPLEMENTATION;
 
     constructor() {
@@ -126,6 +124,10 @@ contract SmartWallet is
             // Check for upgrade calls in the batch and validate implementation has code
             for (uint256 i; i < batchedCall.calls.length; i++) {
                 bytes memory callData = batchedCall.calls[i].data;
+                if (callData.length < 4) {
+                    revert Errors.InvalidNonceKey(key);
+                }
+
                 bytes4 selector;
                 assembly {
                     /// @dev truncate to only take the first 4 bytes
@@ -262,7 +264,7 @@ contract SmartWallet is
 
         bytes32 keyHash = bytes32(userOp.signature[0:32]);
         address validator = getVerifiedValidator(keyHash);
-        if (validator == address(0)) return SIG_VALIDATION_FAILED;
+        if (validator == address(0)) return Static.SIG_VALIDATION_FAILED;
 
         uint256 key = userOp.nonce >> 64;
 
@@ -273,13 +275,16 @@ contract SmartWallet is
             Call[] memory calls = abi.decode(userOp.callData[4:], (Call[]));
             for (uint256 i; i < calls.length; i++) {
                 bytes memory callData = calls[i].data;
+                if (callData.length < 4) {
+                    return Static.SIG_VALIDATION_FAILED;
+                }
                 bytes4 selector;
                 assembly {
                     /// @dev truncate to only take the first 4 bytes
                     selector := mload(add(callData, 32))
                 }
                 if (!canSkipChainIdValidation(selector)) {
-                    revert Errors.InvalidNonceKey(key);
+                    return Static.SIG_VALIDATION_FAILED;
                 }
             }
         }
@@ -291,7 +296,7 @@ contract SmartWallet is
                 userOpHash,
                 userOp.signature[32:]
             )
-        ) return SIG_VALIDATION_FAILED;
+        ) return Static.SIG_VALIDATION_FAILED;
         return validationData;
     }
 
