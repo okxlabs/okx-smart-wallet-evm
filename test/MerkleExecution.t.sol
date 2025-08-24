@@ -9,7 +9,7 @@ import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProo
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
 import {OwnersManager} from "src/OwnersManager.sol";
-import {ValidationLogic} from "src/ValidationLogic.sol";
+import {ValidateManager} from "src/ValidateManager.sol";
 import {ERC712} from "src/ERC712.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 

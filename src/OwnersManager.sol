@@ -43,6 +43,18 @@ abstract contract OwnersManager is IOwnersManager {
         address validator,
         uint256 settings
     ) external onlySelf {
+        _addOwner(keyHash, validator, settings);
+    }
+
+    /// @dev Internal function to add an owner
+    /// @param keyHash The public key hash to associate with this validator
+    /// @param validator The address of the validator contract to be registered
+    /// @param settings Packed settings value (use packSettings to create)
+    function _addOwner(
+        bytes32 keyHash,
+        address validator,
+        uint256 settings
+    ) internal {
         // Check if keyHash is already registered
         if (_ownerKeys.contains(keyHash)) {
             revert Errors.ValidatorAlreadyExists();
@@ -110,7 +122,7 @@ abstract contract OwnersManager is IOwnersManager {
         return _ownerKeys.values();
     }
 
-    function hasOwner(bytes32 keyHash) external view override returns (bool) {
+    function hasOwner(bytes32 keyHash) public view override returns (bool) {
         return _ownerKeys.contains(keyHash);
     }
 

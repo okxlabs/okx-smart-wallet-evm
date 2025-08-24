@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.29;
 
-import {IValidation} from "./interfaces/IValidation.sol";
 import {IValidator} from "./interfaces/IValidator.sol";
 import {ECDSAValidatorLib} from "./libraries/ECDSAValidatorLib.sol";
 import {PasskeyValidatorLib} from "./libraries/PasskeyValidatorLib.sol";
 
 import {Static} from "./libraries/Static.sol";
 
-abstract contract ValidationLogic is IValidation {
+abstract contract ValidateManager {
     /**
      * @notice Validates expiry has not passed
      * @dev Checks if the given expiry timestamp is in the past

@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.23;
 
-import "src/SmartWallet.sol";
-import "src/validator/ECDSAValidator.sol";
-import "src/test/DeployFactory.sol";
+import {OKXSmartWalletEntry} from "src/OKXSmartWalletEntry.sol";
+import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
+import {DeployFactory} from "src/test/DeployFactory.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
 import "lib/forge-std/src/Test.sol";
+import {Helper} from "src/test/Helper.sol";
 
 library DeployInitHelper {
     function deployContracts(
@@ -15,8 +16,9 @@ library DeployInitHelper {
         internal
         returns (
             ECDSAValidator ecdsaValidatorImpl,
-            SmartWallet smartWalletImpl,
-            SmartWalletFactory factoryImpl
+            OKXSmartWalletEntry smartWalletImpl,
+            SmartWalletFactory factoryImpl,
+            Helper helperImpl
         )
     {
         // deploy ECDSAValidator
@@ -28,13 +30,18 @@ library DeployInitHelper {
 
         // deploy SmartWallet
         address payable smartWalletAddr = deployFactory.deploy(
-            type(SmartWallet).creationCode,
+            type(OKXSmartWalletEntry).creationCode,
             deployFactorySalt
         );
-        smartWalletImpl = SmartWallet(smartWalletAddr);
+        smartWalletImpl = OKXSmartWalletEntry(smartWalletAddr);
 
         factoryImpl = SmartWalletFactory(deployFactory.deploy(
             type(SmartWalletFactory).creationCode,
+            deployFactorySalt
+        ));
+
+        helperImpl = Helper(deployFactory.deploy(
+            type(Helper).creationCode,
             deployFactorySalt
         ));
     }

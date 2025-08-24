@@ -9,7 +9,7 @@ import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
 import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
-import {Helper} from "src/test/Helper.sol";
+import {HelperLib} from "src/test/Helper.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
@@ -67,7 +67,7 @@ contract ValidateUserOpTest is Base {
         t.signer = _alice;
         t.privateKey = _alicePk;
         (t.v, t.r, t.s) = vm.sign(t.privateKey, t.userOpHash);
-        t.missingAccountFunds = 456;
+        t.missingAccountFunds = 123;
         vm.deal(address(account), 1 ether);
         assertEq(address(account).balance, 1 ether);
 
@@ -204,7 +204,7 @@ contract ValidateUserOpTest is Base {
         vm.deal(address(account), 2 ether);
 
         // Create Passkey signature with WebAuthn auth
-        WebAuthn.WebAuthnAuth memory auth = Helper.getWebAuthnAuth(
+        WebAuthn.WebAuthnAuth memory auth = HelperLib.getWebAuthnAuth(
             t.userOpHash,
             TEST_SIG_R,
             TEST_SIG_S
@@ -408,5 +408,37 @@ contract ValidateUserOpTest is Base {
             1 << 96,
             "Malformed signature should fail"
         );
+    }
+}
+
+// Mock contract moved from mocks/MockEntryPoint.sol
+contract MockEntryPoint {
+    mapping(address => uint256) public balanceOf;
+
+    function depositTo(address to) public payable {
+        balanceOf[to] += msg.value;
+    }
+
+    function withdrawTo(address to, uint256 amount) public payable {
+        balanceOf[msg.sender] -= amount;
+        (bool success, ) = payable(to).call{value: amount}("");
+        require(success);
+    }
+
+    function validateUserOp(
+        address account,
+        PackedUserOperation memory userOp,
+        bytes32 userOpHash,
+        uint256 missingAccountFunds
+    ) public payable returns (uint256 validationData) {
+        validationData = IERC4337Account(payable(account)).validateUserOp(
+            userOp,
+            userOpHash,
+            missingAccountFunds
+        );
+    }
+
+    receive() external payable {
+        depositTo(msg.sender);
     }
 }

@@ -20,8 +20,6 @@ import {IERC4337Account} from "src/interfaces/IERC4337Account.sol";
 contract ValidatorTest is Base {
     address internal _charlie;
     uint256 internal _charliePk;
-
-    // Helper function to directly test validateUserOp by pranking as EntryPoint
     address internal _dave;
     uint256 internal _davePk;
 

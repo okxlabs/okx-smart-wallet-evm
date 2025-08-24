@@ -8,8 +8,8 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
 import {OwnersManager} from "./OwnersManager.sol";
 import {NonceManager} from "./NonceManager.sol";
-import {ValidationLogic} from "./ValidationLogic.sol";
-import {ExecutionLogic} from "./ExecutionLogic.sol";
+import {ValidateManager} from "./ValidateManager.sol";
+import {ExecuteManager} from "./ExecuteManager.sol";
 import {FallbackHandler} from "./FallbackHandler.sol";
 import {Call, BatchedCall, InitialOwner} from "./Types.sol";
 import {Errors} from "./libraries/Errors.sol";
@@ -19,6 +19,7 @@ import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.s
 import {ERC4337Account, PackedUserOperation} from "./ERC4337Account.sol";
 import {BatchedCallLib} from "./libraries/BatchedCallLib.sol";
 import {AllowanceManager} from "./AllowanceManager.sol";
+import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 
 // Do not set any states in this contract
 contract SmartWallet is
@@ -27,12 +28,13 @@ contract SmartWallet is
     ERC4337Account,
     OwnersManager,
     NonceManager,
-    ValidationLogic,
-    ExecutionLogic,
+    ValidateManager,
+    ExecuteManager,
     ERC712,
     FallbackHandler,
     Initializable,
-    AllowanceManager
+    AllowanceManager,
+    UUPSUpgradeable
 {
     using ECDSA for bytes32;
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
@@ -54,10 +56,8 @@ contract SmartWallet is
         }
 
         bytes32 keyHash = keccak256(abi.encodePacked(msg.sender));
-        address validator = ownerValidators[keyHash];
-
-        if (validator == address(0)) {
-            revert Errors.NotFromSelf();
+        if (!hasOwner(keyHash)) {
+            revert Errors.InvalidCaller(msg.sender);
         }
 
         uint256 settings = ownerSettings[keyHash];
@@ -74,7 +74,7 @@ contract SmartWallet is
      */
     function initialize(
         InitialOwner[] calldata initialOwners
-    ) public initializer {
+    ) external initializer {
         // Set up initial owners
         // isAdmin = true, expiration = 0 (never expires), hook = address(0)
         uint256 settings = packSettings(true, 0, address(0));
@@ -86,12 +86,7 @@ contract SmartWallet is
             bytes32 keyHash = initialOwners[i].keyHash;
             address validator = initialOwners[i].validator;
 
-            if (validator == address(0)) {
-                revert Errors.InvalidValidatorImpl(validator);
-            }
-
-            // Set admin settings for initial owners
-            _setValidatorWithSettings(keyHash, validator, settings);
+            _addOwner(keyHash, validator, settings);
         }
     }
 
@@ -124,6 +119,26 @@ contract SmartWallet is
         if (!validateAndUpdateNonce(batchedCall.nonce))
             revert Errors.InvalidNonce(batchedCall.nonce);
 
+        uint256 key = batchedCall.nonce >> 64;
+        bytes32 dataHash = batchedCall.hash();
+        if (key == Static.CHAIN_LESS_NONCE_KEY) {
+            // Check for upgrade calls in the batch and validate implementation has code
+            for (uint256 i; i < batchedCall.calls.length; i++) {
+                Call calldata callData = batchedCall.calls[i];
+                bytes4 selector;
+                assembly {
+                    selector := mload(add(callData, 32)) // truncate to only take the first 4 bytes
+                }
+
+                if (!canSkipChainIdValidation(selector)) {
+                    revert Errors.InvalidNonceKey(key);
+                }
+            }
+            dataHash = hashTypedDataSansChainId(dataHash);
+        } else {
+            dataHash = hashTypedData(dataHash);
+        }
+
         // Extract keyHash and validate validator
         bytes32 keyHash = bytes32(validatorData[:32]);
         address validator = getVerifiedValidator(keyHash);
@@ -134,7 +149,7 @@ contract SmartWallet is
             !_validateSignature(
                 validator,
                 keyHash,
-                hashTypedData(batchedCall.hash()),
+                dataHash,
                 validatorData[32:]
             )
         ) revert Errors.InvalidSignature();
@@ -211,7 +226,7 @@ contract SmartWallet is
         uint256 settings = ownerSettings[keyHash];
         address hookAddress = getHook(settings);
 
-        bool isAdmin = isAdmin(settings);
+        bool canCallSelf = keyHash == entryPointKeyHash() || isAdmin(settings);
 
         bytes memory ret;
 
@@ -220,7 +235,7 @@ contract SmartWallet is
         }
 
         for (uint256 i; i < calls.length; i++) {
-            if (calls[i].target == address(this) && !isAdmin) {
+            if (calls[i].target == address(this) && !canCallSelf) {
                 revert Errors.NonAdminSelfCall();
             }
             _call(calls[i]);
@@ -246,6 +261,26 @@ contract SmartWallet is
         bytes32 keyHash = bytes32(userOp.signature[0:32]);
         address validator = getVerifiedValidator(keyHash);
         if (validator == address(0)) return SIG_VALIDATION_FAILED;
+
+        uint256 key = userOp.nonce >> 64;
+
+        if (key == Static.CHAIN_LESS_NONCE_KEY) {
+            userOpHash = getUserOpHashWithoutChainId(userOp);
+
+            // Check for upgrade calls in the batch and validate implementation has code
+            Call[] memory calls = abi.decode(userOp.callData[4:], (Call[]));
+            for (uint256 i; i < calls.length; i++) {
+                Call memory callData = calls[i];
+                bytes4 selector;
+                assembly {
+                    selector := mload(add(callData, 32)) // truncate to only take the first 4 bytes
+                }
+
+                if (!canSkipChainIdValidation(selector)) {
+                    revert Errors.InvalidNonceKey(key);
+                }
+            }
+        }
 
         if (
             !_validateSignature(
@@ -305,4 +340,33 @@ contract SmartWallet is
         }
         return Static.INVALID_VALUE;
     }
+
+    /// @notice Returns whether `functionSelector` can be called in `executeWithoutChainIdValidation`.
+    /// @param functionSelector The function selector to check.
+    /// @return `true` is the function selector is allowed to skip the chain ID validation, else `false`.
+    /// @dev This function is used to skip the chain ID validation for the following functions:
+    ///      - addOwner
+    ///      - updateOwner
+    ///      - removeOwner
+    ///      - upgradeToAndCall
+    function canSkipChainIdValidation(
+        bytes4 functionSelector
+    ) public pure returns (bool) {
+        if (
+            functionSelector == OwnersManager.addOwner.selector ||
+            functionSelector == OwnersManager.updateOwner.selector ||
+            functionSelector == OwnersManager.removeOwner.selector ||
+            functionSelector == UUPSUpgradeable.upgradeToAndCall.selector
+        ) {
+            return true;
+        }
+        return false;
+    }
+
+    /// @inheritdoc UUPSUpgradeable
+    /// @dev Authorization logic is only based on the `msg.sender` being an owner of this account,
+    ///      or `address(this)`.
+    function _authorizeUpgrade(
+        address
+    ) internal view override(UUPSUpgradeable) onlyOwnerOrEntryPoint {}
 }

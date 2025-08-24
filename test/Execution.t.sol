@@ -67,7 +67,9 @@ contract ExecutionTest is Base {
     function test_execute_reverts_for_non_owner() public {
         vm.prank(_bob);
         Call[] memory calls = constructCallsData();
-        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.InvalidCaller.selector, _bob)
+        );
         ISmartWallet(_alice).execute(calls);
     }
 
@@ -99,7 +101,9 @@ contract ExecutionTest is Base {
 
         vm.prank(dave);
         Call[] memory calls = constructCallsData();
-        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.InvalidCaller.selector, dave)
+        );
         ISmartWallet(_alice).execute(calls);
     }
 
@@ -114,7 +118,9 @@ contract ExecutionTest is Base {
         // Charlie should not be able to call execute
         vm.prank(_charlie);
         Call[] memory calls = constructCallsData();
-        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.InvalidCaller.selector, _charlie)
+        );
         ISmartWallet(_alice).execute(calls);
 
         // Add Charlie as owner
