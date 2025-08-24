@@ -4,6 +4,7 @@ pragma solidity ^0.8.29;
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 import {IERC4337Account} from "./interfaces/IERC4337Account.sol";
 import {Errors} from "./libraries/Errors.sol";
+import {UserOperationLib} from "account-abstraction/core/UserOperationLib.sol";
 
 abstract contract ERC4337Account is IERC4337Account {
     /// @notice Modifier to ensure the caller is the EntryPoint
@@ -31,5 +32,18 @@ abstract contract ERC4337Account is IERC4337Account {
             payable(msg.sender).call{value: missingAccountFunds}("");
             // Ignore failure (its EntryPoint's job to verify, not account.)
         }
+    }
+
+    /// @notice Returns the key hash of the entry point
+    function entryPointKeyHash() public view virtual returns (bytes32) {
+        return keccak256(abi.encodePacked(entryPoint()));
+    }
+
+    // TODO: remove this function
+    function getUserOpHashWithoutChainId(
+        PackedUserOperation calldata userOp
+    ) public view virtual returns (bytes32) {
+        return
+            keccak256(abi.encode(UserOperationLib.hash(userOp), entryPoint()));
     }
 }

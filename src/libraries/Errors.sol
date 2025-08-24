@@ -29,5 +29,9 @@ library Errors {
     error InvalidOwnersAndValidatorsLength();
 
     error NotEntryPoint();
+
+    error InvalidNonceKey(uint256 nonce);
+
     error InvalidCaller(address owner);
+
 }

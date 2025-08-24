@@ -119,6 +119,26 @@ contract SmartWallet is
         if (!validateAndUpdateNonce(batchedCall.nonce))
             revert Errors.InvalidNonce(batchedCall.nonce);
 
+        uint256 key = batchedCall.nonce >> 64;
+        bytes32 dataHash = batchedCall.hash();
+        if (key == Static.CHAIN_LESS_NONCE_KEY) {
+            // Check for upgrade calls in the batch and validate implementation has code
+            for (uint256 i; i < batchedCall.calls.length; i++) {
+                Call calldata callData = batchedCall.calls[i];
+                bytes4 selector;
+                assembly {
+                    selector := mload(add(callData, 32)) // truncate to only take the first 4 bytes
+                }
+
+                if (!canSkipChainIdValidation(selector)) {
+                    revert Errors.InvalidNonceKey(key);
+                }
+            }
+            dataHash = hashTypedDataSansChainId(dataHash);
+        } else {
+            dataHash = hashTypedData(dataHash);
+        }
+
         // Extract keyHash and validate validator
         bytes32 keyHash = bytes32(validatorData[:32]);
         address validator = getVerifiedValidator(keyHash);
@@ -129,7 +149,7 @@ contract SmartWallet is
             !_validateSignature(
                 validator,
                 keyHash,
-                hashTypedData(batchedCall.hash()),
+                dataHash,
                 validatorData[32:]
             )
         ) revert Errors.InvalidSignature();
@@ -206,7 +226,7 @@ contract SmartWallet is
         uint256 settings = ownerSettings[keyHash];
         address hookAddress = getHook(settings);
 
-        bool isAdmin = isAdmin(settings);
+        bool canCallSelf = keyHash == entryPointKeyHash() || isAdmin(settings);
 
         bytes memory ret;
 
@@ -215,7 +235,7 @@ contract SmartWallet is
         }
 
         for (uint256 i; i < calls.length; i++) {
-            if (calls[i].target == address(this) && !isAdmin) {
+            if (calls[i].target == address(this) && !canCallSelf) {
                 revert Errors.NonAdminSelfCall();
             }
             _call(calls[i]);
@@ -241,6 +261,26 @@ contract SmartWallet is
         bytes32 keyHash = bytes32(userOp.signature[0:32]);
         address validator = getVerifiedValidator(keyHash);
         if (validator == address(0)) return SIG_VALIDATION_FAILED;
+
+        uint256 key = userOp.nonce >> 64;
+
+        if (key == Static.CHAIN_LESS_NONCE_KEY) {
+            userOpHash = getUserOpHashWithoutChainId(userOp);
+
+            // Check for upgrade calls in the batch and validate implementation has code
+            Call[] memory calls = abi.decode(userOp.callData[4:], (Call[]));
+            for (uint256 i; i < calls.length; i++) {
+                Call memory callData = calls[i];
+                bytes4 selector;
+                assembly {
+                    selector := mload(add(callData, 32)) // truncate to only take the first 4 bytes
+                }
+
+                if (!canSkipChainIdValidation(selector)) {
+                    revert Errors.InvalidNonceKey(key);
+                }
+            }
+        }
 
         if (
             !_validateSignature(
@@ -299,6 +339,28 @@ contract SmartWallet is
                     : Static.INVALID_VALUE;
         }
         return Static.INVALID_VALUE;
+    }
+
+    /// @notice Returns whether `functionSelector` can be called in `executeWithoutChainIdValidation`.
+    /// @param functionSelector The function selector to check.
+    /// @return `true` is the function selector is allowed to skip the chain ID validation, else `false`.
+    /// @dev This function is used to skip the chain ID validation for the following functions:
+    ///      - addOwner
+    ///      - updateOwner
+    ///      - removeOwner
+    ///      - upgradeToAndCall
+    function canSkipChainIdValidation(
+        bytes4 functionSelector
+    ) public pure returns (bool) {
+        if (
+            functionSelector == OwnersManager.addOwner.selector ||
+            functionSelector == OwnersManager.updateOwner.selector ||
+            functionSelector == OwnersManager.removeOwner.selector ||
+            functionSelector == UUPSUpgradeable.upgradeToAndCall.selector
+        ) {
+            return true;
+        }
+        return false;
     }
 
     /// @inheritdoc UUPSUpgradeable
