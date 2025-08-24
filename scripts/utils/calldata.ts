@@ -182,6 +182,13 @@ function generateKeyHashFromPubKey(pubKeyX: string, pubKeyY: string): string {
 }
 
 /**
+ * Get Passkey X and Y from public key
+ */ 
+function getPasskeyXY(pubKey: string): [string, string] {
+    return [pubKey.slice(2, 66), pubKey.slice(-64)];
+}
+
+/**
  * Create InitialOwner for ECDSA validator
  */
 function createECDSAOwner(
@@ -218,4 +225,5 @@ export const calldataUtils = {
     generateKeyHashFromPubKey,
     createECDSAOwner,
     createPasskeyOwner,
+    getPasskeyXY
 };

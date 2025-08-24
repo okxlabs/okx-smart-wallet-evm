@@ -96,7 +96,7 @@ contract RecoveryTest is Base {
         verifiers[0] = address(mockVerifier);
 
         // Deploy RecoverySigner implementation
-        recoverySignerImpl = new RecoverySigner(nonceManager);
+        recoverySignerImpl = new RecoverySigner(address(nonceManager));
 
         // Use LibClone to create deterministic clone
         bytes32 salt = keccak256(abi.encode(keyHashes, verifiers));
