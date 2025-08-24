@@ -29,4 +29,5 @@ library Errors {
     error InvalidOwnersAndValidatorsLength();
 
     error NotEntryPoint();
+    error InvalidCaller(address owner);
 }

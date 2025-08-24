@@ -8,7 +8,7 @@ import {Errors} from "src/libraries/Errors.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
 import {OwnersManager} from "src/OwnersManager.sol";
-import {ValidationLogic} from "src/ValidationLogic.sol";
+import {ValidateManager} from "src/ValidateManager.sol";
 import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {P256} from "@openzeppelin/contracts/utils/cryptography/P256.sol";

@@ -8,8 +8,8 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
 import {OwnersManager} from "./OwnersManager.sol";
 import {NonceManager} from "./NonceManager.sol";
-import {ValidationLogic} from "./ValidationLogic.sol";
-import {ExecutionLogic} from "./ExecutionLogic.sol";
+import {ValidateManager} from "./ValidateManager.sol";
+import {ExecuteManager} from "./ExecuteManager.sol";
 import {FallbackHandler} from "./FallbackHandler.sol";
 import {Call, BatchedCall, InitialOwner} from "./Types.sol";
 import {Errors} from "./libraries/Errors.sol";
@@ -28,8 +28,8 @@ contract SmartWallet is
     ERC4337Account,
     OwnersManager,
     NonceManager,
-    ValidationLogic,
-    ExecutionLogic,
+    ValidateManager,
+    ExecuteManager,
     ERC712,
     FallbackHandler,
     Initializable,
@@ -56,10 +56,8 @@ contract SmartWallet is
         }
 
         bytes32 keyHash = keccak256(abi.encodePacked(msg.sender));
-        address validator = ownerValidators[keyHash];
-
-        if (validator == address(0)) {
-            revert Errors.NotFromSelf();
+        if (!hasOwner(keyHash)) {
+            revert Errors.InvalidCaller(msg.sender);
         }
 
         uint256 settings = ownerSettings[keyHash];
@@ -76,7 +74,7 @@ contract SmartWallet is
      */
     function initialize(
         InitialOwner[] calldata initialOwners
-    ) public initializer {
+    ) external initializer {
         // Set up initial owners
         // isAdmin = true, expiration = 0 (never expires), hook = address(0)
         uint256 settings = packSettings(true, 0, address(0));
@@ -88,12 +86,7 @@ contract SmartWallet is
             bytes32 keyHash = initialOwners[i].keyHash;
             address validator = initialOwners[i].validator;
 
-            if (validator == address(0)) {
-                revert Errors.InvalidValidatorImpl(validator);
-            }
-
-            // Set admin settings for initial owners
-            _setValidatorWithSettings(keyHash, validator, settings);
+            _addOwner(keyHash, validator, settings);
         }
     }
 
