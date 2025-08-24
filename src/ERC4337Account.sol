@@ -28,8 +28,11 @@ abstract contract ERC4337Account is IERC4337Account {
      */
     function _payPrefund(uint256 missingAccountFunds) internal virtual {
         if (missingAccountFunds != 0) {
-            payable(msg.sender).call{value: missingAccountFunds}("");
-            // Ignore failure (its EntryPoint's job to verify, not account.)
+            // solhint-disable-next-line avoid-low-level-calls
+            (bool success, ) = payable(msg.sender).call{
+                value: missingAccountFunds
+            }("");
+            success; // Explicitly unused
         }
     }
 }

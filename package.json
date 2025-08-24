@@ -7,6 +7,7 @@
     "prettier:sol": "prettier --write --plugin=prettier-plugin-solidity 'src/**/*.sol' 'test/**/*.sol'",
     "prettier:solhint": "solhint 'src/**/*.sol' 'test/**/*.sol' --fix --noPrompt",
     "prettier:check": "prettier --check --plugin=prettier-plugin-solidity 'src/**/*.sol' 'test/**/*.sol'",
+    "update-recovery": "git submodule update --remote --merge lib/smart-wallet-recovery",
     "cloc": "npx cloc src test --exclude-dir=mocks,test",
     "coverage": "forge coverage --report lcov && genhtml -o coverage_report lcov.info --ignore-errors inconsistent && open coverage_report/index.html",
     "test": "forge test",
@@ -18,7 +19,8 @@
     "test-relayer": "npx mocha tests/RelayerFlow.t.ts --require ts-node/register --timeout 120000"
   },
   "pre-commit": [
-    "prettier:sol"
+    "prettier:sol",
+    "update-recovery"
   ],
   "dependencies": {
     "axios": "^1.11.0",

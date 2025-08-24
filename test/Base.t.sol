@@ -15,10 +15,18 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {ERC712} from "src/ERC712.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
+import {EntryPoint} from "account-abstraction/core/EntryPoint.sol";
+import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
+import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
+import {IAccount} from "account-abstraction/interfaces/IAccount.sol";
 
 contract Base is Test {
     string public constant NAME = "SmartWallet";
     string public constant VERSION = "1.0.0";
+
+    // Standard EntryPoint address used in ERC-4337
+    address constant ENTRYPOINT_ADDRESS =
+        0x0000000071727De22E5E9d8BAf0edAc6f37da032;
 
     address payable internal _alice;
     uint256 internal _alicePk;
@@ -28,6 +36,7 @@ contract Base is Test {
     SmartWallet internal _smartWallet;
     SmartWalletFactory internal _factory;
     DeployFactory public deployFactory;
+    EntryPoint internal _entryPoint; // EntryPoint instance
     address internal relayer;
     uint256 internal relayerPk;
     address internal validator;
@@ -47,6 +56,11 @@ contract Base is Test {
         _alice = payable(aliceAddr);
         _alicePk = alicePk;
         (_bob, _bobPk) = makeAddrAndKey("bob");
+
+        // Deploy EntryPoint and place it at the standard address
+        _entryPoint = new EntryPoint();
+        vm.etch(ENTRYPOINT_ADDRESS, address(_entryPoint).code);
+        vm.deal(ENTRYPOINT_ADDRESS, 100 ether); // Fund EntryPoint for gas payments
 
         deployFactory = new DeployFactory();
         bytes32 deployFactorySalt = vm.envBytes32("DEPLOY_FACTORY_SALT");
@@ -293,6 +307,22 @@ contract Base is Test {
     ) internal view returns (bool) {
         uint256 settings = IOwnersManager(wallet).ownerSettings(keyHash);
         return settings != 0 && IOwnersManager(wallet).isAdmin(settings);
+    }
+
+    // Helper function to test validateUserOp from EntryPoint's perspective
+    function _testValidateUserOp(
+        address account,
+        PackedUserOperation memory userOp,
+        bytes32 userOpHash,
+        uint256 missingAccountFunds
+    ) internal returns (uint256) {
+        vm.prank(ENTRYPOINT_ADDRESS);
+        return
+            IAccount(account).validateUserOp(
+                userOp,
+                userOpHash,
+                missingAccountFunds
+            );
     }
 
     // Helper function for tests to check if a signer is expired

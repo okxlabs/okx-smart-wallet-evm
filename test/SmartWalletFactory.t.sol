@@ -196,7 +196,7 @@ contract FactoryTest is Base {
         vm.stopPrank();
     }
 
-    function test_predict_address_deterministic_calculation() external {
+    function test_predict_address_deterministic_calculation() external view {
         // This test demonstrates the deterministic nature of address calculation
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
