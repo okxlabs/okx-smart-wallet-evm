@@ -124,10 +124,11 @@ contract SmartWallet is
         if (key == Static.CHAIN_LESS_NONCE_KEY) {
             // Check for upgrade calls in the batch and validate implementation has code
             for (uint256 i; i < batchedCall.calls.length; i++) {
-                Call calldata callData = batchedCall.calls[i];
+                Call memory call = batchedCall.calls[i];
                 bytes4 selector;
                 assembly {
-                    selector := mload(add(callData, 32)) // truncate to only take the first 4 bytes
+                    /// @dev truncate to only take the first 4 bytes
+                    selector := shr(224, mload(add(call.data, 32)))
                 }
 
                 if (!canSkipChainIdValidation(selector)) {
@@ -270,10 +271,11 @@ contract SmartWallet is
             // Check for upgrade calls in the batch and validate implementation has code
             Call[] memory calls = abi.decode(userOp.callData[4:], (Call[]));
             for (uint256 i; i < calls.length; i++) {
-                Call memory callData = calls[i];
+                Call memory call = calls[i];
                 bytes4 selector;
                 assembly {
-                    selector := mload(add(callData, 32)) // truncate to only take the first 4 bytes
+                    /// @dev truncate to only take the first 4 bytes
+                    selector := shr(224, mload(add(call.data, 32)))
                 }
 
                 if (!canSkipChainIdValidation(selector)) {
