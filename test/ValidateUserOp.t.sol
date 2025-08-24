@@ -13,6 +13,9 @@ import {HelperLib} from "src/test/Helper.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
+import {Static} from "src/libraries/Static.sol";
+import {ERC4337Account} from "src/ERC4337Account.sol";
+import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 
 contract ValidateUserOpTest is Base {
     ECDSAValidator ecdsaValidator;
@@ -116,6 +119,75 @@ contract ValidateUserOpTest is Base {
             userOp,
             t.userOpHash,
             t.missingAccountFunds
+        );
+    }
+
+    function test_validateUserOp_with_eoa_signer_and_chain_less_nonce()
+        external
+    {
+        vm.prank(_alice);
+
+        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 _bobKeyHash = keccak256(abi.encodePacked(_bob));
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: _aliceKeyHash,
+            validator: address(1)
+        });
+        address account = _factory.createAccount(
+            address(_smartWallet),
+            initialOwners,
+            0
+        );
+
+        _TestTemps memory t;
+        PackedUserOperation memory userOp;
+        userOp.nonce = Static.CHAIN_LESS_NONCE_KEY << 64;
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: address(account),
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnersManager.addOwner.selector,
+                _bobKeyHash,
+                address(1),
+                0
+            )
+        });
+
+        userOp.callData = abi.encodeWithSelector(
+            ISmartWallet.execute.selector,
+            calls
+        );
+
+        t.userOpHash = IERC4337Account(account).getUserOpHashWithoutChainId(
+            userOp
+        );
+        t.signer = _alice;
+        t.privateKey = _alicePk;
+        (t.v, t.r, t.s) = vm.sign(t.privateKey, t.userOpHash);
+        t.missingAccountFunds = 123;
+        vm.deal(address(account), 1 ether);
+        assertEq(address(account).balance, 1 ether);
+
+        // Success returns 0.
+        userOp.signature = abi.encodePacked(
+            _aliceKeyHash,
+            abi.encodePacked(t.r, t.s, t.v)
+        );
+        assertEq(
+            _testValidateUserOp(
+                address(account),
+                userOp,
+                t.userOpHash,
+                t.missingAccountFunds
+            ),
+            0
+        );
+        assertEq(
+            address(ENTRYPOINT_ADDRESS).balance,
+            100 ether + t.missingAccountFunds
         );
     }
 

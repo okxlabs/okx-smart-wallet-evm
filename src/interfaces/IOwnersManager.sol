@@ -11,6 +11,16 @@ interface IOwnersManager {
     function ownerValidators(bytes32 keyHash) external view returns (address);
     function ownerSettings(bytes32 keyHash) external view returns (uint256);
 
+    /// @notice Add an owner to the wallet
+    /// @param keyHash The public key hash to associate with this validator
+    /// @param validator The address of the validator contract to be registered
+    /// @param settings Packed settings value (use packSettings to create)
+    function addOwner(
+        bytes32 keyHash,
+        address validator,
+        uint256 settings
+    ) external;
+
     function getVerifiedValidator(
         bytes32 keyHash
     ) external view returns (address);

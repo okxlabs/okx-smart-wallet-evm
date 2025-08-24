@@ -20,6 +20,7 @@ import {ERC4337Account, PackedUserOperation} from "./ERC4337Account.sol";
 import {BatchedCallLib} from "./libraries/BatchedCallLib.sol";
 import {AllowanceManager} from "./AllowanceManager.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
+import {console} from "forge-std/console.sol";
 
 // Do not set any states in this contract
 contract SmartWallet is
@@ -124,11 +125,11 @@ contract SmartWallet is
         if (key == Static.CHAIN_LESS_NONCE_KEY) {
             // Check for upgrade calls in the batch and validate implementation has code
             for (uint256 i; i < batchedCall.calls.length; i++) {
-                Call memory call = batchedCall.calls[i];
+                bytes memory callData = batchedCall.calls[i].data;
                 bytes4 selector;
                 assembly {
                     /// @dev truncate to only take the first 4 bytes
-                    selector := shr(224, mload(add(call.data, 32)))
+                    selector := mload(add(callData, 32))
                 }
 
                 if (!canSkipChainIdValidation(selector)) {
@@ -271,13 +272,12 @@ contract SmartWallet is
             // Check for upgrade calls in the batch and validate implementation has code
             Call[] memory calls = abi.decode(userOp.callData[4:], (Call[]));
             for (uint256 i; i < calls.length; i++) {
-                Call memory call = calls[i];
+                bytes memory callData = calls[i].data;
                 bytes4 selector;
                 assembly {
                     /// @dev truncate to only take the first 4 bytes
-                    selector := shr(224, mload(add(call.data, 32)))
+                    selector := mload(add(callData, 32))
                 }
-
                 if (!canSkipChainIdValidation(selector)) {
                     revert Errors.InvalidNonceKey(key);
                 }
