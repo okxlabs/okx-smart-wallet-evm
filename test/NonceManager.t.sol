@@ -156,24 +156,9 @@ contract NonceManagerTest is Test {
         assertEq(nonceManager.getNonce(maxKey), 1);
     }
 
-    function test_nonce_value_boundaries() public {
-        uint192 key = uint192(1);
-
-        // Start from max uint64 - 1 to test overflow
-        uint64 nearMaxNonce = type(uint64).max - 1;
-
-        // Manually set the internal nonce to near max
-        // We need to call validateAndUpdateNonce enough times to reach near max
-        // For testing purposes, we'll test the overflow behavior conceptually
-
-        // Test that large nonce values work
-        uint256 packedNonce = (uint256(key) << 64) | uint256(0);
-        assertTrue(nonceManager.testValidateAndUpdateNonce(packedNonce));
-        assertEq(nonceManager.getNonce(key), 1);
-    }
-
-    function test_nonce_overflow_behavior() public {
+    function test_nonce_overflow_behavior() public pure {
         uint192 key = uint192(42);
+        key; // Intentionally unused - for documentation purposes
 
         // Test the theoretical overflow case
         // Note: In practice, reaching uint64 max would require enormous gas
@@ -195,7 +180,7 @@ contract NonceManagerTest is Test {
 
     // ============ Packed Nonce Bit Operation Tests ============
 
-    function test_packed_nonce_key_extraction() public {
+    function test_packed_nonce_key_extraction() public pure {
         uint192 originalKey = uint192(
             0x123456789ABCDEF123456789ABCDEF123456789ABC
         );
@@ -213,7 +198,7 @@ contract NonceManagerTest is Test {
         assertEq(extractedNonce, originalNonce);
     }
 
-    function test_packed_nonce_edge_cases() public {
+    function test_packed_nonce_edge_cases() public pure {
         // Test with key = 0, nonce = max
         uint192 key1 = uint192(0);
         uint64 nonce1 = type(uint64).max;

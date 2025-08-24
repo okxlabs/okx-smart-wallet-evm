@@ -11,11 +11,11 @@ import {Errors} from "src/libraries/Errors.sol";
 import {Static} from "src/libraries/Static.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
-import {MockEntryPoint} from "./ValidateUserOp.t.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 import {ERC712} from "src/ERC712.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {IValidator} from "src/interfaces/IValidator.sol";
+import {IERC4337Account} from "src/interfaces/IERC4337Account.sol";
 
 contract ValidatorTest is Base {
     address internal _charlie;
@@ -1075,14 +1075,6 @@ contract ValidatorTest is Base {
 
         vm.deal(address(account), 1 ether);
 
-        vm.etch(
-            IERC4337Account(account).entryPoint(),
-            address(new MockEntryPoint()).code
-        );
-        MockEntryPoint ep = MockEntryPoint(
-            payable(IERC4337Account(account).entryPoint())
-        );
-
         PackedUserOperation memory userOp;
         // Signature too short (less than 32 bytes)
         userOp.signature = abi.encodePacked(
@@ -1094,7 +1086,7 @@ contract ValidatorTest is Base {
 
         // Should revert due to array bounds error when trying to access signature[0:32]
         vm.expectRevert();
-        ep.validateUserOp(
+        _testValidateUserOp(
             address(account),
             userOp,
             userOpHash,
@@ -1119,14 +1111,6 @@ contract ValidatorTest is Base {
 
         vm.deal(address(account), 1 ether);
 
-        vm.etch(
-            IERC4337Account(account).entryPoint(),
-            address(new MockEntryPoint()).code
-        );
-        MockEntryPoint ep = MockEntryPoint(
-            payable(IERC4337Account(account).entryPoint())
-        );
-
         PackedUserOperation memory userOp;
         // Empty signature
         userOp.signature = bytes("");
@@ -1136,7 +1120,7 @@ contract ValidatorTest is Base {
 
         // Should revert due to array bounds error when trying to access signature[0:32]
         vm.expectRevert();
-        ep.validateUserOp(
+        _testValidateUserOp(
             address(account),
             userOp,
             userOpHash,
@@ -1161,14 +1145,6 @@ contract ValidatorTest is Base {
 
         vm.deal(address(account), 1 ether);
 
-        vm.etch(
-            IERC4337Account(account).entryPoint(),
-            address(new MockEntryPoint()).code
-        );
-        MockEntryPoint ep = MockEntryPoint(
-            payable(IERC4337Account(account).entryPoint())
-        );
-
         PackedUserOperation memory userOp;
         bytes32 userOpHash = keccak256("test");
 
@@ -1183,7 +1159,7 @@ contract ValidatorTest is Base {
         uint256 missingAccountFunds = 100;
 
         // Should return SIG_VALIDATION_FAILED (1 << 96)
-        uint256 result = ep.validateUserOp(
+        uint256 result = _testValidateUserOp(
             address(account),
             userOp,
             userOpHash,

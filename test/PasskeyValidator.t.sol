@@ -16,6 +16,7 @@ import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {ERC712} from "src/ERC712.sol";
 import {HelperLib} from "src/test/Helper.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
+import {Base64} from "@openzeppelin/contracts/utils/Base64.sol";
 
 contract PasskeyValidatorTest is Base {
     PasskeyValidator internal passkeyValidator;

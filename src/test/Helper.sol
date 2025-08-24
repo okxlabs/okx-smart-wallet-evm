@@ -5,6 +5,7 @@ import {Base64} from "openzeppelin-contracts/contracts/utils/Base64.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/IAccount.sol";
 import {UserOperationLib} from "account-abstraction/core/UserOperationLib.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
+import {Utils, WebAuthnInfo} from "webauthn-sol/../test/Utils.sol";
 import {EntryPoint} from "account-abstraction/core/EntryPoint.sol";
 // import {MerkleProof} from "openzeppelin-contracts/contracts/utils/cryptography/MerkleProof.sol";
 

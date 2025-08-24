@@ -79,8 +79,10 @@ contract AllowanceManagerTest is Test {
         wallet.initialize(initialOwners);
 
         // Transfer tokens to wallet
-        mockToken.transfer(address(wallet), 1000 * 10 ** 18);
-        mockToken2.transfer(address(wallet), 1000 * 10 ** 18);
+        bool success1 = mockToken.transfer(address(wallet), 1000 * 10 ** 18);
+        bool success2 = mockToken2.transfer(address(wallet), 1000 * 10 ** 18);
+        assertTrue(success1, "Token transfer failed");
+        assertTrue(success2, "Token2 transfer failed");
 
         // Fund wallet with ETH
         vm.deal(address(wallet), 100 ether);
