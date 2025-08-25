@@ -7,6 +7,8 @@ import {LibClone} from "solady/utils/LibClone.sol";
 import {Initializable} from "solady/utils/Initializable.sol";
 import {ISmartWallet} from "./interfaces/ISmartWallet.sol";
 import {ISmartWalletFactory, InitialOwner} from "./interfaces/ISmartWalletFactory.sol";
+import {Call} from "./libraries/CallLib.sol";
+import {BatchedCall} from "./libraries/BatchedCallLib.sol";
 
 contract SmartWalletFactory is
     Ownable,
@@ -30,7 +32,7 @@ contract SmartWalletFactory is
         address implementation,
         InitialOwner[] calldata initialOwners,
         uint256 salt
-    ) external payable returns (address acount) {
+    ) public payable returns (address acount) {
         (bool alreadyDeployed, address instance) = LibClone
             .createDeterministicERC1967(
                 msg.value,
@@ -44,6 +46,23 @@ contract SmartWalletFactory is
 
         emit AccountCreated(instance, implementation, initialOwners, salt);
         acount = instance;
+    }
+
+    /// @notice create smart account with owners and validators
+    /// @param implementation implementation address
+    /// @param initialOwners initial owners
+    /// @param salt salt
+    /// @param calls calls
+    /// @param validatorData validator data
+    function createAccountWithCall(
+        address implementation,
+        InitialOwner[] calldata initialOwners,
+        uint256 salt,
+        BatchedCall calldata batchedCall,
+        bytes calldata validatorData
+    ) external payable returns (address acount) {
+        acount = createAccount(implementation, initialOwners, salt);
+        ISmartWallet(acount).executeWithRelayer(batchedCall, validatorData);
     }
 
     /// @notice predict deterministic address
