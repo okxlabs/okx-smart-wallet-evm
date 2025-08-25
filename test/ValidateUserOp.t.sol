@@ -21,16 +21,6 @@ contract ValidateUserOpTest is Base {
     ECDSAValidator ecdsaValidator;
     PasskeyValidator passkeyValidator;
 
-    // Passkey test constants (from PasskeyValidator.t.sol)
-    uint256 internal constant TEST_PUBKEY_X =
-        0x640c5cacef387563d0b105c7724c45ee19f8a952cb583de494a6a7ce5ed16760;
-    uint256 internal constant TEST_PUBKEY_Y =
-        0x142b33cbf8255e9f0628ab9e250e179a3e7e8e24e0a2a4340f0b9fdeb29a1b48;
-    uint256 internal constant TEST_SIG_R =
-        112450831948757142750562360134609669473647155538405639309009281430691665378703;
-    uint256 internal constant TEST_SIG_S =
-        18363333552806174256136300126987944752421142252269824522148009181078823230960;
-
     function setUp() public override {
         super.setUp();
 
@@ -375,7 +365,7 @@ contract ValidateUserOpTest is Base {
     function test_validateUserOp_with_passkey_validator() external {
         // Create account with Passkey validator
         bytes32 passkeyHash = keccak256(
-            abi.encodePacked(TEST_PUBKEY_X, TEST_PUBKEY_Y)
+            abi.encodePacked(_passkeyPubX, _passkeyPubY)
         );
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
@@ -396,19 +386,24 @@ contract ValidateUserOpTest is Base {
         t.missingAccountFunds = 1000;
         vm.deal(address(account), 2 ether);
 
+        (, , bytes32 messageHash) = HelperLib.getPasskeyMessageHash(
+            t.userOpHash
+        );
+        (bytes32 r, bytes32 s) = vm.signP256(_passkeyPrivateKey, messageHash);
+
         // Create Passkey signature with WebAuthn auth
         WebAuthn.WebAuthnAuth memory auth = HelperLib.getWebAuthnAuth(
             t.userOpHash,
-            TEST_SIG_R,
-            TEST_SIG_S
+            uint256(r),
+            uint256(s)
         );
 
         bytes memory sig = abi.encode(auth, new bytes32[](0)); // No merkle proofs
         bytes memory validatorData = abi.encodePacked(
             abi.encode(
                 PasskeyValidatorLib.PasskeyPubKey({
-                    pubKeyX: TEST_PUBKEY_X,
-                    pubKeyY: TEST_PUBKEY_Y
+                    pubKeyX: _passkeyPubX,
+                    pubKeyY: _passkeyPubY
                 })
             ),
             sig
