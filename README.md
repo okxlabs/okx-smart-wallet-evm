@@ -118,13 +118,6 @@ RPC_URL=https://rpc.xlayer.tech
 forge script scripts/DeployInit.sol --rpc-url $RPC_URL --legacy --broadcast
 ```
 
-Deploy and initialize 7702 wallet on local
-```bash
-# Start local blockchain node with 7702 support
-anvil --hardfork prague
-./initialise.sh
-```
-
 ### 1. Set Code & Initialize Wallet
 
 Deploy and initialize your ERC-7702 wallet:
