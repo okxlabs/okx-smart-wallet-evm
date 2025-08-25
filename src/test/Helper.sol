@@ -189,10 +189,9 @@ contract Helper {
     }
 
     function getProxyInitCode(
-        address implementation,
-        bytes memory args
+        address implementation
     ) external pure returns (bytes memory) {
-        return LibClone.initCodeERC1967(implementation, args);
+        return LibClone.initCodeERC1967(implementation);
     }
 
     function getProxyInitCodeHash(
