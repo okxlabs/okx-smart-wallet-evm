@@ -2,7 +2,8 @@
 pragma solidity ^0.8.29;
 
 /// @title IAllowanceManager
-/// @notice Interface for managing both native ETH and ERC20 token allowances
+/// @notice Interface for managing both native ETH and ERC20 token allowances using a unified mapping
+/// @dev Native ETH allowances are stored using Static.NATIVE_ETH as the token address
 interface IAllowanceManager {
     /// @notice Emitted when a native ETH allowance is set
     event ApproveNative(

@@ -15,4 +15,7 @@ library Static {
 
     // EIP-1271 signature validation return values
     uint256 public constant SIG_VALIDATION_FAILED = 1 << 96;
+
+    address public constant NATIVE_ETH =
+        0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
 }

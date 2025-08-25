@@ -6,6 +6,7 @@ import {SmartWallet} from "../src/SmartWallet.sol";
 import {IAllowanceManager} from "src/interfaces/IAllowanceManager.sol";
 import {MockERC20} from "src/test/MockERC20.sol";
 import {InitialOwner} from "src/Types.sol";
+import {Static} from "../src/libraries/Static.sol";
 
 contract AllowanceManagerTest is Test {
     SmartWallet public wallet;
@@ -106,6 +107,8 @@ contract AllowanceManagerTest is Test {
 
         assertTrue(success);
         assertEq(wallet.nativeAllowance(spender), amount);
+        // Verify it's stored in the unified mapping
+        assertEq(wallet.tokenAllowance(Static.NATIVE_ETH, spender), amount);
     }
 
     function test_ApproveNative_OnlySelf() public {
@@ -125,6 +128,7 @@ contract AllowanceManagerTest is Test {
         vm.prank(_alice);
         wallet.approveNative(spender, amount * 2);
         assertEq(wallet.nativeAllowance(spender), amount * 2);
+        assertEq(wallet.tokenAllowance(Static.NATIVE_ETH, spender), amount * 2);
     }
 
     function test_TransferFromNative_Success() public {
@@ -151,6 +155,10 @@ contract AllowanceManagerTest is Test {
         assertEq(recipient.balance, initialBalance + transferAmount);
         assertEq(
             wallet.nativeAllowance(spender),
+            allowanceAmount - transferAmount
+        );
+        assertEq(
+            wallet.tokenAllowance(Static.NATIVE_ETH, spender),
             allowanceAmount - transferAmount
         );
     }
@@ -207,6 +215,10 @@ contract AllowanceManagerTest is Test {
         assertEq(recipient.balance, initialBalance + transferAmount);
         // Unlimited allowance should remain unchanged
         assertEq(wallet.nativeAllowance(spender), type(uint256).max);
+        assertEq(
+            wallet.tokenAllowance(Static.NATIVE_ETH, spender),
+            type(uint256).max
+        );
     }
 
     // ============ ERC20 Token Tests ============
@@ -404,6 +416,70 @@ contract AllowanceManagerTest is Test {
         assertEq(wallet.tokenAllowance(address(mockToken), spender), newAmount);
     }
 
+    // ============ Unified Mapping Tests ============
+
+    function test_UnifiedMapping_NativeAndTokenIndependent() public {
+        uint256 nativeAmount = 5 ether;
+        uint256 tokenAmount = 300 * 10 ** 18;
+
+        // Set up both native and token allowances
+        vm.prank(_alice);
+        wallet.approveNative(spender, nativeAmount);
+
+        vm.prank(_alice);
+        wallet.approveToken(address(mockToken), spender, tokenAmount);
+
+        // Verify they are stored independently in the unified mapping
+        assertEq(
+            wallet.tokenAllowance(Static.NATIVE_ETH, spender),
+            nativeAmount
+        );
+        assertEq(
+            wallet.tokenAllowance(address(mockToken), spender),
+            tokenAmount
+        );
+
+        // Verify the nativeAllowance function returns the correct value
+        assertEq(wallet.nativeAllowance(spender), nativeAmount);
+    }
+
+    function test_UnifiedMapping_DifferentSpenders() public {
+        address spender2 = makeAddr("spender2");
+        uint256 nativeAmount1 = 3 ether;
+        uint256 nativeAmount2 = 7 ether;
+        uint256 tokenAmount1 = 150 * 10 ** 18;
+        uint256 tokenAmount2 = 250 * 10 ** 18;
+
+        // Set up allowances for different spenders
+        vm.prank(_alice);
+        wallet.approveNative(spender, nativeAmount1);
+        vm.prank(_alice);
+        wallet.approveNative(spender2, nativeAmount2);
+
+        vm.prank(_alice);
+        wallet.approveToken(address(mockToken), spender, tokenAmount1);
+        vm.prank(_alice);
+        wallet.approveToken(address(mockToken), spender2, tokenAmount2);
+
+        // Verify all allowances are stored correctly in the unified mapping
+        assertEq(
+            wallet.tokenAllowance(Static.NATIVE_ETH, spender),
+            nativeAmount1
+        );
+        assertEq(
+            wallet.tokenAllowance(Static.NATIVE_ETH, spender2),
+            nativeAmount2
+        );
+        assertEq(
+            wallet.tokenAllowance(address(mockToken), spender),
+            tokenAmount1
+        );
+        assertEq(
+            wallet.tokenAllowance(address(mockToken), spender2),
+            tokenAmount2
+        );
+    }
+
     // ============ Fuzz Tests ============
 
     function testFuzz_ApproveNative(uint256 amount) public {
@@ -414,6 +490,7 @@ contract AllowanceManagerTest is Test {
 
         assertTrue(success);
         assertEq(wallet.nativeAllowance(spender), amount);
+        assertEq(wallet.tokenAllowance(Static.NATIVE_ETH, spender), amount);
     }
 
     function testFuzz_ApproveToken(uint256 amount) public {
@@ -482,6 +559,10 @@ contract AllowanceManagerTest is Test {
         if (allowanceAmount < type(uint256).max) {
             assertEq(
                 wallet.nativeAllowance(spender),
+                allowanceAmount - transferAmount
+            );
+            assertEq(
+                wallet.tokenAllowance(Static.NATIVE_ETH, spender),
                 allowanceAmount - transferAmount
             );
         }

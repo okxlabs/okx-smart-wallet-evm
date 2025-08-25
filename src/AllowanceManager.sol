@@ -5,19 +5,18 @@ import {IAllowanceManager} from "./interfaces/IAllowanceManager.sol";
 import {OwnersManager} from "./OwnersManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Static} from "./libraries/Static.sol";
 
 /**
  * @title AllowanceManager
  * @notice Abstract contract providing allowance management for both native ETH and ERC20 tokens
- * @dev Provides persistent allowance management for both native ETH and ERC20 tokens
+ * @dev Provides persistent allowance management for both native ETH and ERC20 tokens using a unified mapping
  */
 abstract contract AllowanceManager is IAllowanceManager, OwnersManager {
     using SafeERC20 for IERC20;
 
-    /// @notice Mapping of spender => allowance for persistent native ETH allowances
-    mapping(address spender => uint256 allowance) public nativeAllowance;
-
-    /// @notice Mapping of token => spender => allowance for persistent ERC20 allowances
+    /// @notice Unified mapping of token => spender => allowance for both native ETH and ERC20 tokens
+    /// @dev Native ETH is identified by Static.NATIVE_ETH address
     mapping(address token => mapping(address spender => uint256 allowance))
         public tokenAllowance;
 
@@ -26,7 +25,7 @@ abstract contract AllowanceManager is IAllowanceManager, OwnersManager {
         address spender,
         uint256 amount
     ) external onlySelf returns (bool) {
-        nativeAllowance[spender] = amount;
+        tokenAllowance[Static.NATIVE_ETH][spender] = amount;
         emit ApproveNative(address(this), spender, amount);
         return true;
     }
@@ -80,7 +79,9 @@ abstract contract AllowanceManager is IAllowanceManager, OwnersManager {
         if (from != address(this)) revert IncorrectSender();
 
         // Check allowance
-        uint256 currentAllowance = nativeAllowance[msg.sender];
+        uint256 currentAllowance = tokenAllowance[Static.NATIVE_ETH][
+            msg.sender
+        ];
         if (currentAllowance < amount) revert NativeAllowanceExceeded();
 
         // Update allowance
@@ -89,7 +90,7 @@ abstract contract AllowanceManager is IAllowanceManager, OwnersManager {
             unchecked {
                 newAllowance = currentAllowance - amount;
             }
-            nativeAllowance[msg.sender] = newAllowance;
+            tokenAllowance[Static.NATIVE_ETH][msg.sender] = newAllowance;
             emit NativeAllowanceUpdated(msg.sender, newAllowance);
         }
 
@@ -134,5 +135,14 @@ abstract contract AllowanceManager is IAllowanceManager, OwnersManager {
         } catch {
             revert TokenTransferFailed();
         }
+    }
+
+    /// @notice Get the current persistent native ETH allowance
+    /// @param spender The spender address
+    /// @return allowance The current allowance
+    function nativeAllowance(
+        address spender
+    ) external view returns (uint256 allowance) {
+        return tokenAllowance[Static.NATIVE_ETH][spender];
     }
 }
