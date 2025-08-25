@@ -74,7 +74,7 @@ contract AdminPermissionsTest is Base {
         });
 
         bytes32 typedDataHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(batchedCall)
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
             nonAdminKeyHash,
@@ -110,7 +110,7 @@ contract AdminPermissionsTest is Base {
         });
 
         bytes32 typedDataHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(batchedCall)
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
             adminKeyHash,
@@ -138,7 +138,7 @@ contract AdminPermissionsTest is Base {
         });
 
         bytes32 typedDataHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(batchedCall)
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
             nonAdminKeyHash,
@@ -180,7 +180,7 @@ contract AdminPermissionsTest is Base {
         });
 
         bytes32 typedDataHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(batchedCall)
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
             adminKeyHash,
@@ -215,7 +215,7 @@ contract AdminPermissionsTest is Base {
         });
 
         bytes32 typedDataHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(batchedCall)
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
             adminKeyHash,
@@ -258,7 +258,7 @@ contract AdminPermissionsTest is Base {
         });
 
         bytes32 typedDataHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(batchedCall)
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
             adminKeyHash,
@@ -304,7 +304,7 @@ contract AdminPermissionsTest is Base {
         });
 
         bytes32 revokeTypedDataHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(revokeBatchedCall)
+            BatchedCallLib.hash(revokeBatchedCall, address(_smartWallet))
         );
         bytes memory revokeValidatorData = abi.encodePacked(
             aliceKeyHash,
@@ -337,7 +337,7 @@ contract AdminPermissionsTest is Base {
         });
 
         bytes32 selfCallTypedDataHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(selfCallBatch)
+            BatchedCallLib.hash(selfCallBatch, address(_smartWallet))
         );
         bytes memory selfCallValidatorData = abi.encodePacked(
             adminKeyHash,
@@ -376,7 +376,7 @@ contract AdminPermissionsTest is Base {
         });
 
         bytes32 elevateTypedDataHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(elevateBatchedCall)
+            BatchedCallLib.hash(elevateBatchedCall, address(_smartWallet))
         );
         bytes memory elevateValidatorData = abi.encodePacked(
             aliceKeyHash,
@@ -409,7 +409,7 @@ contract AdminPermissionsTest is Base {
         });
 
         bytes32 selfCallTypedDataHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(selfCallBatch)
+            BatchedCallLib.hash(selfCallBatch, address(_smartWallet))
         );
         bytes memory selfCallValidatorData = abi.encodePacked(
             nonAdminKeyHash,
@@ -454,7 +454,7 @@ contract AdminPermissionsTest is Base {
         });
 
         bytes32 typedDataHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(batchedCall)
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
             adminKeyHash,
@@ -496,7 +496,7 @@ contract AdminPermissionsTest is Base {
         });
 
         bytes32 typedDataHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(batchedCall)
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
             nonAdminKeyHash,
@@ -539,7 +539,7 @@ contract AdminPermissionsTest is Base {
         });
 
         bytes32 typedDataHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(batchedCall)
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
             adminKeyHash,

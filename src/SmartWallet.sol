@@ -20,7 +20,6 @@ import {ERC4337Account, PackedUserOperation} from "./ERC4337Account.sol";
 import {BatchedCallLib} from "./libraries/BatchedCallLib.sol";
 import {AllowanceManager} from "./AllowanceManager.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
-import {console} from "forge-std/console.sol";
 import {DecodeLib} from "./libraries/DecodeLib.sol";
 
 // Do not set any states in this contract
@@ -138,7 +137,7 @@ contract SmartWallet is
             revert Errors.InvalidNonce(batchedCall.nonce);
 
         uint256 key = batchedCall.nonce >> 64;
-        bytes32 dataHash = batchedCall.hash();
+        bytes32 dataHash = batchedCall.hash(IMPLEMENTATION);
         if (key == Static.CHAIN_LESS_NONCE_KEY) {
             // Check for upgrade calls in the batch and validate implementation has code
             for (uint256 i; i < batchedCall.calls.length; i++) {
@@ -224,7 +223,7 @@ contract SmartWallet is
             !_validateSignature(
                 validator,
                 keyHash,
-                hashTypedData(batchedCall.hash()),
+                hashTypedData(batchedCall.hash(IMPLEMENTATION)),
                 validatorData[32:]
             )
         ) {

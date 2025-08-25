@@ -2,7 +2,6 @@
 pragma solidity ^0.8.23;
 
 import {Test} from "forge-std/Test.sol";
-import {console} from "forge-std/console.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
 import {OwnersManager} from "src/OwnersManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
@@ -159,7 +158,8 @@ contract Base is Test {
         return
             ERC712(_alice).hashTypedData(
                 BatchedCallLib.hash(
-                    BatchedCall({calls: calls, nonce: nonce, expiry: 0})
+                    BatchedCall({calls: calls, nonce: nonce, expiry: 0}),
+                    address(_smartWallet)
                 )
             );
     }
@@ -172,7 +172,8 @@ contract Base is Test {
         return
             ERC712(account).hashTypedData(
                 BatchedCallLib.hash(
-                    BatchedCall({calls: calls, nonce: nonce, expiry: 0})
+                    BatchedCall({calls: calls, nonce: nonce, expiry: 0}),
+                    address(_smartWallet)
                 )
             );
     }
@@ -185,7 +186,8 @@ contract Base is Test {
         return
             ERC712(account).hashTypedData(
                 BatchedCallLib.hash(
-                    BatchedCall({calls: calls, nonce: nonce, expiry: 0})
+                    BatchedCall({calls: calls, nonce: nonce, expiry: 0}),
+                    address(_smartWallet)
                 )
             );
     }
@@ -279,7 +281,7 @@ contract Base is Test {
         uint256 signerPk
     ) public view returns (bytes memory) {
         bytes32 hash = ERC712(account).hashTypedData(
-            BatchedCallLib.hash(batchedCall)
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         address signer = vm.addr(signerPk);
         bytes32 keyHash = keccak256(abi.encodePacked(signer));

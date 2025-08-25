@@ -126,7 +126,7 @@ contract PasskeyValidatorTest is Base {
 
         // Get the REAL message hash that needs to be signed
         bytes32 realTypedDataHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(batchedCall)
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
 
         // Log the real typedDataHash for our script
@@ -144,7 +144,9 @@ contract PasskeyValidatorTest is Base {
         });
 
         // Get the message hash that needs to be signed
-        ERC712(_alice).hashTypedData(BatchedCallLib.hash(batchedCall));
+        ERC712(_alice).hashTypedData(
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+        );
 
         // Create simplified mock Passkey signature data
         PasskeyValidatorLib.PasskeyPubKey

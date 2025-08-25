@@ -373,7 +373,7 @@ contract ExecutionTest is Base {
         });
 
         bytes32 typedDataHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(batchedCall)
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
             userKeyHash,
@@ -421,7 +421,7 @@ contract ExecutionTest is Base {
         });
 
         bytes32 typedDataHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(batchedCall)
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
             userKeyHash,
@@ -472,7 +472,7 @@ contract ExecutionTest is Base {
         });
 
         bytes32 typedDataHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(batchedCall)
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
             userKeyHash,
@@ -511,7 +511,7 @@ contract ExecutionTest is Base {
         });
 
         bytes32 singleTypedDataHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(singleCallBatch)
+            BatchedCallLib.hash(singleCallBatch, address(_smartWallet))
         );
         bytes memory singleValidatorData = abi.encodePacked(
             userKeyHash,
@@ -537,7 +537,7 @@ contract ExecutionTest is Base {
         });
 
         bytes32 multipleTypedDataHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(multipleCallsBatch)
+            BatchedCallLib.hash(multipleCallsBatch, address(_smartWallet))
         );
         bytes memory multipleValidatorData = abi.encodePacked(
             userKeyHash,

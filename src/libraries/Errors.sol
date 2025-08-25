@@ -11,7 +11,6 @@ library Errors {
     error OwnerExpired();
 
     // Call related
-    error CallFailed(uint256 index, uint256 originalLength, bytes returnData);
     error NonAdminSelfCall();
 
     // ValidationLogic related
@@ -25,8 +24,6 @@ library Errors {
 
     // Simulation related
     error SimulateExecution();
-
-    error InvalidOwnersAndValidatorsLength();
 
     error NotEntryPoint();
 

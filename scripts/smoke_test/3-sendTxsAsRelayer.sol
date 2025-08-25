@@ -34,7 +34,9 @@ contract SendTxsAsRelayer is Script {
         });
 
         // Get typed hash for signing using BatchedCallLib
-        bytes32 hash = BatchedCallLib.hash(batchedCall);
+        // Get the implementation address from the SmartWallet
+        address implementation = SmartWallet(payable(sender)).IMPLEMENTATION();
+        bytes32 hash = BatchedCallLib.hash(batchedCall, implementation);
         console.log("BatchedCall hash:", vm.toString(hash));
         
         // Ensure the sender has SmartWallet code

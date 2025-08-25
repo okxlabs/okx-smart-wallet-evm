@@ -3,12 +3,11 @@ pragma solidity ^0.8.23;
 
 import "./Base.t.sol";
 import "src/libraries/Errors.sol";
+import {console} from "forge-std/console.sol";
 import {MockERC20} from "src/test/MockERC20.sol";
 import {MockMaliciousERC20} from "src/test/MockMaliciousERC20.sol";
 
 error ERC20InsufficientBalance(address, uint256, uint256);
-
-event CallFailed(uint256 index, uint256 originalLength, bytes returnData);
 
 interface IMaliciousToken {
     function getDrainingAttackHeight() external returns (uint256);
@@ -606,31 +605,6 @@ contract SimulationTest is Base {
                 (i + 1) * 100
             );
         }
-    }
-
-    function _decodeCallFailed(
-        bytes memory errorData
-    )
-        private
-        pure
-        returns (uint256 index, uint256 originalLength, bytes memory returnData)
-    {
-        bytes4 selector;
-        assembly {
-            selector := mload(add(errorData, 32))
-        }
-        assertEq(selector, Errors.CallFailed.selector);
-
-        // decode gas and error msg
-        uint256 argsLen = errorData.length - 4;
-        bytes memory payload = new bytes(argsLen);
-        for (uint256 i = 0; i < argsLen; i++) {
-            payload[i] = errorData[i + 4];
-        }
-        (index, originalLength, returnData) = abi.decode(
-            payload,
-            (uint256, uint256, bytes)
-        );
     }
 
     function test_simulate_executeFromRelayer() public {

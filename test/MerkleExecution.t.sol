@@ -44,7 +44,10 @@ contract MerkleExecutionTest is Base {
         address account,
         BatchedCall memory batchedCall
     ) internal view returns (bytes32) {
-        return ERC712(account).hashTypedData(BatchedCallLib.hash(batchedCall));
+        return
+            ERC712(account).hashTypedData(
+                BatchedCallLib.hash(batchedCall, address(_smartWallet))
+            );
     }
 
     function _setupMerkleTree() internal {

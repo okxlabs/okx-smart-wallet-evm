@@ -5,10 +5,6 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 
 interface ISmartWallet is IERC165 {
-    // EVENTS
-    event StorageInitialized();
-    event StorageCreated(address storageAddress);
-
     function initialize(InitialOwner[] calldata initialOwners) external;
 
     function execute(Call[] calldata calls) external;

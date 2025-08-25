@@ -38,12 +38,11 @@ abstract contract ERC4337Account is IERC4337Account {
         }
     }
 
-    /// @notice Returns the key hash of the entry point
-    function entryPointKeyHash() public view virtual returns (bytes32) {
-        return keccak256(abi.encodePacked(entryPoint()));
-    }
-
-    // TODO: remove this function
+    /**
+     * @notice Returns the hash of the user operation without the chain id
+     * @param userOp The user operation to hash
+     * @return The hash of the user operation without the chain id
+     */
     function getUserOpHashWithoutChainId(
         PackedUserOperation calldata userOp
     ) public view virtual returns (bytes32) {

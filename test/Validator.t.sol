@@ -874,7 +874,7 @@ contract ValidatorTest is Base {
         });
 
         bytes32 typedDataHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(batchedCall)
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_charliePk, typedDataHash);
 
@@ -1037,7 +1037,7 @@ contract ValidatorTest is Base {
         });
 
         bytes32 typedDataHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(batchedCall)
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_charliePk, typedDataHash);
 

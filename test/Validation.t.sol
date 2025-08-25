@@ -365,7 +365,7 @@ contract ValidationTest is Base {
     ) internal view returns (bytes32) {
         return
             ERC712(account).hashTypedDataSansChainId(
-                BatchedCallLib.hash(batchedCall)
+                BatchedCallLib.hash(batchedCall, address(_smartWallet))
             );
     }
 

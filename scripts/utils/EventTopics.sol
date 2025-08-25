@@ -12,13 +12,6 @@ import {ISmartWalletFactory} from "src/interfaces/ISmartWalletFactory.sol";
 /// @notice A script for printing the event topics of all contract events
 contract EventTopics is Script {
     function run() external pure {
-        // ISmartWallet events
-        console.log("\n=== ISmartWallet Events ===");
-        console.log("StorageInitialized:");
-        console.logBytes32(ISmartWallet.StorageInitialized.selector);
-        console.log("StorageCreated:");
-        console.logBytes32(ISmartWallet.StorageCreated.selector);
-
         // IOwnersManager events
         console.log("\n=== IOwnersManager Events ===");
         console.log("OwnerAdded:");
