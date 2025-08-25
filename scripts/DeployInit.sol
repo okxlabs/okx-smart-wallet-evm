@@ -20,7 +20,9 @@ contract DeployInit is Script {
         console.log("Deploy owner: %s", deployOwner);
 
         // Create a new DeployFactory for local testing instead of using pre-deployed one
-        DeployFactory deployFactory = new DeployFactory();
+        DeployFactory deployFactory = DeployFactory(
+            vm.envAddress("DEPLOY_FACTORY_ADDRESS")
+        );
         bytes32 deployFactorySalt = vm.envBytes32("DEPLOY_FACTORY_SALT");
         console.log("Deploy factory address: %s", address(deployFactory));
         console.log("Deploy factory salt:");
@@ -37,10 +39,7 @@ contract DeployInit is Script {
             SmartWallet smartWallet_,
             SmartWalletFactory factory_,
             Helper helper_
-        ) = DeployInitHelper.deployContracts(
-                deployFactory,
-                deployFactorySalt
-            );
+        ) = DeployInitHelper.deployContracts(deployFactory, deployFactorySalt);
 
         console.log("SmartWallet address: %s", address(smartWallet_));
         console.log("SmartWalletFactory address: %s", address(factory_));
