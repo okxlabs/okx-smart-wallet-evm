@@ -2,6 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {OKXSmartWalletEntry} from "src/OKXSmartWalletEntry.sol";
+import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
 import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
 import {DeployFactory} from "src/test/DeployFactory.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
@@ -16,6 +17,7 @@ library DeployInitHelper {
         internal
         returns (
             ECDSAValidator ecdsaValidatorImpl,
+            PasskeyValidator passkeyValidatorImpl,
             OKXSmartWalletEntry smartWalletImpl,
             SmartWalletFactory factoryImpl,
             Helper helperImpl
@@ -27,6 +29,13 @@ library DeployInitHelper {
             deployFactorySalt
         );
         ecdsaValidatorImpl = ECDSAValidator(ecdsaValidatorAddr);
+
+        // deploy PasskeyValidator
+        address payable passkeyValidatorAddr = deployFactory.deploy(
+            type(PasskeyValidator).creationCode,
+            deployFactorySalt
+        );
+        passkeyValidatorImpl = PasskeyValidator(passkeyValidatorAddr);
 
         // deploy SmartWallet
         address payable smartWalletAddr = deployFactory.deploy(
