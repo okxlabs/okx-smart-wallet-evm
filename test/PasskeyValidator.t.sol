@@ -61,10 +61,14 @@ contract PasskeyValidatorTest is Base {
     }
 
     function test_webauthn_signature_directly() public view {
+        (, , bytes32 messageHash) = HelperLib.getPasskeyMessageHash(
+            SIGNED_MESSAGE_HASH
+        );
+        (bytes32 r, bytes32 s) = vm.signP256(_passkeyPrivateKey, messageHash);
         WebAuthn.WebAuthnAuth memory auth = HelperLib.getWebAuthnAuth(
             SIGNED_MESSAGE_HASH,
-            TEST_SIG_R,
-            TEST_SIG_S
+            uint256(r),
+            uint256(s)
         );
         bool isValid = WebAuthn.verify(
             abi.encode(SIGNED_MESSAGE_HASH),
@@ -78,11 +82,15 @@ contract PasskeyValidatorTest is Base {
     }
 
     function test_real_passkey_signature_validates() public view {
+        (, , bytes32 messageHash) = HelperLib.getPasskeyMessageHash(
+            SIGNED_MESSAGE_HASH
+        );
+        (bytes32 r, bytes32 s) = vm.signP256(_passkeyPrivateKey, messageHash);
         // Test with the signed message hash directly
         WebAuthn.WebAuthnAuth memory auth = HelperLib.getWebAuthnAuth(
             SIGNED_MESSAGE_HASH,
-            TEST_SIG_R,
-            TEST_SIG_S
+            uint256(r),
+            uint256(s)
         );
         // Create simplified PasskeySignature struct
 
@@ -243,14 +251,12 @@ contract PasskeyValidatorTest is Base {
             proofs,
             SIGNED_MESSAGE_HASH
         );
-        console.logBytes32(rootHash);
-
-        uint256 r = 115089831660395801645201494062165654030955933932905789802589562760237870153377;
-        uint256 s = 9836647715005216035744379238445769602048920336947092990322163033664673154607;
+        (, , bytes32 messageHash) = HelperLib.getPasskeyMessageHash(rootHash);
+        (bytes32 r, bytes32 s) = vm.signP256(_passkeyPrivateKey, messageHash);
         WebAuthn.WebAuthnAuth memory auth = HelperLib.getWebAuthnAuth(
             rootHash,
-            r,
-            s
+            uint256(r),
+            uint256(s)
         );
         // Create simplified PasskeySignature struct
 

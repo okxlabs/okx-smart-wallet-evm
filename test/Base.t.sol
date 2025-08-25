@@ -34,6 +34,7 @@ contract Base is Test {
     uint256 internal _bobPk;
     uint256 internal _passkeyPubX;
     uint256 internal _passkeyPubY;
+    uint256 internal _passkeyPrivateKey;
     ECDSAValidator internal _ecdsaValidator; // Shared validator instance
     SmartWallet internal _smartWallet;
     SmartWalletFactory internal _factory;
@@ -65,9 +66,10 @@ contract Base is Test {
         vm.deal(ENTRYPOINT_ADDRESS, 100 ether); // Fund EntryPoint for gas payments
 
         // Generated real P256 signature using SmartAccount method (crypto.createSign compatibility)
-        _passkeyPubX = 0x640c5cacef387563d0b105c7724c45ee19f8a952cb583de494a6a7ce5ed16760;
-        _passkeyPubY = 0x142b33cbf8255e9f0628ab9e250e179a3e7e8e24e0a2a4340f0b9fdeb29a1b48;
-
+        _passkeyPubX = 0xac3363644e2570764491a4ef772d7a2df4322a6f6830330baa85f2bf5edf4cb1;
+        _passkeyPubY = 0x293e49491e2b881d16d17aa6cacee25feccbfb74acce4ff15402f09c2ee9f9f5;
+        _passkeyPrivateKey = 0x305cfeb0eecbb0cdb260b8c93b0f9b1f812d601261c135fce04bb8de6a310f0f;
+        // Deploy Factory
         deployFactory = new DeployFactory();
         bytes32 deployFactorySalt = vm.envBytes32("DEPLOY_FACTORY_SALT");
 
