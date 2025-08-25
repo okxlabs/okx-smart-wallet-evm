@@ -21,6 +21,7 @@ import {BatchedCallLib} from "./libraries/BatchedCallLib.sol";
 import {AllowanceManager} from "./AllowanceManager.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 import {console} from "forge-std/console.sol";
+import {DecodeLib} from "./libraries/DecodeLib.sol";
 
 // Do not set any states in this contract
 contract SmartWallet is
@@ -48,12 +49,7 @@ contract SmartWallet is
         _disableInitializers();
     }
 
-    modifier onlyOwnerOrEntryPoint() {
-        if (msg.sender == entryPoint() || msg.sender == address(this)) {
-            _;
-            return;
-        }
-
+    modifier onlyOwner() {
         bytes32 keyHash = keccak256(abi.encodePacked(msg.sender));
         if (!hasOwner(keyHash)) {
             revert Errors.InvalidCaller(msg.sender);
@@ -94,8 +90,25 @@ contract SmartWallet is
      * @dev Only callable by the account itself
      * @param calls Array of Call structs containing destination address, value, and calldata
      */
-    function execute(Call[] calldata calls) external onlyOwnerOrEntryPoint {
+    function execute(Call[] calldata calls) external onlyOwner {
         _batchCall(calls, keccak256(abi.encodePacked(msg.sender)));
+    }
+
+    /// @dev This function is executeable only by the EntryPoint contract, and is the main pathway for UserOperations to be executed.
+    /// UserOperations can be executed through the execute function, but another method of authorization (ie through a passed in signature) is required.
+    /// userOp.callData is abi.encodeCall(IAccountExecute.executeUserOp.selector, (abi.encode(Call[]), bool))
+    /// Note that this contract is only compatible with Entrypoint versions v0.7.0 and v0.8.0. It is not compatible with v0.6.0, as that version does not support the "executeUserOp" selector.
+    function executeUserOp(
+        PackedUserOperation calldata userOp,
+        bytes32
+    ) external onlyEntryPoint {
+        // Parse the keyHash from the signature. This is the keyHash that has been pre-validated as the correct signer over the UserOp data
+        // and must be used to check further on-chain permissions over the call execution.
+        bytes32 keyHash = bytes32(userOp.signature[0:32]);
+
+        Call[] calldata calls = DecodeLib.decodeCalls(userOp.callData[4:]);
+
+        _batchCall(calls, keyHash);
     }
 
     /**
@@ -231,8 +244,6 @@ contract SmartWallet is
         uint256 settings = ownerSettings[keyHash];
         address hookAddress = getHook(settings);
 
-        bool canCallSelf = keyHash == entryPointKeyHash() || isAdmin(settings);
-
         bytes memory ret;
 
         if (hookAddress != address(0)) {
@@ -240,7 +251,7 @@ contract SmartWallet is
         }
 
         for (uint256 i; i < calls.length; i++) {
-            if (calls[i].target == address(this) && !canCallSelf) {
+            if (calls[i].target == address(this) && !isAdmin(settings)) {
                 revert Errors.NonAdminSelfCall();
             }
             _call(calls[i]);
@@ -376,5 +387,5 @@ contract SmartWallet is
     ///      or `address(this)`.
     function _authorizeUpgrade(
         address
-    ) internal view override(UUPSUpgradeable) onlyOwnerOrEntryPoint {}
+    ) internal view override(UUPSUpgradeable) onlyOwner {}
 }

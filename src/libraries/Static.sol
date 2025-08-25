@@ -11,7 +11,7 @@ library Static {
     bytes4 public constant MAGIC_VALUE = 0x1626ba7e;
     bytes4 public constant INVALID_VALUE = 0xffffffff;
 
-    uint256 public constant CHAIN_LESS_NONCE_KEY = 8453;
+    uint256 public constant CHAIN_LESS_NONCE_KEY = 196;
 
     // EIP-1271 signature validation return values
     uint256 public constant SIG_VALIDATION_FAILED = 1 << 96;

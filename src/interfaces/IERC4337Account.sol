@@ -10,4 +10,12 @@ interface IERC4337Account is IAccount {
     function getUserOpHashWithoutChainId(
         PackedUserOperation calldata userOp
     ) external view returns (bytes32);
+
+    /// @notice Execute a UserOperation
+    /// @param userOp The UserOperation to execute
+    /// @param userOpHash The hash of the UserOperation
+    function executeUserOp(
+        PackedUserOperation calldata userOp,
+        bytes32 userOpHash
+    ) external;
 }
