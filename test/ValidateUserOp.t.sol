@@ -602,6 +602,342 @@ contract ValidateUserOpTest is Base {
             "Malformed signature should fail"
         );
     }
+
+    // Test canSkipChainIdValidation logic in validateUserOp context
+    function test_validateUserOp_allows_chainless_nonce_for_addOwner()
+        external
+    {
+        // Create account with ECDSA validator
+        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: _aliceKeyHash,
+            validator: address(ecdsaValidator)
+        });
+
+        address account = _factory.createAccount(
+            address(_smartWallet),
+            initialOwners,
+            0
+        );
+
+        vm.deal(account, 2 ether);
+
+        // Create addOwner call
+        bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(_bob));
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: account,
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnersManager.addOwner.selector,
+                newOwnerKeyHash,
+                address(ecdsaValidator),
+                0
+            )
+        });
+
+        PackedUserOperation memory userOp;
+        userOp.nonce = Static.CHAIN_LESS_NONCE_KEY << 64; // Use chainless nonce
+        userOp.callData = abi.encodeWithSelector(
+            ISmartWallet.execute.selector,
+            calls
+        );
+
+        // Get hash without chain ID for chainless nonce
+        bytes32 userOpHash = IERC4337Account(account)
+            .getUserOpHashWithoutChainId(userOp);
+
+        // Sign the hash
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
+        userOp.signature = abi.encodePacked(
+            _aliceKeyHash,
+            abi.encodePacked(r, s, v)
+        );
+
+        uint256 missingAccountFunds = 100;
+
+        // Should succeed for addOwner with chainless nonce
+        assertEq(
+            _testValidateUserOp(
+                account,
+                userOp,
+                userOpHash,
+                missingAccountFunds
+            ),
+            0,
+            "addOwner should succeed with chainless nonce"
+        );
+    }
+
+    function test_validateUserOp_allows_chainless_nonce_for_updateOwner()
+        external
+    {
+        // Create account with ECDSA validator
+        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: _aliceKeyHash,
+            validator: address(ecdsaValidator)
+        });
+
+        address account = _factory.createAccount(
+            address(_smartWallet),
+            initialOwners,
+            0
+        );
+
+        vm.deal(account, 2 ether);
+
+        // Create updateOwner call (make alice admin)
+        uint256 adminSettings = IOwnersManager(account).packSettings(
+            true,
+            0,
+            address(0)
+        );
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: account,
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnersManager.updateOwner.selector,
+                _aliceKeyHash,
+                address(ecdsaValidator),
+                adminSettings
+            )
+        });
+
+        PackedUserOperation memory userOp;
+        userOp.nonce = Static.CHAIN_LESS_NONCE_KEY << 64;
+        userOp.callData = abi.encodeWithSelector(
+            ISmartWallet.execute.selector,
+            calls
+        );
+
+        bytes32 userOpHash = IERC4337Account(account)
+            .getUserOpHashWithoutChainId(userOp);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
+        userOp.signature = abi.encodePacked(
+            _aliceKeyHash,
+            abi.encodePacked(r, s, v)
+        );
+
+        uint256 missingAccountFunds = 100;
+
+        // Should succeed for updateOwner with chainless nonce
+        assertEq(
+            _testValidateUserOp(
+                account,
+                userOp,
+                userOpHash,
+                missingAccountFunds
+            ),
+            0,
+            "updateOwner should succeed with chainless nonce"
+        );
+    }
+
+    function test_validateUserOp_allows_chainless_nonce_for_removeOwner()
+        external
+    {
+        // Create account with ECDSA validator
+        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 _bobKeyHash = keccak256(abi.encodePacked(_bob));
+        InitialOwner[] memory initialOwners = new InitialOwner[](2);
+        initialOwners[0] = InitialOwner({
+            keyHash: _aliceKeyHash,
+            validator: address(ecdsaValidator)
+        });
+        initialOwners[1] = InitialOwner({
+            keyHash: _bobKeyHash,
+            validator: address(ecdsaValidator)
+        });
+
+        address account = _factory.createAccount(
+            address(_smartWallet),
+            initialOwners,
+            0
+        );
+
+        vm.deal(account, 2 ether);
+
+        // Create removeOwner call (remove bob)
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: account,
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnersManager.removeOwner.selector,
+                _bobKeyHash
+            )
+        });
+
+        PackedUserOperation memory userOp;
+        userOp.nonce = Static.CHAIN_LESS_NONCE_KEY << 64;
+        userOp.callData = abi.encodeWithSelector(
+            ISmartWallet.execute.selector,
+            calls
+        );
+
+        bytes32 userOpHash = IERC4337Account(account)
+            .getUserOpHashWithoutChainId(userOp);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
+        userOp.signature = abi.encodePacked(
+            _aliceKeyHash,
+            abi.encodePacked(r, s, v)
+        );
+
+        uint256 missingAccountFunds = 100;
+
+        // Should succeed for removeOwner with chainless nonce
+        assertEq(
+            _testValidateUserOp(
+                account,
+                userOp,
+                userOpHash,
+                missingAccountFunds
+            ),
+            0,
+            "removeOwner should succeed with chainless nonce"
+        );
+    }
+
+    function test_validateUserOp_rejects_chainless_nonce_for_unsupported_selector()
+        external
+    {
+        // Create account with ECDSA validator
+        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: _aliceKeyHash,
+            validator: address(ecdsaValidator)
+        });
+
+        address account = _factory.createAccount(
+            address(_smartWallet),
+            initialOwners,
+            0
+        );
+
+        vm.deal(account, 2 ether);
+
+        // Create regular transfer call (not supported for chainless nonce)
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _bob, value: 1 ether, data: ""});
+
+        PackedUserOperation memory userOp;
+        userOp.nonce = Static.CHAIN_LESS_NONCE_KEY << 64;
+        userOp.callData = abi.encodeWithSelector(
+            ISmartWallet.execute.selector,
+            calls
+        );
+
+        bytes32 userOpHash = IERC4337Account(account)
+            .getUserOpHashWithoutChainId(userOp);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
+        userOp.signature = abi.encodePacked(
+            _aliceKeyHash,
+            abi.encodePacked(r, s, v)
+        );
+
+        uint256 missingAccountFunds = 100;
+
+        // Should revert with InvalidNonceKey for unsupported selector
+        vm.prank(ENTRYPOINT_ADDRESS);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Errors.InvalidNonceKey.selector,
+                Static.CHAIN_LESS_NONCE_KEY
+            )
+        );
+        IERC4337Account(account).validateUserOp(
+            userOp,
+            userOpHash,
+            missingAccountFunds
+        );
+    }
+
+    function test_validateUserOp_comprehensive_chainless_nonce_coverage()
+        external
+    {
+        // Create account with ECDSA validator
+        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: _aliceKeyHash,
+            validator: address(ecdsaValidator)
+        });
+
+        address account = _factory.createAccount(
+            address(_smartWallet),
+            initialOwners,
+            0
+        );
+
+        vm.deal(account, 2 ether);
+
+        // Create multiple supported calls in one batch
+        bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(_bob));
+        Call[] memory calls = new Call[](2);
+
+        // 1. addOwner call
+        calls[0] = Call({
+            target: account,
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnersManager.addOwner.selector,
+                newOwnerKeyHash,
+                address(ecdsaValidator),
+                0
+            )
+        });
+
+        // 2. updateOwner call (make alice admin)
+        uint256 adminSettings = IOwnersManager(account).packSettings(
+            true,
+            0,
+            address(0)
+        );
+        calls[1] = Call({
+            target: account,
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnersManager.updateOwner.selector,
+                _aliceKeyHash,
+                address(ecdsaValidator),
+                adminSettings
+            )
+        });
+
+        PackedUserOperation memory userOp;
+        userOp.nonce = Static.CHAIN_LESS_NONCE_KEY << 64;
+        userOp.callData = abi.encodeWithSelector(
+            ISmartWallet.execute.selector,
+            calls
+        );
+
+        bytes32 userOpHash = IERC4337Account(account)
+            .getUserOpHashWithoutChainId(userOp);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
+        userOp.signature = abi.encodePacked(
+            _aliceKeyHash,
+            abi.encodePacked(r, s, v)
+        );
+
+        uint256 missingAccountFunds = 100;
+
+        // Should succeed with all supported selectors
+        assertEq(
+            _testValidateUserOp(
+                account,
+                userOp,
+                userOpHash,
+                missingAccountFunds
+            ),
+            0,
+            "Multiple supported selectors should succeed with chainless nonce"
+        );
+    }
 }
 
 // Mock contract moved from mocks/MockEntryPoint.sol
