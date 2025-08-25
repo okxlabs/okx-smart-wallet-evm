@@ -284,7 +284,7 @@ contract AdminPermissionsTest is Base {
         bytes32 adminKeyHash = keccak256(abi.encodePacked(adminUser));
 
         // First, revoke admin rights
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
         Call[] memory revokeAdminCalls = new Call[](1);
         revokeAdminCalls[0] = Call({
             target: _alice,
@@ -354,7 +354,7 @@ contract AdminPermissionsTest is Base {
 
     function test_admin_rights_elevation_grants_permissions() public {
         bytes32 nonAdminKeyHash = keccak256(abi.encodePacked(nonAdminUser));
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
 
         // Elevate non-admin to admin
         Call[] memory elevateAdminCalls = new Call[](1);
@@ -519,7 +519,7 @@ contract AdminPermissionsTest is Base {
 
     function test_admin_cannot_remove_last_admin() public {
         bytes32 adminKeyHash = keccak256(abi.encodePacked(adminUser));
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
 
         // Try to remove the original admin (alice) when adminUser is the only other admin
         Call[] memory removeAdminCalls = new Call[](1);

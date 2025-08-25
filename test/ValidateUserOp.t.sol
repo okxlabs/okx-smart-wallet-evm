@@ -43,7 +43,7 @@ contract ValidateUserOpTest is Base {
     function test_validateUserOp_with_eoa_signer() external {
         vm.prank(_alice);
 
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
             keyHash: _aliceKeyHash,
@@ -72,7 +72,7 @@ contract ValidateUserOpTest is Base {
         );
         assertEq(
             _testValidateUserOp(
-                address(account),
+                account,
                 userOp,
                 t.userOpHash,
                 t.missingAccountFunds
@@ -117,7 +117,7 @@ contract ValidateUserOpTest is Base {
     {
         vm.prank(_alice);
 
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
         bytes32 _bobKeyHash = keccak256(abi.encodePacked(_bob));
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
@@ -186,7 +186,7 @@ contract ValidateUserOpTest is Base {
     {
         vm.prank(_alice);
 
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
         bytes32 _bobKeyHash = keccak256(abi.encodePacked(_bob));
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
@@ -249,8 +249,7 @@ contract ValidateUserOpTest is Base {
     {
         vm.prank(_alice);
 
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_alice));
-        bytes32 _bobKeyHash = keccak256(abi.encodePacked(_bob));
+        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
             keyHash: _aliceKeyHash,
@@ -304,7 +303,7 @@ contract ValidateUserOpTest is Base {
 
     function test_validateUserOp_with_ecdsa_validator() external {
         // Create account with ECDSA validator
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
             keyHash: _aliceKeyHash,
@@ -450,7 +449,7 @@ contract ValidateUserOpTest is Base {
 
     function test_validateUserOp_onlyEntryPoint_modifier() external {
         // Create account
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
             keyHash: _aliceKeyHash,
@@ -515,7 +514,7 @@ contract ValidateUserOpTest is Base {
     }
 
     function test_validateUserOp_signature_validation_edge_cases() external {
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
             keyHash: _aliceKeyHash,
@@ -603,7 +602,7 @@ contract ValidateUserOpTest is Base {
         external
     {
         // Create account with ECDSA validator
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
             keyHash: _aliceKeyHash,
@@ -669,7 +668,7 @@ contract ValidateUserOpTest is Base {
         external
     {
         // Create account with ECDSA validator
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
             keyHash: _aliceKeyHash,
@@ -736,7 +735,7 @@ contract ValidateUserOpTest is Base {
         external
     {
         // Create account with ECDSA validator
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
         bytes32 _bobKeyHash = keccak256(abi.encodePacked(_bob));
         InitialOwner[] memory initialOwners = new InitialOwner[](2);
         initialOwners[0] = InitialOwner({
@@ -801,7 +800,7 @@ contract ValidateUserOpTest is Base {
         external
     {
         // Create account with ECDSA validator
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
             keyHash: _aliceKeyHash,
@@ -854,7 +853,7 @@ contract ValidateUserOpTest is Base {
         external
     {
         // Create account with ECDSA validator
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
             keyHash: _aliceKeyHash,

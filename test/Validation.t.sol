@@ -22,14 +22,12 @@ contract ValidationTest is Base {
 
     function test_executeFromRelayer_reverts_for_invalid_signature() public {
         Call[] memory calls = constructCallsData();
-        _addValidator(_alice);
 
         bytes32 hash = _getValidationTypedHash(_alice, calls);
-        bytes memory validatorData = constructValidatorData(
-            _alice,
-            _bobPk, // Wrong private key for invalid signature test
-            hash
-        );
+        // Use alice's keyHash but bob's signature to create invalid signature
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_bobPk, hash);
+        bytes memory validatorData = abi.encodePacked(aliceKeyHash, r, s, v);
 
         vm.prank(_alice);
         vm.expectRevert(
@@ -98,9 +96,6 @@ contract ValidationTest is Base {
     }
 
     function test_executeFromRelayer_emits_nonce_consumed() public {
-        // Register validator first
-        _addValidator(_alice);
-
         vm.prank(_alice);
         uint256 nonce = _getNonce(_alice);
         Call[] memory calls = constructCallsData();
@@ -111,6 +106,7 @@ contract ValidationTest is Base {
         bytes32 hash = _getValidationTypedHash(_alice, calls);
         bytes memory validatorData = constructValidatorData(
             _alice,
+            _aliceEOA,
             _alicePk,
             hash
         );
@@ -127,12 +123,9 @@ contract ValidationTest is Base {
     }
 
     function test_nonce_unchanged_after_invalid_signature_revert() public {
-        // Add validator
-        _addValidator(_alice);
-
         // Get initial nonce
         uint192 nonceKey = uint192(
-            uint256(keccak256(abi.encodePacked(_alice))) >> 64
+            uint256(keccak256(abi.encodePacked(_aliceEOA))) >> 64
         );
         uint64 initialNonce = INonceManager(_alice).getNonce(nonceKey);
 
@@ -145,7 +138,7 @@ contract ValidationTest is Base {
         });
 
         // Create validatorData with invalid signature
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
         bytes memory invalidSignature = new bytes(65); // All zeros - invalid signature
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
@@ -304,7 +297,9 @@ contract ValidationTest is Base {
         view
     {
         bytes32 hash = keccak256("test");
-        bytes memory signature = abi.encodePacked(_signDigest(hash, _alicePk));
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        bytes memory sig = _signDigest(hash, _alicePk);
+        bytes memory signature = abi.encodePacked(aliceKeyHash, sig);
 
         // Call isValidSignature
         bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
@@ -313,12 +308,10 @@ contract ValidationTest is Base {
 
     function test_isValidSignature_succeeds_with_valid_validator_signer()
         public
+        view
     {
-        // Add validator
-        _addValidator(_alice);
-
         bytes32 hash = keccak256("test");
-        bytes32 keyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 keyHash = keccak256(abi.encodePacked(_aliceEOA));
         bytes memory sig = _signDigest(hash, _alicePk);
         bytes memory signature = abi.encodePacked(keyHash, sig);
 
@@ -339,8 +332,9 @@ contract ValidationTest is Base {
         // Sign the bound digest
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, digest);
 
-        // Signature
-        bytes memory validatorData = abi.encodePacked(r, s, v);
+        // Signature with keyHash prefix
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        bytes memory validatorData = abi.encodePacked(aliceKeyHash, r, s, v);
 
         // Call isValidSignature
         bytes4 result = ISmartWallet(_alice).isValidSignature(
@@ -379,8 +373,6 @@ contract ValidationTest is Base {
     function test_executeWithRelayer_allows_chainless_nonce_for_addOwner()
         public
     {
-        _addValidator(_alice);
-
         // Create addOwner call
         bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(_bob));
         Call[] memory calls = new Call[](1);
@@ -408,6 +400,7 @@ contract ValidationTest is Base {
         bytes32 hash = _getValidationTypedHashSansChainId(_alice, batchedCall);
         bytes memory validatorData = constructValidatorData(
             _alice,
+            _aliceEOA,
             _alicePk,
             hash
         );
@@ -426,8 +419,6 @@ contract ValidationTest is Base {
     function test_executeWithRelayer_allows_chainless_nonce_for_updateOwner()
         public
     {
-        _addValidator(_alice);
-
         // First add an owner to update
         bytes32 ownerKeyHash = keccak256(abi.encodePacked(_bob));
         _executeAddValidator(
@@ -467,6 +458,7 @@ contract ValidationTest is Base {
         bytes32 hash = _getValidationTypedHashSansChainId(_alice, batchedCall);
         bytes memory validatorData = constructValidatorData(
             _alice,
+            _aliceEOA,
             _alicePk,
             hash
         );
@@ -486,8 +478,6 @@ contract ValidationTest is Base {
     function test_executeWithRelayer_allows_chainless_nonce_for_removeOwner()
         public
     {
-        _addValidator(_alice);
-
         // First add an owner to remove
         bytes32 ownerKeyHash = keccak256(abi.encodePacked(_bob));
         _executeAddValidator(
@@ -520,6 +510,7 @@ contract ValidationTest is Base {
         bytes32 hash = _getValidationTypedHashSansChainId(_alice, batchedCall);
         bytes memory validatorData = constructValidatorData(
             _alice,
+            _aliceEOA,
             _alicePk,
             hash
         );
@@ -538,8 +529,6 @@ contract ValidationTest is Base {
     function test_executeWithRelayer_rejects_chainless_nonce_for_unsupported_selector()
         public
     {
-        _addValidator(_alice);
-
         // Create a regular execute call (not supported for chainless nonce)
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _bob, value: 1 ether, data: ""});
@@ -554,6 +543,7 @@ contract ValidationTest is Base {
         bytes32 hash = _getValidationTypedHashSansChainId(_alice, batchedCall);
         bytes memory validatorData = constructValidatorData(
             _alice,
+            _aliceEOA,
             _alicePk,
             hash
         );
@@ -572,8 +562,6 @@ contract ValidationTest is Base {
     function test_executeWithRelayer_allows_mixed_calls_with_supported_selectors()
         public
     {
-        _addValidator(_alice);
-
         // Create multiple calls with supported selectors
         bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(_bob));
         Call[] memory calls = new Call[](2);
@@ -593,7 +581,7 @@ contract ValidationTest is Base {
         });
 
         // updateOwner call (update alice to admin)
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
         uint256 adminSettings = IOwnersManager(_alice).packSettings(
             true, // Make admin
             0, // No expiry
@@ -620,6 +608,7 @@ contract ValidationTest is Base {
         bytes32 hash = _getValidationTypedHashSansChainId(_alice, batchedCall);
         bytes memory validatorData = constructValidatorData(
             _alice,
+            _aliceEOA,
             _alicePk,
             hash
         );
@@ -646,8 +635,6 @@ contract ValidationTest is Base {
     function test_executeWithRelayer_allows_chainless_nonce_for_upgradeToAndCall()
         public
     {
-        _addValidator(_alice);
-
         // Create a mock upgrade call (we don't need a real implementation for this test)
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -670,6 +657,7 @@ contract ValidationTest is Base {
         bytes32 hash = _getValidationTypedHashSansChainId(_alice, batchedCall);
         bytes memory validatorData = constructValidatorData(
             _alice,
+            _aliceEOA,
             _alicePk,
             hash
         );
@@ -697,11 +685,9 @@ contract ValidationTest is Base {
     function test_executeWithRelayer_comprehensive_chainless_nonce_coverage()
         public
     {
-        _addValidator(_alice);
-
         // Test all supported selectors in one batch
         bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(_bob));
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
 
         // First add an owner that we can later remove
         _executeAddValidator(
@@ -765,6 +751,7 @@ contract ValidationTest is Base {
         bytes32 hash = _getValidationTypedHashSansChainId(_alice, batchedCall);
         bytes memory validatorData = constructValidatorData(
             _alice,
+            _aliceEOA,
             _alicePk,
             hash
         );

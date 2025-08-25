@@ -639,6 +639,7 @@ contract SimulationTest is Base {
         bytes32 hash = _getValidationTypedHash(_alice, calls);
         bytes memory validatorData = constructValidatorData(
             _alice,
+            _aliceEOA,
             _alicePk,
             hash
         );
@@ -675,14 +676,12 @@ contract SimulationTest is Base {
     }
 
     function test_compareGas_simulateVsActual_executeFromRelayer() public {
-        // Register validator first (required for both simulate and execute)
-        _addValidator(_alice);
-
         // Setup common data for both tests
         Call[] memory calls = constructCallsData();
         bytes32 hash = _getValidationTypedHash(_alice, calls);
         bytes memory validatorData = constructValidatorData(
             _alice,
+            _aliceEOA,
             _alicePk,
             hash
         );

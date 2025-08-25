@@ -50,6 +50,12 @@ contract SmartWallet is
     }
 
     modifier onlyOwner() {
+        // Allow self-calls for EIP-7702 compatibility
+        if (msg.sender == address(this)) {
+            _;
+            return;
+        }
+
         bytes32 keyHash = keccak256(abi.encodePacked(msg.sender));
         if (!hasOwner(keyHash)) {
             revert Errors.InvalidCaller(msg.sender);
@@ -246,12 +252,17 @@ contract SmartWallet is
 
         bytes memory ret;
 
+        // Allow self-calls for EIP-7702 EOAs or admins
+        bool allowSelfCall = keyHash ==
+            keccak256(abi.encodePacked(address(this))) ||
+            isAdmin(settings);
+
         if (hookAddress != address(0)) {
             ret = IHook(hookAddress).preCheck(calls, msg.sender);
         }
 
         for (uint256 i; i < calls.length; i++) {
-            if (calls[i].target == address(this) && !isAdmin(settings)) {
+            if (calls[i].target == address(this) && !allowSelfCall) {
                 revert Errors.NonAdminSelfCall();
             }
             _call(calls[i]);

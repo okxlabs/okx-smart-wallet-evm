@@ -133,13 +133,11 @@ contract ExecutionTest is Base {
     }
 
     function test_executeFromRelayer_succeeds_as_relayer() public {
-        // Register validator first
-        _addValidator(_alice);
-
         Call[] memory calls = constructCallsData();
         bytes32 hash = _getValidationTypedHash(_alice, calls);
         bytes memory validatorData = constructValidatorData(
             _alice,
+            _aliceEOA,
             _alicePk,
             hash
         );
@@ -161,24 +159,28 @@ contract ExecutionTest is Base {
     }
 
     function test_executeFromRelayer_initialization_on_first_time() public {
-        (address charlie, uint256 charliePk) = makeAddrAndKey("charlie");
-        vm.deal(charlie, 1 ether);
-        _setCodeToEOA(address(_smartWallet), charlie);
+        (address charlieEOA, uint256 charliePk) = makeAddrAndKey("charlieEOA");
 
-        // Initialize charlie's wallet storage with charlie as initial admin owner
-        vm.prank(charlie);
+        // Create charlie's wallet using factory
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
-            keyHash: keccak256(abi.encodePacked(charlie)),
+            keyHash: keccak256(abi.encodePacked(charlieEOA)),
             validator: address(_ecdsaValidator)
         });
-        ISmartWallet(charlie).initialize(initialOwners);
+
+        address charlie = _factory.createAccount(
+            address(_smartWallet),
+            initialOwners,
+            1 // Different salt
+        );
+        vm.deal(charlie, 1 ether);
 
         Call[] memory calls = constructCallsData();
 
         bytes32 hash = _getValidationTypedHash(charlie, calls);
         bytes memory validatorData = constructValidatorData(
-            charlie,
+            charlie, // wallet address
+            charlieEOA, // signer address
             charliePk,
             hash
         );
@@ -195,9 +197,6 @@ contract ExecutionTest is Base {
     }
 
     function test_executeFromRelayer_reverts_on_failed_payment() public {
-        // Register validator first
-        _addValidator(_alice);
-
         assertEq(mockToken2.balanceOf(_alice), 0);
         vm.prank(_alice);
         Call[] memory calls = new Call[](2);
@@ -212,6 +211,7 @@ contract ExecutionTest is Base {
         bytes32 hash = _getValidationTypedHash(_alice, calls);
         bytes memory validatorData = constructValidatorData(
             _alice,
+            _aliceEOA,
             _alicePk,
             hash
         );
@@ -225,9 +225,6 @@ contract ExecutionTest is Base {
     }
 
     function test_executeFromRelayer_succeeds_on_payment() public {
-        // Register validator first
-        _addValidator(_alice);
-
         Call[] memory calls = new Call[](2);
         // Include payment to relayer as part of the batch
         calls[0] = constructErc20TransferCall(
@@ -240,6 +237,7 @@ contract ExecutionTest is Base {
         bytes32 hash = _getValidationTypedHash(_alice, calls);
         bytes memory validatorData = constructValidatorData(
             _alice,
+            _aliceEOA,
             _alicePk,
             hash
         );
@@ -258,9 +256,6 @@ contract ExecutionTest is Base {
     // This test is no longer valid as executeFromRelayer now reverts on any failed call
     // The batch execution is atomic - all succeed or all fail
     function test_executeFromRelayer_reverts_on_any_failed_call() public {
-        // Register validator first
-        _addValidator(_alice);
-
         vm.prank(_alice);
         Call[] memory calls = new Call[](2);
         calls[0] = Call({target: _bob, value: 1 ether, data: ""});
@@ -269,6 +264,7 @@ contract ExecutionTest is Base {
         bytes32 hash = _getValidationTypedHash(_alice, calls);
         bytes memory validatorData = constructValidatorData(
             _alice,
+            _aliceEOA,
             _alicePk,
             hash
         );
@@ -285,9 +281,6 @@ contract ExecutionTest is Base {
     }
 
     function test_executeFromRelayer_succeeds_on_free_gas_mode() public {
-        // Register validator first
-        _addValidator(_alice);
-
         Call[] memory calls = new Call[](1);
         // calls[0] = Call({target: _bob, value: 1 ether, data: ""});
         calls[0] = constructErc20TransferCall(
@@ -299,6 +292,7 @@ contract ExecutionTest is Base {
         bytes32 hash = _getValidationTypedHash(_alice, calls);
         bytes memory validatorData = constructValidatorData(
             _alice,
+            _aliceEOA,
             _alicePk,
             hash
         );

@@ -94,7 +94,7 @@ contract ValidatorTest is Base {
 
     function test_addValidator_reverts_for_duplicate() public {
         // Alice already has a validator from initialization, try to add duplicate
-        bytes32 keyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 keyHash = keccak256(abi.encodePacked(_aliceEOA));
 
         // Verify Alice has the validator first
         assertTrue(IOwnersManager(_alice).hasOwner(keyHash));
@@ -155,7 +155,7 @@ contract ValidatorTest is Base {
 
     function test_validator_management_succeeds() public {
         // Alice already has a validator from initialization
-        bytes32 keyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 keyHash = keccak256(abi.encodePacked(_aliceEOA));
 
         // Pack settings before setting expectRevert
         uint256 settings = OwnersManager(_alice).packSettings(
@@ -405,7 +405,7 @@ contract ValidatorTest is Base {
 
         // Should succeed without errors
         // No signers should be set
-        bytes32 testKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 testKeyHash = keccak256(abi.encodePacked(_aliceEOA));
         assertEq(
             IOwnersManager(newWallet).ownerValidators(testKeyHash),
             address(0)
@@ -787,7 +787,7 @@ contract ValidatorTest is Base {
         vm.prank(freshWallet);
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
-            keyHash: keccak256(abi.encodePacked(_alice)),
+            keyHash: keccak256(abi.encodePacked(_aliceEOA)),
             validator: address(_ecdsaValidator)
         });
         ISmartWallet(freshWallet).initialize(initialOwners);
@@ -1061,7 +1061,7 @@ contract ValidatorTest is Base {
     function test_validateUserOp_signature_too_short() public {
         vm.prank(_alice);
 
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
             keyHash: aliceKeyHash,
@@ -1097,7 +1097,7 @@ contract ValidatorTest is Base {
     function test_validateUserOp_empty_signature() public {
         vm.prank(_alice);
 
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
             keyHash: aliceKeyHash,
@@ -1131,7 +1131,7 @@ contract ValidatorTest is Base {
     function test_validateUserOp_malformed_keyhash_in_signature() public {
         vm.prank(_alice);
 
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
             keyHash: aliceKeyHash,

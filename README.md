@@ -1,106 +1,100 @@
-# Wallet Core - EIP-7702 Smart Contract Wallet
+# Smart Wallet - EIP-4337 Account Abstraction Wallet
 
-A modular and secure implementation of EIP-7702 smart contract wallet with multiple execution types and advanced security features.
+A modular and secure smart contract wallet implementation supporting EIP-4337 account abstraction with advanced security features and multiple validator types.
 
 ## Overview
 
 This implementation provides a flexible smart contract wallet that supports:
 
-- EIP-7702 Type 4 initialization
-- Three distinct execution types
-- Advanced security features including replay protection and batched transactions
-- Modular architecture with separate storage and execution logic
+- EIP-4337 Account Abstraction standard
+- Multiple execution methods (direct, relayer-based, UserOperation)
+- Advanced validator system (ECDSA, Passkey, External validators)
+- Modular architecture with managers and upgradeable proxy pattern
+- Comprehensive permission system with admin controls
 
 ## Core Features
 
-### 1. Set Code & Initialize
+### 1. Factory Pattern Deployment
 
-The wallet setup involves two main steps:
+The wallet deployment uses a factory pattern:
 
-1. **Set Code**:
+1. **Smart Wallet Factory**:
+   - Creates deterministic wallet addresses using CREATE2
+   - Deploys proxy contracts pointing to implementation
+   - Supports batch wallet creation
 
-   - Submits an EIP-7702 Type 4 transaction
-   - Assigns smart contract code to an EOA (Externally Owned Address)
-   - Transforms the EOA into a smart contract wallet
+2. **Initialize Wallet**:
+   - Calls the `initialize` function with initial owners
+   - Sets up validator mappings and permissions
+   - Configures admin settings and expiration rules
 
-2. **Initialize Contract**:
-   - Calls the `initialize` function in Wallet Core
-   - Sets up proper configuration and state
-   - Creates and links Core Storage for nonce management
+### 2. Execution Methods
 
-### 2. Execution Types
+#### Method 1: Direct Execution
 
-#### Type 1: Execute From Self
+- Direct execution from wallet owners
+- Uses `execute(Call[] calls)` function
+- Verifies caller is registered owner with valid permissions
+- Supports batched transactions with hook validation
+- Most gas-efficient for owner operations
 
-- Direct execution from the wallet itself
-- Uses `executeFromSelf` function
-- Verifies transaction through self-check
-- Supports batched transactions via `_batchCall`
-- Most gas-efficient execution type
+#### Method 2: Relayer-Based Execution
 
-#### Type 2: Execute From Relayer
+1. **Signature-Based Authorization**:
+   - Owner signs transaction data off-chain
+   - Relayer submits via `executeWithRelayer`
+   - Supports nonce management and expiry validation
+   - Compatible with meta-transactions
 
-1. **Validator Setup**:
-   - User adds validator to wallet core
-   - Validator signs transaction off-chain with nonce
-2. **Execution Flow**:
-   - User provides off-chain signature
-   - Relayer submits transaction via `executeWithValidation`
-   - Core Storage manages nonce for replay protection
-   - ECDSA validation ensures signature authenticity
+2. **Validation Flow**:
+   - Extract keyHash from validator data
+   - Lookup registered validator for keyHash
+   - Validate signature using appropriate validator
+   - Execute calls if validation succeeds
 
-#### Type 3: Execute From Executor
+#### Method 3: EIP-4337 UserOperation
 
-1. **Session-Based Execution**:
-
-   - No pre-encoded calls needed
-   - Uses hook-based validation (`preHook` and `postHook`)
-   - Single signature authorizes entire session
-
-2. **Session Parameters**:
-   - `session_id`
-   - `validAfter`
-   - `validUntil`
-   - `executor`
-   - `validator`
-   - `preCheck`
-   - `postCheck`
-   - `signature`
+- Full EIP-4337 Account Abstraction support
+- Uses `executeUserOp` for EntryPoint integration
+- Supports gas abstraction and paymaster integration
+- Compatible with standard AA infrastructure
 
 ## Architecture
 
-The implementation follows a modular design:
+The implementation follows a modular manager-based design:
 
-- `SmartWallet`: Main contract handling execution logic
-- `Core Storage`: Manages nonces and validation states
-- `ExecutionLogic`: Handles different execution types
-- `ValidationLogic`: Manages signature and session validation
-- `ExecutorLogic`: Implements session-based execution with hooks
-- `FallbackHandler`: Provides token receiving capabilities
+- `SmartWallet`: Main wallet contract inheriting all managers
+- `OwnersManager`: Manages owner registration, settings, and permissions
+- `NonceManager`: Handles nonce validation and management
+- `ValidateManager`: Signature validation with multiple validator types
+- `ExecuteManager`: Low-level call execution functionality
+- `AllowanceManager`: Token allowance and spending controls
+- `FallbackHandler`: Token receiving and standard interface support
 
 ## Deployed Contracts
 
-### Ethereum Mainnet
+### Local Development (Anvil)
 
-| Contract    | Address                                      |
-| ----------- | -------------------------------------------- |
-| SmartWallet | `0x80296FF8D1ED46f8e3C7992664D13B833504c2Bb` |
-| CoreStorage | `0x7DAF91DFe55FcAb363416A6E3bceb3Da34ff1d30` |
-
-### Sepolia Testnet
-
-| Contract    | Address                                      |
-| ----------- | -------------------------------------------- |
-| SmartWallet | `0x80296FF8D1ED46f8e3C7992664D13B833504c2Bb` |
-| CoreStorage | `0x7DAF91DFe55FcAb363416A6E3bceb3Da34ff1d30` |
+| Contract | Address | Description |
+| -------- | ------- | ----------- |
+| DeployFactory | `0x890a66d57ce06d6b41f9e848ea58588fed8e6667` | Contract factory for deterministic deployments |
+| PasskeyValidator | `0x14e162dc1efe884946b8443a54871357c906c771` | WebAuthn/Passkey signature validator |
 
 ### XLayer Mainnet
 
-| Contract    | Address                                      |
-| ----------- | -------------------------------------------- |
-| WalletCore  | `0xe5c170b631d93edced30f654f58551dcfbee8d72` |
-| SmartWalletFactory | `0x0e9c0de106c0193f40a87b3cb45cd6e81ad5a895` |
-| ECDSAValidator | `0x54ca77dabd3cf025ef08545189f298023e7dc2f6` |
+| Contract | Address | Description |
+| -------- | ------- | ----------- |
+| SmartWallet | `0xe5c170b631d93edced30f654f58551dcfbee8d72` | Main wallet implementation |
+| SmartWalletFactory | `0x0e9c0de106c0193f40a87b3cb45cd6e81ad5a895` | Factory for wallet deployment |
+| ECDSAValidator | `0x54ca77dabd3cf025ef08545189f298023e7dc2f6` | ECDSA signature validator |
+
+### Validator Addresses
+
+| Validator Type | Built-in Address | Description |
+| -------------- | --------------- | ----------- |
+| ECDSA | `Static.ECDSA_VALIDATOR_ADDRESS` | Built-in ECDSA validation |
+| Passkey | `Static.PASSKEY_VALIDATOR_ADDRESS` | Built-in P256/WebAuthn validation |
+| External | Custom contracts | User-deployed validator contracts |
 
 ## Usage
 
@@ -118,9 +112,16 @@ RPC_URL=https://rpc.xlayer.tech
 forge script scripts/DeployInit.sol --rpc-url $RPC_URL --legacy --broadcast
 ```
 
-### 1. Set Code & Initialize Wallet
+Deploy and initialize 7702 wallet on local
+```bash
+# Start local blockchain node with 7702 support
+anvil --hardfork prague
+./initialise.sh
+```
 
-Deploy and initialize your ERC-7702 wallet:
+### 1. Deploy & Initialize Wallet
+
+Deploy a new smart wallet using the factory:
 
 ```bash
 npx hardhat run scripts/smoke_test/1-setCodeAndInitialize.ts --network <NETWORK>
@@ -128,8 +129,9 @@ npx hardhat run scripts/smoke_test/1-setCodeAndInitialize.ts --network <NETWORK>
 
 This script:
 
-- Sets up the EOA as a smart contract wallet
-- Initializes core storage and configuration
+- Creates a new wallet instance via SmartWalletFactory
+- Initializes with initial owners and validators
+- Sets up permissions and admin settings
 
 ### 2. Execute Direct Transactions
 
@@ -153,16 +155,20 @@ Send transactions through a relayer:
 forge script scripts/smoke_test/3-sendTxsAsRelayer.sol --rpc-url <RPC_URL> --broadcast
 ```
 
-This shows:
+This demonstrates:
 
-- Relayer-based transaction execution
-- Signature validation
-- Nonce management
-- Gas-efficient transaction batching
+- Off-chain signature generation with proper keyHash format
+- Relayer-based transaction execution via `executeWithRelayer`
+- Signature validation using registered validators
+- Nonce management and replay protection
+- Support for chain-agnostic signatures
 
 ## Security Considerations
 
-- All execution types include proper validation
-- Nonce management prevents replay attacks
-- Session-based execution can be revoked
-- Hook-based validation provides additional security layers
+- Multi-layered validation system with external validator support
+- Comprehensive nonce management prevents replay attacks
+- Admin privilege controls with expiration mechanisms
+- Hook-based validation for additional security checks
+- Owner permission system with granular access controls
+- Built-in support for ECDSA and Passkey (WebAuthn) validation
+- Upgradeable implementation with authorized upgrade controls

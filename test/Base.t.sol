@@ -28,7 +28,8 @@ contract Base is Test {
     address constant ENTRYPOINT_ADDRESS =
         0x0000000071727De22E5E9d8BAf0edAc6f37da032;
 
-    address payable internal _alice;
+    address payable internal _alice; // Alice's smart wallet address
+    address internal _aliceEOA; // Alice's original EOA address
     uint256 internal _alicePk;
     address internal _bob;
     uint256 internal _bobPk;
@@ -53,11 +54,7 @@ contract Base is Test {
     );
 
     function setUp() public virtual {
-        (address aliceAddr, uint256 alicePk) = makeAddrAndKey("alice");
-
-        // Make _alice payable so we can cast to SmartWallet (which has payable fallback functions) in relevant unit tests
-        _alice = payable(aliceAddr);
-        _alicePk = alicePk;
+        (_aliceEOA, _alicePk) = makeAddrAndKey("alice");
         (_bob, _bobPk) = makeAddrAndKey("bob");
 
         // Deploy EntryPoint and place it at the standard address
@@ -76,19 +73,23 @@ contract Base is Test {
         (_ecdsaValidator, _smartWallet, _factory, ) = DeployInitHelper
             .deployContracts(deployFactory, deployFactorySalt);
 
-        _setCodeToEOA(address(_smartWallet), _alice);
-
-        deal(_alice, 10 ether);
-
-        // Alice initializes the account with herself as admin
-        vm.prank(_alice);
+        // Use factory to create a wallet for Alice instead of _setCodeToEOA
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
-            keyHash: keccak256(abi.encodePacked(_alice)),
+            keyHash: keccak256(abi.encodePacked(_aliceEOA)),
             validator: address(_ecdsaValidator)
         });
-        ISmartWallet(_alice).initialize(initialOwners);
-        vm.stopPrank();
+
+        // Create wallet using factory with deterministic address
+        _alice = payable(
+            _factory.createAccount(
+                address(_smartWallet),
+                initialOwners,
+                0 // salt
+            )
+        );
+
+        deal(_alice, 10 ether);
     }
 
     function _setCodeToEOA(address contractCode, address eoa) internal {
@@ -197,32 +198,10 @@ contract Base is Test {
         return abi.encodePacked(r, s, v);
     }
 
-    function _addValidator(address signer) internal returns (address) {
-        // Use the signer's address as the keyHash for testing
-        bytes32 keyHash = keccak256(abi.encodePacked(signer));
-
-        // Check if validator already exists (alice is initialized with a validator)
-        if (IOwnersManager(signer).hasOwner(keyHash)) {
-            return address(_ecdsaValidator);
-        }
-
-        _executeAddValidator(
-            signer,
-            keyHash,
-            address(_ecdsaValidator),
-            false,
-            0,
-            address(0)
-        );
-
-        return address(_ecdsaValidator);
-    }
-
     function _addValidator(
         address account,
         address signer
     ) internal returns (address) {
-        // Use the signer's address as the keyHash for testing
         bytes32 keyHash = keccak256(abi.encodePacked(signer));
 
         // Check if validator already exists
@@ -265,7 +244,7 @@ contract Base is Test {
     }
 
     function constructValidatorData(
-        address /* wallet */,
+        address, // wallet (unused)
         address signer,
         uint256 privateKey,
         bytes32 hash

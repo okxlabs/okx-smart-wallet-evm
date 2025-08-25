@@ -21,12 +21,13 @@ contract ValidatorEnumerationTest is Base {
         // Alice starts with 1 validator from initialization
         assertEq(IOwnersManager(_alice).ownerCount(), 1);
         assertTrue(
-            IOwnersManager(_alice).hasOwner(keccak256(abi.encodePacked(_alice)))
+            IOwnersManager(_alice).hasOwner(
+                keccak256(abi.encodePacked(_aliceEOA))
+            )
         );
 
-        // _addValidator will return early since alice already has a validator
-        _addValidator(_alice);
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        // Alice already has a validator from initialization
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
 
         assertEq(IOwnersManager(_alice).ownerCount(), 1);
         assertTrue(IOwnersManager(_alice).hasOwner(aliceKeyHash));
@@ -75,9 +76,7 @@ contract ValidatorEnumerationTest is Base {
     }
 
     function test_ownerAt_reverts_on_out_of_bounds() public {
-        // Add one validator
-        _addValidator(_alice);
-
+        // Alice already has one validator from initialization
         // This should work
         IOwnersManager(_alice).ownerAt(0);
 
