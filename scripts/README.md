@@ -2,6 +2,18 @@
 
 This directory contains scripts migrated and adapted from the SmartAccount project to work with the OKX Smart Wallet architecture.
 
+## Local Testing
+
+```shell
+# Start local blockchain node with 7702 support
+anvil --hardfork prague
+# Deploy the DeployFactory contract
+./scripts/smoke_test/deploy-factory.sh
+# Check your .env file
+# Deploy AA contracts
+forge script scripts/DeployInit.sol --rpc-url http://localhost:8545 --broadcast
+```
+
 ## Files Overview
 
 ### Core Scripts
@@ -47,6 +59,3 @@ The scripts have been adapted to work with OKX Smart Wallet's architecture, whic
    - Removed SmartAccount-specific helper contracts
    - Updated import statements to match OKX project structure
    - Fixed ethers.js import patterns
-
-## Setup and Configuration
-TODO
