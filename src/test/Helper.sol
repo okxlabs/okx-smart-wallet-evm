@@ -6,6 +6,8 @@ import {PackedUserOperation} from "account-abstraction/interfaces/IAccount.sol";
 import {UserOperationLib} from "account-abstraction/core/UserOperationLib.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {EntryPoint} from "account-abstraction/core/EntryPoint.sol";
+import {LibClone} from "solady/utils/LibClone.sol";
+import {InitialOwner} from "../Types.sol";
 // import {MerkleProof} from "openzeppelin-contracts/contracts/utils/cryptography/MerkleProof.sol";
 
 library HelperLib {
@@ -184,6 +186,40 @@ contract Helper {
         );
         bytes memory sig = abi.encode(auth, new bytes(0));
         return abi.encodePacked(abi.encode(x, y), sig);
+    }
+
+    function getProxyInitCode(
+        address implementation,
+        bytes memory args
+    ) external pure returns (bytes memory) {
+        return LibClone.initCodeERC1967(implementation, args);
+    }
+
+    function getProxyInitCodeHash(
+        address implementation
+    ) external pure returns (bytes32) {
+        return LibClone.initCodeHashERC1967(implementation);
+    }
+
+    function predictDeterministicAddress(
+        address implementation,
+        InitialOwner[] calldata initialOwners,
+        uint256 salt,
+        address factory
+    ) external pure returns (address) {
+        return
+            LibClone.predictDeterministicAddressERC1967(
+                implementation,
+                _getSalt(initialOwners, salt),
+                factory
+            );
+    }
+
+    function _getSalt(
+        InitialOwner[] calldata initialOwners,
+        uint256 salt
+    ) internal pure returns (bytes32) {
+        return keccak256(abi.encode(initialOwners, salt));
     }
 }
 
