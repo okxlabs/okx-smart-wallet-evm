@@ -842,18 +842,16 @@ contract ValidateUserOpTest is Base {
 
         uint256 missingAccountFunds = 100;
 
-        // Should revert with InvalidNonceKey for unsupported selector
-        vm.prank(ENTRYPOINT_ADDRESS);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                Errors.InvalidNonceKey.selector,
-                Static.CHAIN_LESS_NONCE_KEY
-            )
-        );
-        IERC4337Account(account).validateUserOp(
-            userOp,
-            userOpHash,
-            missingAccountFunds
+        // Should return SIG_VALIDATION_FAILED for unsupported selector
+        assertEq(
+            _testValidateUserOp(
+                account,
+                userOp,
+                userOpHash,
+                missingAccountFunds
+            ),
+            Static.SIG_VALIDATION_FAILED,
+            "Should return validation failed for unsupported selector with chainless nonce"
         );
     }
 
