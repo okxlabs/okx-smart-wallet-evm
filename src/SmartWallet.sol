@@ -174,6 +174,7 @@ contract SmartWallet is
      * 2) "Successful simulation" means both validation and the sponsorship call passed.
      *    Any failure in the user’s batch calls is then captured in `errorData` and surfaced inside the `SimulateExecution` revert.
      * @param batchedCall BatchedCall struct containing calls, nonce, and expiry
+     * @param validator Validator address intended to be used for validation during execution
      * @param validatorData Encoded data containing keyHash and signature: abi.encodePacked(keyHash, signature)
      */
     function simulateExecuteWithRelayer(
