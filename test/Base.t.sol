@@ -7,7 +7,7 @@ import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
 import {OwnersManager} from "src/OwnersManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
-import {SmartWallet} from "src/SmartWallet.sol";
+import {OKXSmartWalletEntry} from "src/OKXSmartWalletEntry.sol";
 import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 import {DeployInitHelper, DeployFactory} from "scripts/DeployInitHelper.sol";
@@ -37,7 +37,7 @@ contract Base is Test {
     uint256 internal _passkeyPubY;
     uint256 internal _passkeyPrivateKey;
     ECDSAValidator internal _ecdsaValidator; // Shared validator instance
-    SmartWallet internal _smartWallet;
+    OKXSmartWalletEntry internal _smartWallet;
     SmartWalletFactory internal _factory;
     DeployFactory public deployFactory;
     EntryPoint internal _entryPoint; // EntryPoint instance
@@ -70,7 +70,7 @@ contract Base is Test {
         deployFactory = new DeployFactory();
         bytes32 deployFactorySalt = vm.envBytes32("DEPLOY_FACTORY_SALT");
 
-        (_ecdsaValidator, _smartWallet, _factory, ) = DeployInitHelper
+        (_ecdsaValidator, , _smartWallet, _factory, ) = DeployInitHelper
             .deployContracts(deployFactory, deployFactorySalt);
 
         // Use factory to create a wallet for Alice instead of _setCodeToEOA
