@@ -52,7 +52,7 @@ contract SmartWalletFactory is
     /// @param implementation implementation address
     /// @param initialOwners initial owners
     /// @param salt salt
-    /// @param calls calls
+    /// @param batchedCall batched call
     /// @param validatorData validator data
     function createAccountWithCall(
         address implementation,
