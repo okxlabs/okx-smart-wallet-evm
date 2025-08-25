@@ -237,7 +237,6 @@ contract PasskeyValidatorTest is Base {
     function test_validateSignature_with_merkle_proof_single() public view {
         // Create a simple Merkle proof - in real scenario, messageHash would be a leaf
         // For testing, we'll create a proof where messageHash is already the root
-        return;
         bytes32[] memory proofs = new bytes32[](1);
         proofs[0] = keccak256("123");
         bytes32 rootHash = HelperLib.getMerkleProofRootHash(

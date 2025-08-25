@@ -8,7 +8,7 @@ import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {EntryPoint} from "account-abstraction/core/EntryPoint.sol";
 import {LibClone} from "solady/utils/LibClone.sol";
 import {InitialOwner} from "../Types.sol";
-// import {MerkleProof} from "openzeppelin-contracts/contracts/utils/cryptography/MerkleProof.sol";
+import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 library HelperLib {
     uint256 public constant CHALLENGE_LOCATION = 23;
@@ -105,8 +105,7 @@ library HelperLib {
         bytes32[] memory proofs,
         bytes32 leaf
     ) internal pure returns (bytes32) {
-        // return MerkleProof.processProof(proofs, leaf);
-        return bytes32(0);
+        return MerkleProof.processProof(proofs, leaf);
     }
 }
 
