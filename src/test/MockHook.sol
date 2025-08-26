@@ -18,8 +18,13 @@ contract MockHook is IHook {
         address token = calls.length > 0 ? calls[0].target : address(0);
         uint256 maxTotalAmount = 100 ether; // Hardcoded limit for testing
 
-        uint256 initialBalance = IERC20(token).balanceOf(msg.sender);
+        uint256 initialBalance = 0;
         uint256 totalAmount = 0;
+
+        // Check if there is a valid token address
+        if (token != address(0)) {
+            initialBalance = IERC20(token).balanceOf(msg.sender);
+        }
 
         for (uint256 i = 0; i < calls.length; i++) {
             require(calls[i].target == token, "Invalid token address");
@@ -50,11 +55,14 @@ contract MockHook is IHook {
     ) external payable {
         (address token, uint256 initialBalance, uint256 totalAmount) = abi
             .decode(preHookRet, (address, uint256, uint256));
-
-        uint256 finalBalance = IERC20(token).balanceOf(msg.sender);
-        require(
-            initialBalance - finalBalance == totalAmount,
-            "Balance mismatch: transfer amounts do not match"
-        );
+        
+        // Include token address check otherwise empty calls will revert
+        if (token != address(0)) {
+            uint256 finalBalance = IERC20(token).balanceOf(msg.sender);
+            require(
+                initialBalance - finalBalance == totalAmount,
+                "Balance mismatch: transfer amounts do not match"
+            );
+        }
     }
 }

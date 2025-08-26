@@ -234,7 +234,8 @@ contract SmartWallet is
             keccak256(abi.encodePacked(address(this))) ||
             isAdmin(settings);
 
-        if (hookAddress != address(0)) {
+        // Only call hook if it exists and settings are not expired
+        if (hookAddress != address(0) && !isSettingsExpired(settings)) {
             ret = IHook(hookAddress).preCheck(calls, msg.sender);
         }
 
@@ -245,7 +246,8 @@ contract SmartWallet is
             _call(calls[i]);
         }
 
-        if (hookAddress != address(0)) {
+        // Only call postCheck if hook exists and settings are not expired
+        if (hookAddress != address(0) && !isSettingsExpired(settings)) {
             IHook(hookAddress).postCheck(ret, msg.sender);
         }
     }
