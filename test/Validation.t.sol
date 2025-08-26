@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import {Base} from "./Base.t.sol";
 import {Errors} from "src/libraries/Errors.sol";
-import {Call, BatchedCall} from "src/Types.sol";
+import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
@@ -12,6 +12,8 @@ import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 import {Static} from "src/libraries/Static.sol";
 import {ERC712} from "src/ERC712.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
+import {SmartWallet} from "src/SmartWallet.sol";
+import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
 
 contract ValidationTest is Base {
     event NonceConsumed(uint192 key, uint64 nonce);
@@ -247,6 +249,253 @@ contract ValidationTest is Base {
         vm.prank(_bob);
         ISmartWallet(_alice).execute(calls);
         assertEq(address(_bob).balance, 1 ether);
+    }
+
+    function test_executeWithRelayer_reverts_for_expired_batchedCall() public {
+        // Create a BatchedCall that will expire in 1 second
+        Call[] memory calls = constructCallsData();
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: 0,
+            expiry: uint48(block.timestamp + 1)
+        });
+
+        // Sign the BatchedCall
+        bytes32 hash = ERC712(_alice).hashTypedData(
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+        );
+        bytes memory validatorData = constructValidatorData(
+            _alice,
+            _aliceEOA,
+            _alicePk,
+            hash
+        );
+
+        // Fast forward time by 2 seconds to make the BatchedCall expired
+        vm.warp(block.timestamp + 2);
+
+        // Should revert with ExpiryPassed error
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Errors.ExpiryPassed.selector,
+                batchedCall.expiry
+            )
+        );
+        vm.prank(_alice);
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+    }
+
+    function test_executeWithRelayer_allows_zero_expiry_batchedCall() public {
+        // Create a BatchedCall with expiry = 0 (never expires)
+        Call[] memory calls = constructCallsData();
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: 0,
+            expiry: 0
+        });
+
+        // Sign the BatchedCall
+        bytes32 hash = ERC712(_alice).hashTypedData(
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+        );
+        bytes memory validatorData = constructValidatorData(
+            _alice,
+            _aliceEOA,
+            _alicePk,
+            hash
+        );
+
+        // Fast forward time by 365 days
+        vm.warp(block.timestamp + 365 days);
+
+        // Should still execute successfully since expiry = 0 means never expires
+        vm.prank(_alice);
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+
+        // Verify the transaction was successful
+        assertEq(address(_bob).balance, 1 ether);
+    }
+
+    function test_signature_replay_protection_across_independent_deployments()
+        public
+    {
+        // Deploy a completely independent SmartWallet and Factory
+        // This simulates a third party deploying our open-sourced contracts
+
+        // Deploy a new SmartWallet implementation
+        SmartWallet independentImplementation = new SmartWallet();
+
+        // Deploy a new Factory (constructor disables initializers)
+        SmartWalletFactory independentFactory = new SmartWalletFactory();
+
+        // Create a wallet using the independent factory with same pubKeyHash as alice
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: keccak256(abi.encodePacked(_aliceEOA)), // Same pubKeyHash
+            validator: address(_ecdsaValidator) // Same validator type
+        });
+
+        address independentWallet = independentFactory.createAccount(
+            address(independentImplementation),
+            initialOwners,
+            0 // Same salt as alice's wallet for maximum similarity
+        );
+
+        // Fund the independent wallet
+        vm.deal(independentWallet, 10 ether);
+
+        // Create a BatchedCall and sign it for alice's original wallet
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _bob, value: 1 ether, data: ""});
+
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: 0,
+            expiry: 0
+        });
+
+        // Sign for the ORIGINAL alice wallet (from Base.t.sol)
+        bytes32 hashForAlice = ERC712(_alice).hashTypedData(
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+        );
+        bytes memory validatorDataForAlice = constructValidatorData(
+            _alice,
+            _aliceEOA,
+            _alicePk,
+            hashForAlice
+        );
+
+        // Execute on alice's original wallet - should succeed
+        address relayer = makeAddr("relayer");
+        vm.prank(relayer);
+        ISmartWallet(_alice).executeWithRelayer(
+            batchedCall,
+            validatorDataForAlice
+        );
+        assertEq(_bob.balance, 1 ether);
+
+        // Try to replay alice's signature on the independent wallet - should FAIL
+        // Even though:
+        // 1. Same implementation bytecode
+        // 2. Same pubKeyHash installed
+        // 3. Same validator type
+        // The signature is bound to alice's specific wallet address
+        vm.prank(relayer);
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+        );
+        ISmartWallet(independentWallet).executeWithRelayer(
+            batchedCall,
+            validatorDataForAlice
+        );
+
+        // Verify bob didn't receive additional funds
+        assertEq(_bob.balance, 1 ether);
+
+        // Now create proper signature for the independent wallet
+        bytes32 hashForIndependent = ERC712(independentWallet).hashTypedData(
+            BatchedCallLib.hash(batchedCall, address(independentImplementation))
+        );
+        bytes memory validatorDataForIndependent = constructValidatorData(
+            independentWallet,
+            _aliceEOA,
+            _alicePk,
+            hashForIndependent
+        );
+
+        // This should succeed with proper signature
+        vm.prank(relayer);
+        ISmartWallet(independentWallet).executeWithRelayer(
+            batchedCall,
+            validatorDataForIndependent
+        );
+        assertEq(_bob.balance, 2 ether);
+    }
+
+    function test_signature_replay_protection_across_different_wallets()
+        public
+    {
+        // Deploy a second SmartWallet with the same bytecode but different address
+        // This simulates a third party deploying our open-sourced contract
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: keccak256(abi.encodePacked(_aliceEOA)), // Same pubKeyHash as alice's wallet
+            validator: address(_ecdsaValidator)
+        });
+
+        // Deploy second wallet with different salt
+        address secondWallet = _factory.createAccount(
+            address(_smartWallet),
+            initialOwners,
+            999 // Different salt to get different address
+        );
+
+        // Fund the second wallet
+        vm.deal(secondWallet, 10 ether);
+
+        // Create a BatchedCall for the first wallet
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _bob, value: 1 ether, data: ""});
+
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: 0,
+            expiry: 0
+        });
+
+        // Sign the BatchedCall for the FIRST wallet (_alice)
+        // Note: The hash includes the wallet address via domain separator
+        bytes32 hash = ERC712(_alice).hashTypedData(
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+        );
+        bytes memory validatorData = constructValidatorData(
+            _alice,
+            _aliceEOA,
+            _alicePk,
+            hash
+        );
+
+        // Create a relayer address
+        address relayer = makeAddr("relayer");
+
+        // Execute on the first wallet - should succeed
+        vm.prank(relayer);
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        assertEq(_bob.balance, 1 ether);
+
+        // Try to replay the same signature on the second wallet - should fail
+        // Even though both wallets have the same pubKeyHash installed,
+        // the signature is bound to the specific wallet address
+        vm.prank(relayer);
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+        );
+        ISmartWallet(secondWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
+
+        // Verify that bob didn't receive additional funds
+        assertEq(_bob.balance, 1 ether);
+
+        // Now create a proper signature for the second wallet
+        bytes32 hashForSecondWallet = ERC712(secondWallet).hashTypedData(
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+        );
+        bytes memory validatorDataForSecondWallet = constructValidatorData(
+            secondWallet,
+            _aliceEOA,
+            _alicePk,
+            hashForSecondWallet
+        );
+
+        // This should succeed because it's properly signed for the second wallet
+        vm.prank(relayer);
+        ISmartWallet(secondWallet).executeWithRelayer(
+            batchedCall,
+            validatorDataForSecondWallet
+        );
+        assertEq(_bob.balance, 2 ether);
     }
 
     function test_isValidSignature_fails_for_removed_validator() public {

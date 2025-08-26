@@ -3,20 +3,14 @@ pragma solidity ^0.8.29;
 
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
-/**
- * @dev Contract that handles token receiving functionality, implementing both IERC165 and IModule interfaces.
- * Supports ERC721 and ERC1155 token receiving through standard interfaces.
- */
+/// @dev Contract that handles token receiving functionality, implementing both IERC165 and IModule interfaces.
+/// Supports ERC721 and ERC1155 token receiving through standard interfaces.
 abstract contract FallbackHandler is IERC165 {
-    /**
-     * @dev Allows the contract to receive ETH
-     */
+    /// @dev Allows the contract to receive ETH
     receive() external payable virtual {}
 
-    /**
-     * @dev Fallback function that handles token receiving callbacks
-     * Returns the function selector for ERC721 and ERC1155 token receiving functions
-     */
+    /// @dev Fallback function that handles token receiving callbacks
+    /// Returns the function selector for ERC721 and ERC1155 token receiving functions
     fallback() external payable {
         assembly {
             let s := shr(224, calldataload(0))
@@ -32,11 +26,9 @@ abstract contract FallbackHandler is IERC165 {
         revert();
     }
 
-    /**
-     * @dev Implementation of IERC165 interface detection
-     * @param interfaceId The interface identifier to check
-     * @return bool True if the contract supports the interface
-     */
+    /// @dev Implementation of IERC165 interface detection
+    /// @param interfaceId The interface identifier to check
+    /// @return bool True if the contract supports the interface
     function supportsInterface(
         bytes4 interfaceId
     ) external view virtual override returns (bool) {

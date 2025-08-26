@@ -67,11 +67,9 @@ contract SmartWallet is
         _;
     }
 
-    /**
-     * @notice Initializes the wallet core with initial owners
-     * @dev Storage is now integrated directly into SmartWallet
-     * @param initialOwners Array of tuples containing keyHash and validator address pairs
-     */
+    /// @notice Initializes the wallet core with initial owners
+    /// @dev Storage is now integrated directly into SmartWallet
+    /// @param initialOwners Array of tuples containing keyHash and validator address pairs
     function initialize(
         InitialOwner[] calldata initialOwners
     ) external initializer {
@@ -90,11 +88,9 @@ contract SmartWallet is
         }
     }
 
-    /**
-     * @notice Executes multiple contract calls in a single transaction
-     * @dev Only callable by the account itself
-     * @param calls Array of Call structs containing destination address, value, and calldata
-     */
+    /// @notice Executes multiple contract calls in a single transaction
+    /// @dev Only callable by the account itself
+    /// @param calls Array of Call structs containing destination address, value, and calldata
     function execute(Call[] calldata calls) external onlyOwner {
         _batchCall(calls, keccak256(abi.encodePacked(msg.sender)));
     }
@@ -116,14 +112,12 @@ contract SmartWallet is
         _batchCall(calls, keyHash);
     }
 
-    /**
-     * @notice  Executes a validated call and subsequent batch of user's calls sent by a relayer.
-     * @dev
-     * 1) The validator must be previously registered and the validation data must be valid
-     * 2) Validator is looked up from keyHash in validatorData
-     * @param batchedCall BatchedCall struct containing calls, nonce, and expiry
-     * @param validatorData Encoded data containing keyHash and signature: pubkeyHash + signatures
-     */
+    /// @notice  Executes a validated call and subsequent batch of user's calls sent by a relayer.
+    /// @dev
+    /// 1) The validator must be previously registered and the validation data must be valid
+    /// 2) Validator is looked up from keyHash in validatorData
+    /// @param batchedCall BatchedCall struct containing calls, nonce, and expiry
+    /// @param validatorData Encoded data containing keyHash and signature: pubkeyHash + signatures
     function executeWithRelayer(
         BatchedCall calldata batchedCall,
         bytes calldata validatorData
@@ -136,47 +130,35 @@ contract SmartWallet is
         if (!validateAndUpdateNonce(batchedCall.nonce))
             revert Errors.InvalidNonce(batchedCall.nonce);
 
-        uint256 key = batchedCall.nonce >> 64;
+        uint256 nonceKey = batchedCall.nonce >> 64;
         bytes32 dataHash = batchedCall.hash(IMPLEMENTATION);
-        if (key == Static.CHAIN_LESS_NONCE_KEY) {
-            // Check for upgrade calls in the batch and validate implementation has code
-            for (uint256 i; i < batchedCall.calls.length; i++) {
-                bytes memory callData = batchedCall.calls[i].data;
-                if (callData.length < 4) {
-                    revert Errors.InvalidNonceKey(key);
-                }
 
-                bytes4 selector;
-                assembly {
-                    /// @dev truncate to only take the first 4 bytes
-                    selector := mload(add(callData, 32))
-                }
-
-                if (!canSkipChainIdValidation(selector)) {
-                    revert Errors.InvalidNonceKey(key);
-                }
+        if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
+            // Validate all calls are allowed to skip chain ID validation
+            if (!_validateChainlessNonceCallData(batchedCall.calls)) {
+                revert Errors.InvalidNonceKey(nonceKey);
             }
             dataHash = hashTypedDataSansChainId(dataHash);
         } else {
             dataHash = hashTypedData(dataHash);
         }
 
-        // Extract keyHash and validate validator
-        bytes32 keyHash = bytes32(validatorData[:32]);
-        address validator = getVerifiedValidator(keyHash);
-        if (validator == address(0)) revert Errors.InvalidKeyHash(keyHash);
+        // Extract pubKeyHash and validate validator
+        bytes32 pubKeyHash = bytes32(validatorData[:32]);
+        address validator = getVerifiedValidator(pubKeyHash);
+        if (validator == address(0)) revert Errors.InvalidKeyHash(pubKeyHash);
 
         // Validate signature
         if (
             !_validateSignature(
                 validator,
-                keyHash,
+                pubKeyHash,
                 dataHash,
                 validatorData[32:]
             )
         ) revert Errors.InvalidSignature();
 
-        _batchCall(batchedCall.calls, keyHash);
+        _batchCall(batchedCall.calls, pubKeyHash);
 
         emit ExecuteSuccessEvent(
             keccak256(abi.encode(batchedCall.calls)),
@@ -185,16 +167,14 @@ contract SmartWallet is
         );
     }
 
-    /**
-     * @notice Simulate a sponsored transaction, measuring gas costs for validation and execution, then reverts with detailed metrics.
-     * @dev Always reverts with `Errors.SimulateExecution` once validation and the sponsor call succeed.
-     * 1) If the simulation fails during validation or the sponsor call, those other errors bubble up directly instead.
-     * 2) "Successful simulation" means both validation and the sponsorship call passed.
-     *    Any failure in the user’s batch calls is then captured in `errorData` and surfaced inside the `SimulateExecution` revert.
-     * @param batchedCall BatchedCall struct containing calls, nonce, and expiry
-     * @param validator Validator address intended to be used for validation during execution
-     * @param validatorData Encoded data containing keyHash and signature: abi.encodePacked(keyHash, signature)
-     */
+    /// @notice Simulate a sponsored transaction, measuring gas costs for validation and execution, then reverts with detailed metrics.
+    /// @dev Always reverts with `Errors.SimulateExecution` once validation and the sponsor call succeed.
+    /// 1) If the simulation fails during validation or the sponsor call, those other errors bubble up directly instead.
+    /// 2) "Successful simulation" means both validation and the sponsorship call passed.
+    ///    Any failure in the user's batch calls is then captured in `errorData` and surfaced inside the `SimulateExecution` revert.
+    /// @param batchedCall BatchedCall struct containing calls, nonce, and expiry
+    /// @param validator Validator address intended to be used for validation during execution
+    /// @param validatorData Encoded data containing keyHash and signature: abi.encodePacked(keyHash, signature)
     function simulateExecuteWithRelayer(
         BatchedCall calldata batchedCall,
         address validator,
@@ -210,19 +190,19 @@ contract SmartWallet is
             // revert Errors.InvalidNonce(batchedCall.nonce);
         }
 
-        // Extract keyHash and validate validator
-        bytes32 keyHash = bytes32(validatorData[:32]);
-        address mockValidator = getVerifiedValidator(keyHash);
+        // Extract pubKeyHash and validate validator
+        bytes32 pubKeyHash = bytes32(validatorData[:32]);
+        address mockValidator = getVerifiedValidator(pubKeyHash);
 
         if (validator == address(0)) {
-            // revert Errors.InvalidKeyHash(keyHash);
+            // revert Errors.InvalidKeyHash(pubKeyHash);
         }
 
         // Validate signature
         if (
             !_validateSignature(
                 validator,
-                keyHash,
+                pubKeyHash,
                 hashTypedData(batchedCall.hash(IMPLEMENTATION)),
                 validatorData[32:]
             )
@@ -230,7 +210,7 @@ contract SmartWallet is
             // revert Errors.InvalidSignature();
         }
 
-        _batchCall(batchedCall.calls, keyHash);
+        _batchCall(batchedCall.calls, pubKeyHash);
 
         emit ExecuteSuccessEvent(
             keccak256(abi.encode(batchedCall.calls)),
@@ -240,11 +220,9 @@ contract SmartWallet is
         revert Errors.SimulateExecution();
     }
 
-    /**
-     * @notice Executes multiple contract calls in a single transaction
-     * @dev Reverts if any of the calls fail
-     * @param calls Array of Call structs containing destination address, value, and calldata
-     */
+    /// @notice Executes multiple contract calls in a single transaction
+    /// @dev Reverts if any of the calls fail
+    /// @param calls Array of Call structs containing destination address, value, and calldata
     function _batchCall(Call[] calldata calls, bytes32 keyHash) internal {
         uint256 settings = ownerSettings[keyHash];
         address hookAddress = getHook(settings);
@@ -284,37 +262,28 @@ contract SmartWallet is
     ) external onlyEntryPoint returns (uint256 validationData) {
         _payPrefund(missingAccountFunds);
 
-        bytes32 keyHash = bytes32(userOp.signature[0:32]);
-        address validator = getVerifiedValidator(keyHash);
+        bytes32 pubKeyHash = bytes32(userOp.signature[0:32]);
+        address validator = getVerifiedValidator(pubKeyHash);
         if (validator == address(0)) return Static.SIG_VALIDATION_FAILED;
 
-        uint256 key = userOp.nonce >> 64;
+        uint256 nonceKey = userOp.nonce >> 64;
 
-        if (key == Static.CHAIN_LESS_NONCE_KEY) {
-            userOpHash = getUserOpHashWithoutChainId(userOp);
-
-            // Check for upgrade calls in the batch and validate implementation has code
+        if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
+            // Decode calls from userOp.callData
             Call[] memory calls = abi.decode(userOp.callData[4:], (Call[]));
-            for (uint256 i; i < calls.length; i++) {
-                bytes memory callData = calls[i].data;
-                if (callData.length < 4) {
-                    return Static.SIG_VALIDATION_FAILED;
-                }
-                bytes4 selector;
-                assembly {
-                    /// @dev truncate to only take the first 4 bytes
-                    selector := mload(add(callData, 32))
-                }
-                if (!canSkipChainIdValidation(selector)) {
-                    return Static.SIG_VALIDATION_FAILED;
-                }
+
+            // Validate all calls are allowed to skip chain ID validation
+            if (!_validateChainlessNonceCallData(calls)) {
+                return Static.SIG_VALIDATION_FAILED;
             }
+
+            userOpHash = getUserOpHashWithoutChainId(userOp);
         }
 
         if (
             !_validateSignature(
                 validator,
-                keyHash,
+                pubKeyHash,
                 userOpHash,
                 userOp.signature[32:]
             )
@@ -322,15 +291,15 @@ contract SmartWallet is
         return validationData;
     }
 
-    /**
-     * @notice Implements EIP-1271 signature validation standard
-     * @dev There are two types of signatures:
-     *      1. 65 bytes: ECDSA signature for EOA compatibility
-     *      2. >65 bytes: abi.encode(keyHash, signature) for validator-based validation
-     * @param _hash The hash of the data to be validated
-     * @param signature The signature to be validated
-     * @return bytes4 Returns Static.MAGIC_VALUE (0x1626ba7e) if valid, Static.INVALID_VALUE (0xffffffff) if invalid
-     */
+    /// @notice Implements EIP-1271 signature validation standard
+    /// @dev There are two types of signatures:
+    ///      1. 65 bytes: ECDSA signature for EOA compatibility
+    ///      2. >65 bytes: abi.encode(keyHash, signature) for validator-based validation
+    /// @dev This function does NOT support chainless validation - all signatures are validated with chain ID
+    ///      to prevent cross-chain replay attacks per EIP-1271 security best practices
+    /// @param _hash The hash of the data to be validated
+    /// @param signature The signature to be validated
+    /// @return bytes4 Returns Static.MAGIC_VALUE (0x1626ba7e) if valid, Static.INVALID_VALUE (0xffffffff) if invalid
     function isValidSignature(
         bytes32 _hash,
         bytes calldata signature
@@ -348,9 +317,9 @@ contract SmartWallet is
             if (recovered == address(this)) return Static.MAGIC_VALUE;
         }
 
-        // Extract keyHash and signature from the input
+        // Extract pubKeyHash and signature from the input
         if (signature.length > 32) {
-            bytes32 keyHash = bytes32(signature[:32]);
+            bytes32 pubKeyHash = bytes32(signature[:32]);
 
             // Create bound hash for EIP-1271 validation
             bytes32 boundHash = keccak256(
@@ -359,20 +328,25 @@ contract SmartWallet is
             bytes32 digest = keccak256(abi.encodePacked("\x19\x01", boundHash));
 
             // Use _validateSignature with calldata signature directly
-            address validator = getVerifiedValidator(keyHash);
+            address validator = getVerifiedValidator(pubKeyHash);
             if (validator == address(0)) return Static.INVALID_VALUE;
 
             return
-                _validateSignature(validator, keyHash, digest, signature[32:])
+                _validateSignature(
+                    validator,
+                    pubKeyHash,
+                    digest,
+                    signature[32:]
+                )
                     ? Static.MAGIC_VALUE
                     : Static.INVALID_VALUE;
         }
         return Static.INVALID_VALUE;
     }
 
-    /// @notice Returns whether `functionSelector` can be called in `executeWithoutChainIdValidation`.
-    /// @param functionSelector The function selector to check.
-    /// @return `true` is the function selector is allowed to skip the chain ID validation, else `false`.
+    /// @notice Returns whether `functionSelector` can be called in `executeWithoutChainIdValidation`
+    /// @param functionSelector The function selector to check
+    /// @return `true` if the function selector is allowed to skip the chain ID validation, else `false`
     /// @dev This function is used to skip the chain ID validation for the following functions:
     ///      - addOwner
     ///      - updateOwner
@@ -390,6 +364,32 @@ contract SmartWallet is
             return true;
         }
         return false;
+    }
+
+    /// @notice Validates that all calls in the batch are allowed to skip chain ID validation
+    /// @param calls Array of calls to validate
+    /// @return true if all calls are allowed to skip chain ID validation, false otherwise
+    /// @dev This is used when CHAIN_LESS_NONCE_KEY is used to ensure only allowed operations are performed
+    function _validateChainlessNonceCallData(
+        Call[] memory calls
+    ) internal pure returns (bool) {
+        for (uint256 i; i < calls.length; i++) {
+            bytes memory callData = calls[i].data;
+            if (callData.length < 4) {
+                return false;
+            }
+
+            bytes4 selector;
+            assembly {
+                /// @dev truncate to only take the first 4 bytes
+                selector := mload(add(callData, 32))
+            }
+
+            if (!canSkipChainIdValidation(selector)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// @inheritdoc UUPSUpgradeable

@@ -10,13 +10,11 @@ library BatchedCallLib {
             "BatchedCall(Call[] calls,uint256 nonce,uint48 expiry,address walletImpl)Call(address target,uint256 value,bytes data)"
         );
 
-    /**
-     * @notice Generates an EIP-712 compliant typed data hash for transaction validation
-     * @dev Combines the message hash with the domain separator using EIP-712 standard
-     * @param batchedCall BatchedCall struct containing calls, nonce, and expiry
-     * @param walletImpl The implementation address of the SmartWallet to prevent cross-contract replay attacks
-     * @return bytes32 The EIP-712 typed data hash ready for signing
-     */
+    /// @notice Generates an EIP-712 compliant typed data hash for transaction validation
+    /// @dev Combines the message hash with the domain separator using EIP-712 standard
+    /// @param batchedCall BatchedCall struct containing calls, nonce, and expiry
+    /// @param walletImpl The implementation address of the SmartWallet to prevent cross-contract replay attacks
+    /// @return bytes32 The EIP-712 typed data hash ready for signing
     function hash(
         BatchedCall memory batchedCall,
         address walletImpl

@@ -3,11 +3,9 @@ pragma solidity ^0.8.29;
 
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
-/**
- * @title MerkleProofProcessor
- * @notice Library for processing Merkle proofs in validator data
- * @dev Provides unified Merkle proof processing for all validators that support batch operations
- */
+/// @title MerkleProofProcessor
+/// @notice Library for processing Merkle proofs in validator data
+/// @dev Provides unified Merkle proof processing for all validators that support batch operations
 library MerkleProofProcessor {
     // process merkle proofs and return the root hash
     // if proofs is empty, return the message hash

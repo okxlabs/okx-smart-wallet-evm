@@ -1167,6 +1167,94 @@ contract ValidatorTest is Base {
         );
         assertEq(result, 1 << 96);
     }
+
+    function test_external_validator_revert_returns_false() public {
+        // Deploy a RevertingValidator that always reverts
+        RevertingValidator revertingValidator = new RevertingValidator();
+
+        // Add the reverting validator
+        bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
+        _executeAddValidator(
+            _alice,
+            keyHash,
+            address(revertingValidator),
+            false,
+            0,
+            address(0)
+        );
+
+        // Create a BatchedCall and try to execute with the reverting validator
+        Call[] memory calls = constructCallsData();
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: 0,
+            expiry: 0
+        });
+
+        // Create signature data - the actual signature doesn't matter since validator will revert
+        bytes32 hash = ERC712(_alice).hashTypedData(
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_charliePk, hash);
+        bytes memory validatorData = abi.encodePacked(keyHash, r, s, v);
+
+        // The transaction should revert with InvalidSignature because the validator reverts
+        // and _validateSignature returns false when external validator reverts
+        vm.expectRevert(Errors.InvalidSignature.selector);
+        vm.prank(_alice);
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+    }
+
+    function test_external_validator_returns_false() public {
+        // Deploy a MockValidator and set it to return false
+        MockValidator testMockValidator = new MockValidator();
+        testMockValidator.setValidationResult(false);
+
+        // Add the mock validator
+        bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
+        _executeAddValidator(
+            _alice,
+            keyHash,
+            address(testMockValidator),
+            false,
+            0,
+            address(0)
+        );
+
+        // Create a BatchedCall and try to execute with the failing validator
+        Call[] memory calls = constructCallsData();
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: 0,
+            expiry: 0
+        });
+
+        // Create signature data
+        bytes32 hash = ERC712(_alice).hashTypedData(
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_charliePk, hash);
+        bytes memory validatorData = abi.encodePacked(keyHash, r, s, v);
+
+        // The transaction should revert with InvalidSignature because validator returns false
+        vm.expectRevert(Errors.InvalidSignature.selector);
+        vm.prank(_alice);
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+    }
+}
+
+/**
+ * @title RevertingValidator
+ * @notice Mock validator that always reverts, for testing error handling
+ */
+contract RevertingValidator is IValidator {
+    function validateSignature(
+        bytes32, // keyHash
+        bytes32, // messageHash
+        bytes calldata // validatorData
+    ) external pure returns (bool) {
+        revert("Validator always reverts");
+    }
 }
 
 /**

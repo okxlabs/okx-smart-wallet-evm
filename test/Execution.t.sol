@@ -107,6 +107,46 @@ contract ExecutionTest is Base {
         ISmartWallet(_alice).execute(calls);
     }
 
+    function test_execute_with_empty_calls_array() public {
+        // Test that execute succeeds with empty calls array (no operations)
+        Call[] memory emptyCalls = new Call[](0);
+
+        vm.prank(_alice);
+        // Should succeed without reverting, but perform no operations
+        ISmartWallet(_alice).execute(emptyCalls);
+
+        // Verify no state changes occurred
+        assertEq(_bob.balance, 0 ether);
+    }
+
+    function test_executeWithRelayer_with_empty_calls_array() public {
+        // Test that executeWithRelayer succeeds with empty calls array
+        Call[] memory emptyCalls = new Call[](0);
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: emptyCalls,
+            nonce: 0,
+            expiry: 0
+        });
+
+        // Sign the BatchedCall
+        bytes32 hash = ERC712(_alice).hashTypedData(
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+        );
+        bytes memory validatorData = constructValidatorData(
+            _alice,
+            _aliceEOA,
+            _alicePk,
+            hash
+        );
+
+        vm.prank(_alice);
+        // Should succeed without reverting, but perform no operations
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+
+        // Verify no state changes occurred
+        assertEq(_bob.balance, 0 ether);
+    }
+
     function test_keyHash_consistency_and_validation() public {
         // Test that keyHash generation is consistent across the system
         address testAddress = _charlie;

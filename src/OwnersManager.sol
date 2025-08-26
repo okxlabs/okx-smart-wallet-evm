@@ -6,11 +6,9 @@ import {Errors} from "./libraries/Errors.sol";
 import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
 import {Static} from "./libraries/Static.sol";
 
-/**
- * @title OwnersManager
- * @notice Abstract contract providing owners management functionality for SmartWallet
- * @dev To be inherited by SmartWallet
- */
+/// @title OwnersManager
+/// @notice Abstract contract providing owners management functionality for SmartWallet
+/// @dev To be inherited by SmartWallet
 abstract contract OwnersManager is IOwnersManager {
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
 
@@ -31,13 +29,11 @@ abstract contract OwnersManager is IOwnersManager {
 
     // ============ External Functions ============
 
-    /**
-     * @notice Registers a validator with optional settings
-     * @dev Only callable by the wallet itself. Use packSettings() to create the settings parameter.
-     * @param keyHash The public key hash to associate with this validator
-     * @param validator The address of the validator contract to be registered
-     * @param settings Packed settings value (use packSettings to create)
-     */
+    /// @notice Registers a validator with optional settings
+    /// @dev Only callable by the wallet itself. Use packSettings() to create the settings parameter.
+    /// @param keyHash The public key hash to associate with this validator
+    /// @param validator The address of the validator contract to be registered
+    /// @param settings Packed settings value (use packSettings to create)
     function addOwner(
         bytes32 keyHash,
         address validator,
@@ -69,13 +65,11 @@ abstract contract OwnersManager is IOwnersManager {
         emit OwnerAdded(validator);
     }
 
-    /**
-     * @notice Updates an existing validator's address and/or settings
-     * @dev Only callable by the wallet itself. Use packSettings() to create the settings parameter.
-     * @param keyHash The public key hash to update
-     * @param newValidator The new validator address
-     * @param newSettings New packed settings value (use packSettings to create)
-     */
+    /// @notice Updates an existing validator's address and/or settings
+    /// @dev Only callable by the wallet itself. Use packSettings() to create the settings parameter.
+    /// @param keyHash The public key hash to update
+    /// @param newValidator The new validator address
+    /// @param newSettings New packed settings value (use packSettings to create)
     function updateOwner(
         bytes32 keyHash,
         address newValidator,
@@ -96,11 +90,9 @@ abstract contract OwnersManager is IOwnersManager {
         emit OwnerUpdated(keyHash, newValidator);
     }
 
-    /**
-     * @notice Removes a validator associated with a keyHash
-     * @dev Only callable by the wallet owner
-     * @param keyHash The public key hash to remove
-     */
+    /// @notice Removes a validator associated with a keyHash
+    /// @dev Only callable by the wallet owner
+    /// @param keyHash The public key hash to remove
     function removeOwner(bytes32 keyHash) external onlySelf {
         _removeValidator(keyHash);
         emit OwnerRemoved(keyHash);
@@ -126,15 +118,13 @@ abstract contract OwnersManager is IOwnersManager {
         return _ownerKeys.contains(keyHash);
     }
 
-    /**
-     * @notice Get comprehensive validator settings including hook, expiration, and admin status
-     * @param keyHash The public key hash to query
-     * @return validator The validator address
-     * @return hook The hook address (address(0) if no hook)
-     * @return expiration Unix timestamp when validator expires (0 = never expires)
-     * @return adminStatus Whether this validator has admin privileges
-     * @return expired Whether the validator is currently expired
-     */
+    /// @notice Get comprehensive validator settings including hook, expiration, and admin status
+    /// @param keyHash The public key hash to query
+    /// @return validator The validator address
+    /// @return hook The hook address (address(0) if no hook)
+    /// @return expiration Unix timestamp when validator expires (0 = never expires)
+    /// @return adminStatus Whether this validator has admin privileges
+    /// @return expired Whether the validator is currently expired
     function getOwnerSettings(
         bytes32 keyHash
     )
@@ -165,12 +155,10 @@ abstract contract OwnersManager is IOwnersManager {
 
     // ============ Public View Functions ============
 
-    /**
-     * @notice Get the verified validator address for a given keyHash with EIP-7702 support
-     * @dev Returns built-in ECDSA validator (address(1)) for self-signing when no validator installed
-     * @param keyHash The public key hash to look up
-     * @return The validator address to use for validation
-     */
+    /// @notice Get the verified validator address for a given keyHash with EIP-7702 support
+    /// @dev Returns built-in ECDSA validator (address(1)) for self-signing when no validator installed
+    /// @param keyHash The public key hash to look up
+    /// @return The validator address to use for validation
     function getVerifiedValidator(
         bytes32 keyHash
     ) public view returns (address) {
@@ -187,11 +175,9 @@ abstract contract OwnersManager is IOwnersManager {
         return validator;
     }
 
-    /**
-     * @notice Check if settings are expired based on block timestamp
-     * @param settings Packed settings value
-     * @return expired True if settings are expired (expiration != 0 and < block.timestamp)
-     */
+    /// @notice Check if settings are expired based on block timestamp
+    /// @param settings Packed settings value
+    /// @return expired True if settings are expired (expiration != 0 and < block.timestamp)
     function isSettingsExpired(uint256 settings) public view returns (bool) {
         uint40 expiration = getExpiration(settings);
         // expiration = 0 means never expires
@@ -203,13 +189,11 @@ abstract contract OwnersManager is IOwnersManager {
     // Layout: 6 bytes UNUSED | 1 byte isAdmin | 5 bytes expiration | 20 bytes hook
     // Bits:   [255-208]       | [207-200]      | [199-160]        | [159-0]
 
-    /**
-     * @notice Pack settings into uint256
-     * @param adminFlag Admin flag
-     * @param expiration Unix timestamp (0 = never expires)
-     * @param hook Hook address (address(0) = no hook)
-     * @return packed Packed settings value
-     */
+    /// @notice Pack settings into uint256
+    /// @param adminFlag Admin flag
+    /// @param expiration Unix timestamp (0 = never expires)
+    /// @param hook Hook address (address(0) = no hook)
+    /// @return packed Packed settings value
     function packSettings(
         bool adminFlag,
         uint40 expiration,
@@ -221,41 +205,33 @@ abstract contract OwnersManager is IOwnersManager {
             (uint256(adminFlag ? 1 : 0) << 200);
     }
 
-    /**
-     * @notice Extract hook address from packed settings (bits 0-159)
-     * @param settings Packed settings value
-     * @return hook Hook address (address(0) = no hook)
-     */
+    /// @notice Extract hook address from packed settings (bits 0-159)
+    /// @param settings Packed settings value
+    /// @return hook Hook address (address(0) = no hook)
     function getHook(uint256 settings) public pure returns (address) {
         return address(uint160(settings));
     }
 
-    /**
-     * @notice Extract expiration timestamp from packed settings (bits 160-199)
-     * @param settings Packed settings value
-     * @return expiration Unix timestamp (0 = never expires)
-     */
+    /// @notice Extract expiration timestamp from packed settings (bits 160-199)
+    /// @param settings Packed settings value
+    /// @return expiration Unix timestamp (0 = never expires)
     function getExpiration(uint256 settings) public pure returns (uint40) {
         return uint40(settings >> 160);
     }
 
-    /**
-     * @notice Extract admin flag from packed settings (bits 200-207)
-     * @param settings Packed settings value
-     * @return isAdmin True if signer has admin privileges
-     */
+    /// @notice Extract admin flag from packed settings (bits 200-207)
+    /// @param settings Packed settings value
+    /// @return isAdmin True if signer has admin privileges
     function isAdmin(uint256 settings) public pure returns (bool) {
         return (settings >> 200) != 0;
     }
 
     // ============ Internal Functions ============
 
-    /**
-     * @notice Internal function to set an owner's validator with settings atomically
-     * @param keyHash The owner's public key hash
-     * @param validator The validator address to associate with this owner
-     * @param settings Packed settings value (0 for default settings)
-     */
+    /// @notice Internal function to set an owner's validator with settings atomically
+    /// @param keyHash The owner's public key hash
+    /// @param validator The validator address to associate with this owner
+    /// @param settings Packed settings value (0 for default settings)
     function _setValidatorWithSettings(
         bytes32 keyHash,
         address validator,
@@ -266,20 +242,16 @@ abstract contract OwnersManager is IOwnersManager {
         _ownerKeys.add(keyHash); // Add to the set
     }
 
-    /**
-     * @notice Internal function to remove an owner's validator mapping
-     * @param keyHash The owner's public key hash to remove
-     */
+    /// @notice Internal function to remove an owner's validator mapping
+    /// @param keyHash The owner's public key hash to remove
     function _removeValidator(bytes32 keyHash) internal {
         delete ownerValidators[keyHash];
         delete ownerSettings[keyHash];
         _ownerKeys.remove(keyHash); // Remove from the set
     }
 
-    /**
-     * @notice Internal function to validate validator address
-     * @param validator The validator address to validate
-     */
+    /// @notice Internal function to validate validator address
+    /// @param validator The validator address to validate
     function _validateValidatorAddress(address validator) internal view {
         // Allow built-in validator addresses (1 and 2), but check other addresses have contract code
         if (

@@ -16,10 +16,23 @@ import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 import {Static} from "src/libraries/Static.sol";
 import {ERC4337Account} from "src/ERC4337Account.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
+import {Call} from "src/Types.sol";
+import {InitialOwner} from "src/Types.sol";
+import {OwnersManager} from "src/OwnersManager.sol";
 
 contract ValidateUserOpTest is Base {
     ECDSAValidator ecdsaValidator;
     PasskeyValidator passkeyValidator;
+
+    event UserOperationEvent(
+        bytes32 indexed userOpHash,
+        address indexed sender,
+        address indexed paymaster,
+        uint256 nonce,
+        bool success,
+        uint256 actualGasCost,
+        uint256 actualGasUsed
+    );
 
     function setUp() public override {
         super.setUp();
@@ -28,6 +41,9 @@ contract ValidateUserOpTest is Base {
         ecdsaValidator = new ECDSAValidator();
         passkeyValidator = new PasskeyValidator();
     }
+
+    // Allow this test contract to receive ETH from EntryPoint
+    receive() external payable {}
 
     // Helper function to directly test validateUserOp by pranking as EntryPoint
     struct _TestTemps {
@@ -38,6 +54,184 @@ contract ValidateUserOpTest is Base {
         bytes32 r;
         bytes32 s;
         uint256 missingAccountFunds;
+    }
+
+    function test_handleOps_complete_flow() external {
+        // Test the complete ERC-4337 flow: handleOps -> validateUserOp -> executeUserOp
+
+        // Create a new account with alice as owner
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: aliceKeyHash,
+            validator: address(1) // Built-in ECDSA validator
+        });
+
+        address account = _factory.createAccount(
+            address(_smartWallet),
+            initialOwners,
+            100 // Different salt to avoid collision
+        );
+
+        // Fund the account for gas
+        vm.deal(account, 10 ether);
+
+        // Prepare calls to be executed - transfer 1 ETH to bob
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _bob, value: 1 ether, data: ""});
+
+        // Encode the calls for executeUserOp
+        // The EntryPoint will call executeUserOp, so callData needs the selector
+        // executeUserOp then extracts calls from userOp.callData[4:]
+        bytes memory encodedCalls = abi.encode(calls);
+        bytes memory callData = abi.encodePacked(
+            IERC4337Account.executeUserOp.selector,
+            encodedCalls
+        );
+
+        // Build the UserOperation
+        PackedUserOperation memory userOp = PackedUserOperation({
+            sender: account,
+            nonce: 0,
+            initCode: bytes(""),
+            callData: callData,
+            accountGasLimits: bytes32((uint256(3000000) << 128) | 100000), // verificationGasLimit | callGasLimit
+            preVerificationGas: 21000,
+            gasFees: bytes32((uint256(1 gwei) << 128) | 10 gwei), // maxPriorityFeePerGas | maxFeePerGas
+            paymasterAndData: bytes(""),
+            signature: bytes("")
+        });
+
+        // Get the userOp hash for signing
+        bytes32 userOpHash = IEntryPoint(ENTRYPOINT_ADDRESS).getUserOpHash(
+            userOp
+        );
+
+        // Sign the userOp hash
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
+        userOp.signature = abi.encodePacked(aliceKeyHash, r, s, v);
+
+        // Record bob's initial balance
+        uint256 bobInitialBalance = _bob.balance;
+
+        // Create array with single UserOperation
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+        ops[0] = userOp;
+
+        // Execute handleOps - this should:
+        // 1. Call validateUserOp on the account (validation phase)
+        // 2. If validation passes, call executeUserOp on the account (execution phase)
+        // 3. Execute the actual calls (transfer 1 ETH to bob)
+
+        // Expect the UserOperationEvent to be emitted
+        vm.expectEmit(true, true, true, false);
+        emit UserOperationEvent(
+            userOpHash,
+            account,
+            address(0), // no paymaster
+            0, // nonce
+            true, // success
+            0, // actualGasCost (we don't check exact value)
+            0 // actualGasUsed (we don't check exact value)
+        );
+
+        // Execute through EntryPoint's handleOps
+        IEntryPoint(ENTRYPOINT_ADDRESS).handleOps(ops, payable(address(this)));
+
+        // Verify the call was executed successfully
+        assertEq(
+            _bob.balance,
+            bobInitialBalance + 1 ether,
+            "Bob should have received 1 ETH"
+        );
+
+        // Verify nonce was consumed
+        uint256 accountNonce = IEntryPoint(ENTRYPOINT_ADDRESS).getNonce(
+            account,
+            0
+        );
+        assertEq(accountNonce, 1, "Account nonce should be incremented");
+    }
+
+    function test_handleOps_with_chainless_nonce() external {
+        // Test handleOps with chainless nonce for cross-chain operations
+
+        // Create a new account
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: aliceKeyHash,
+            validator: address(1)
+        });
+
+        address account = _factory.createAccount(
+            address(_smartWallet),
+            initialOwners,
+            101 // Different salt
+        );
+
+        vm.deal(account, 10 ether);
+
+        // Prepare addOwner call (allowed with chainless nonce)
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: account,
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnersManager.addOwner.selector,
+                bobKeyHash,
+                address(1),
+                false,
+                0,
+                address(0)
+            )
+        });
+
+        bytes memory encodedCalls = abi.encode(calls);
+        bytes memory callData = abi.encodePacked(
+            IERC4337Account.executeUserOp.selector,
+            encodedCalls
+        );
+
+        // Build UserOperation with chainless nonce
+        PackedUserOperation memory userOp = PackedUserOperation({
+            sender: account,
+            nonce: uint256(Static.CHAIN_LESS_NONCE_KEY) << 64, // Chainless nonce key
+            initCode: bytes(""),
+            callData: callData,
+            accountGasLimits: bytes32((uint256(3000000) << 128) | 100000),
+            preVerificationGas: 21000,
+            gasFees: bytes32((uint256(1 gwei) << 128) | 10 gwei),
+            paymasterAndData: bytes(""),
+            signature: bytes("")
+        });
+
+        // Get userOp hash without chain ID for chainless operations
+        bytes32 userOpHash = ERC4337Account(account)
+            .getUserOpHashWithoutChainId(userOp);
+
+        // Sign the userOp
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
+        userOp.signature = abi.encodePacked(aliceKeyHash, r, s, v);
+
+        // Verify bob is not an owner yet
+        assertFalse(
+            IOwnersManager(account).hasOwner(bobKeyHash),
+            "Bob should not be owner initially"
+        );
+
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+        ops[0] = userOp;
+
+        // Execute through EntryPoint
+        IEntryPoint(ENTRYPOINT_ADDRESS).handleOps(ops, payable(address(this)));
+
+        // Verify bob was added as owner
+        assertTrue(
+            IOwnersManager(account).hasOwner(bobKeyHash),
+            "Bob should be added as owner"
+        );
     }
 
     function test_validateUserOp_with_eoa_signer() external {

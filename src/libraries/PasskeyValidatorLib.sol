@@ -5,11 +5,9 @@ import {P256} from "@openzeppelin/contracts/utils/cryptography/P256.sol";
 import {MerkleProofProcessor} from "./MerkleProofProcessor.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 
-/**
- * @title PasskeyValidatorLib
- * @notice Library for Passkey signature validation using P256 verification
- * @dev Provides static validation functions for P256 signatures with SmartAccount compatibility
- */
+/// @title PasskeyValidatorLib
+/// @notice Library for Passkey signature validation using P256 verification
+/// @dev Provides static validation functions for P256 signatures with SmartAccount compatibility
 library PasskeyValidatorLib {
     // the length of the Passkey signature with public key
     uint256 constant PASSKEY_PUBKEY_LENGTH = 64;
@@ -20,17 +18,15 @@ library PasskeyValidatorLib {
         uint256 pubKeyY;
     }
 
-    /**
-     * @notice Validates a Passkey signature using P256 verification with optional Merkle proof support
-     * @dev Verifies that:
-     *      1. Processes Merkle proofs if present in validatorData
-     *      2. The provided public key matches the registered keyHash
-     *      3. The P256 signature is valid for SHA256(messageHash) - required for crypto.createSign compatibility
-     * @param keyHash The hash of the registered public key (keccak256(abi.encodePacked(pubKeyX, pubKeyY)))
-     * @param messageHash The hash of the message being validated (will be SHA256 hashed internally)
-     * @param validatorData Encoded Passkey signature data (PasskeySignature struct + optional Merkle proofs)
-     * @return bool True if the signature is valid
-     */
+    /// @notice Validates a Passkey signature using P256 verification with optional Merkle proof support
+    /// @dev Verifies that:
+    ///      1. Processes Merkle proofs if present in validatorData
+    ///      2. The provided public key matches the registered keyHash
+    ///      3. The P256 signature is valid for SHA256(messageHash) - required for crypto.createSign compatibility
+    /// @param keyHash The hash of the registered public key (keccak256(abi.encodePacked(pubKeyX, pubKeyY)))
+    /// @param messageHash The hash of the message being validated (will be SHA256 hashed internally)
+    /// @param validatorData Encoded Passkey signature data (PasskeySignature struct + optional Merkle proofs)
+    /// @return bool True if the signature is valid
     function validateSignature(
         bytes32 keyHash,
         bytes32 messageHash,

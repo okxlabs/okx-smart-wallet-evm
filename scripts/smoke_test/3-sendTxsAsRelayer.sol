@@ -4,7 +4,7 @@ pragma solidity ^0.8.12;
 import "lib/forge-std/src/Script.sol";
 import "src/interfaces/ISmartWallet.sol";
 import "src/SmartWallet.sol";
-import "src/interfaces/INonceManager.sol";
+import "src/interfaces/IOwnersManager.sol";
 import "src/libraries/BatchedCallLib.sol";
 import "src/Types.sol";
 
@@ -16,45 +16,78 @@ contract SendTxsAsRelayer is Script {
         vm.startBroadcast(senderPk);
 
         address payable sender = payable(vm.addr(senderPk));
-        address receiver = address(0xFeeCC911175C2B6D46BaE4fd357c995a4DC43C60);
         console.log("Sender: ", sender);
-        console.log("Receiver: ", receiver);
+        console.log("Receiver: ", 0xFeeCC911175C2B6D46BaE4fd357c995a4DC43C60);
+        
+        // First, add the sender as an owner with ECDSAValidator
+        _addOwner(sender);
+        
+        // Then execute the relayer transaction
+        _executeRelayerTransaction(sender, senderPk);
 
-        // Construct the call data for the SmartWallet.execute() function
+        console.log("Completed ExecuteWithRelayer script");
+        vm.stopBroadcast();
+    }
+    
+    function _addOwner(address sender) private {
+        address ecdsaValidator = vm.envAddress("ECDSA_VALIDATOR");
+        console.log("ECDSAValidator address:", ecdsaValidator);
+        
+        Call[] memory addOwnerCalls = new Call[](1);
+        addOwnerCalls[0] = Call({
+            target: sender,
+            value: 0,
+            data: abi.encodeWithSelector(
+                IOwnersManager.addOwner.selector,
+                keccak256(abi.encodePacked(sender)),
+                ecdsaValidator,
+                0  // default settings
+            )
+        });
+        
+        // Execute addOwner through the SmartWallet
+        ISmartWallet(sender).execute(addOwnerCalls);
+        console.log("Added sender as owner with ECDSAValidator");
+    }
+    
+    function _executeRelayerTransaction(address payable sender, uint256 senderPk) private {
+        // Construct the call data
         Call[] memory calls = new Call[](1);
-        calls[0] = Call({target: receiver, value: 0.00001 ether, data: ""});
-        // calls[1] = Call({target: receiver, value: 0.00002 ether, data: ""});
+        calls[0] = Call({
+            target: address(0xFeeCC911175C2B6D46BaE4fd357c995a4DC43C60),
+            value: 0.00001 ether,
+            data: ""
+        });
 
         // Create BatchedCall for executeWithRelayer
-        uint256 nonce = 0; // First transaction should use nonce 0
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: nonce,
+            nonce: 0,
             expiry: uint48(block.timestamp + 1 hours)
         });
 
-        // Get typed hash for signing using BatchedCallLib
-        // Get the implementation address from the SmartWallet
-        address implementation = SmartWallet(payable(sender)).IMPLEMENTATION();
+        // Get typed hash for signing
+        address implementation = vm.envAddress("SMART_WALLET");
+        console.log("Using SmartWallet implementation from env:", implementation);
+        
         bytes32 hash = BatchedCallLib.hash(batchedCall, implementation);
         console.log("BatchedCall hash:", vm.toString(hash));
         
-        // Ensure the sender has SmartWallet code
-        bytes memory code = sender.code;
-        console.log("Sender code length:", code.length);
-        require(code.length > 0, "Sender does not have contract code");
+        // Check if the sender has SmartWallet code
+        console.log("Sender code length:", sender.code.length);
         
-        bytes32 typedHash = SmartWallet(payable(sender)).hashTypedData(hash);
+        bytes32 typedHash = SmartWallet(sender).hashTypedData(hash);
 
-        // Sign the hash
+        // Sign and prepare validator data
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(senderPk, typedHash);
-        bytes32 keyHash = keccak256(abi.encodePacked(sender));
-        bytes memory validatorData = abi.encodePacked(keyHash, r, s, v);
+        bytes memory validatorData = abi.encodePacked(
+            keccak256(abi.encodePacked(sender)),
+            r,
+            s,
+            v
+        );
 
         // Execute with relayer
         ISmartWallet(sender).executeWithRelayer(batchedCall, validatorData);
-
-        console.log("Completed ExecuteWithValidator script");
-        vm.stopBroadcast();
     }
 }

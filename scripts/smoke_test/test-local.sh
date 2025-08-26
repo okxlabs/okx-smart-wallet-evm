@@ -28,8 +28,8 @@ if [ -f .env ]; then
     source .env
 fi
 
-# Start anvil in the background
-anvil --port 8545 --chain-id 31337 --accounts 10 --balance 10000 > anvil.log 2>&1 &
+# Start anvil in the background with Prague hardfork for EIP-7702 support
+anvil --port 8545 --chain-id 31337 --hardfork prague --accounts 10 --balance 10000 > anvil.log 2>&1 &
 ANVIL_PID=$!
 
 # Wait for anvil to start
@@ -77,24 +77,63 @@ if [ -n "$DEPLOYER_PRIVATE_KEY" ]; then
     fi
 fi
 
+echo -e "${YELLOW}🏭 Deploying DeployFactory (EIP-2470)...${NC}"
+
+# Deploy the DeployFactory first
+bash scripts/smoke_test/deploy-factory.sh
+FACTORY_RESULT=$?
+
+if [ $FACTORY_RESULT -eq 0 ]; then
+    echo -e "${GREEN}✅ DeployFactory deployed successfully!${NC}"
+else
+    echo -e "${RED}❌ DeployFactory deployment failed with exit code $FACTORY_RESULT${NC}"
+    exit $FACTORY_RESULT
+fi
+
 echo -e "${YELLOW}🏗️  Deploying SmartWallet contracts...${NC}"
 
-# Deploy the SmartWallet contracts  
-forge script scripts/DeployInit.sol --rpc-url http://localhost:8545 --broadcast
+# Deploy the SmartWallet contracts and capture output
+DEPLOY_OUTPUT=$(forge script scripts/DeployInit.sol --rpc-url http://localhost:8545 --broadcast 2>&1)
 DEPLOY_RESULT=$?
 
 if [ $DEPLOY_RESULT -eq 0 ]; then
     echo -e "${GREEN}✅ SmartWallet contracts deployed successfully!${NC}"
+    
+    # Extract SmartWallet address from deployment output
+    SMART_WALLET_ADDRESS=$(echo "$DEPLOY_OUTPUT" | grep "SmartWallet address:" | sed 's/.*SmartWallet address: //')
+    
+    if [ -n "$SMART_WALLET_ADDRESS" ]; then
+        echo -e "${YELLOW}📝 SmartWallet implementation address: $SMART_WALLET_ADDRESS${NC}"
+        export SMART_WALLET=$SMART_WALLET_ADDRESS
+        echo -e "${GREEN}✅ Exported SMART_WALLET environment variable${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Could not extract SmartWallet address from deployment output${NC}"
+    fi
+    
+    # Extract ECDSAValidator address from deployment output
+    ECDSA_VALIDATOR_ADDRESS=$(echo "$DEPLOY_OUTPUT" | grep "ECDSAValidator address:" | sed 's/.*ECDSAValidator address: //')
+    
+    if [ -n "$ECDSA_VALIDATOR_ADDRESS" ]; then
+        echo -e "${YELLOW}📝 ECDSAValidator address: $ECDSA_VALIDATOR_ADDRESS${NC}"
+        export ECDSA_VALIDATOR=$ECDSA_VALIDATOR_ADDRESS
+        echo -e "${GREEN}✅ Exported ECDSA_VALIDATOR environment variable${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Could not extract ECDSAValidator address from deployment output${NC}"
+    fi
+    
+    # Show deployment logs for debugging
+    echo "$DEPLOY_OUTPUT" | grep -E "SmartWallet|ECDSAValidator|PasskeyValidator|Factory|Helper"
 else
     echo -e "${RED}❌ SmartWallet contract deployment failed with exit code $DEPLOY_RESULT${NC}"
+    echo "$DEPLOY_OUTPUT"
     exit $DEPLOY_RESULT
 fi
 
 echo -e "${YELLOW}🧪 Running smoke test scripts...${NC}"
 
-# Test 1: Set Code and Initialize (Hardhat script)
+# Test 1: Set Code and Initialize (Forge script)
 echo -e "${YELLOW}📝 Test 1: EIP-7702 Set Code and Initialize${NC}"
-npx hardhat run scripts/smoke_test/1-setCodeAndInitialize.ts --network localhost
+forge script scripts/smoke_test/1-setCodeAndInitialize.sol --rpc-url http://localhost:8545 --broadcast --evm-version prague --skip-simulation
 TEST1_RESULT=$?
 
 if [ $TEST1_RESULT -eq 0 ]; then
@@ -130,8 +169,9 @@ fi
 
 echo -e "${GREEN}🎉 All smoke tests completed successfully!${NC}"
 
-echo -e "${YELLOW}📋 Anvil logs:${NC}"
-cat anvil.log
+# Anvil logs are saved to anvil.log - uncomment below to display them
+# echo -e "${YELLOW}📋 Anvil logs:${NC}"
+# cat anvil.log
 
 # Keep the node running for manual testing (optional)
 read -p "$(echo -e ${YELLOW}Keep node running for manual testing? [y/N]:${NC} )" -n 1 -r
