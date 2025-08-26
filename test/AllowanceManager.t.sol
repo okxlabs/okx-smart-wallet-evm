@@ -7,6 +7,75 @@ import {IAllowanceManager} from "src/interfaces/IAllowanceManager.sol";
 import {MockERC20} from "src/test/MockERC20.sol";
 import {InitialOwner} from "src/Types.sol";
 import {Static} from "../src/libraries/Static.sol";
+import {MockMaliciousERC20} from "src/test/MockMaliciousERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+// Contract that rejects ETH transfers
+contract ETHRejectingContract {
+    receive() external payable {
+        revert("ETH transfer rejected");
+    }
+}
+
+// Token that always fails transfers (returns false)
+contract FailingToken {
+    string public name = "FailingToken";
+    string public symbol = "FAIL";
+    uint8 public decimals = 18;
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
+
+    function transfer(address, uint256) external pure returns (bool) {
+        return false; // Always fail
+    }
+
+    function transferFrom(
+        address,
+        address,
+        uint256
+    ) external pure returns (bool) {
+        return false; // Always fail
+    }
+
+    function approve(address spender, uint256 amount) external returns (bool) {
+        allowance[msg.sender][spender] = amount;
+        return true;
+    }
+}
+
+// Token that always reverts on transfers
+contract RevertingToken {
+    string public name = "RevertingToken";
+    string public symbol = "REVERT";
+    uint8 public decimals = 18;
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
+
+    function transfer(address, uint256) external pure returns (bool) {
+        revert("Transfer reverted");
+    }
+
+    function transferFrom(
+        address,
+        address,
+        uint256
+    ) external pure returns (bool) {
+        revert("TransferFrom reverted");
+    }
+
+    function approve(address spender, uint256 amount) external returns (bool) {
+        allowance[msg.sender][spender] = amount;
+        return true;
+    }
+}
 
 contract AllowanceManagerTest is Test {
     SmartWallet public wallet;
@@ -566,5 +635,96 @@ contract AllowanceManagerTest is Test {
                 allowanceAmount - transferAmount
             );
         }
+    }
+
+    // ============ Transfer Failure Tests ============
+
+    function test_TransferFromNative_TransferNativeFailed() public {
+        uint256 allowanceAmount = 2 ether;
+        uint256 transferAmount = 1 ether;
+
+        // Set up allowance
+        vm.prank(_alice);
+        wallet.approveNative(spender, allowanceAmount);
+
+        // Deploy a contract that rejects ETH transfers
+        ETHRejectingContract rejectingContract = new ETHRejectingContract();
+
+        vm.prank(spender);
+        vm.expectRevert(IAllowanceManager.TransferNativeFailed.selector);
+        wallet.transferFromNative(
+            _alice,
+            address(rejectingContract),
+            transferAmount
+        );
+
+        // Verify allowance was not consumed
+        assertEq(wallet.nativeAllowance(spender), allowanceAmount);
+        assertEq(
+            wallet.tokenAllowance(Static.NATIVE_ETH, spender),
+            allowanceAmount
+        );
+    }
+
+    function test_TransferFromToken_TokenTransferFailed() public {
+        uint256 allowanceAmount = 200 * 10 ** 18;
+        uint256 transferAmount = 100 * 10 ** 18;
+
+        // Create a token that always fails transfers
+        FailingToken failingToken = new FailingToken();
+
+        // Mint tokens directly to the wallet
+        failingToken.mint(address(wallet), 1000 * 10 ** 18);
+
+        // Approve allowance for the failing token
+        vm.prank(_alice);
+        wallet.approveToken(address(failingToken), spender, allowanceAmount);
+
+        vm.prank(spender);
+        vm.expectRevert(IAllowanceManager.TokenTransferFailed.selector);
+        wallet.transferFromToken(
+            address(failingToken),
+            _alice,
+            recipient,
+            transferAmount
+        );
+
+        // Verify allowance was not consumed
+        assertEq(
+            wallet.tokenAllowance(address(failingToken), spender),
+            allowanceAmount
+        );
+    }
+
+    function test_TransferFromToken_TokenTransferReverts() public {
+        uint256 allowanceAmount = 200 * 10 ** 18;
+        uint256 transferAmount = 100 * 10 ** 18;
+
+        // Create a token that always reverts on transfers
+        RevertingToken revertingToken = new RevertingToken();
+
+        // Mint tokens directly to the wallet
+        revertingToken.mint(address(wallet), 1000 * 10 ** 18);
+
+        // Approve allowance for the reverting token
+        vm.prank(_alice);
+        wallet.approveToken(address(revertingToken), spender, allowanceAmount);
+
+        // The token transfer should revert, but the AllowanceManager should catch it
+        // and revert with TokenTransferFailed
+        vm.prank(spender);
+        vm.expectRevert(IAllowanceManager.TokenTransferFailed.selector);
+        wallet.transferFromToken(
+            address(revertingToken),
+            _alice,
+            recipient,
+            transferAmount
+        );
+
+        // Verify allowance was not consumed
+        assertEq(
+            wallet.tokenAllowance(address(revertingToken), spender),
+            allowanceAmount
+        );
     }
 }

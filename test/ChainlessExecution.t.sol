@@ -56,7 +56,7 @@ contract ChainlessExecutionTest is Base {
      * @notice Test hashTypedData and hashTypedDataSansChainId produce different results
      * @dev Ensures chain ID affects hash computation as expected
      */
-    function test_hash_functions_produce_different_results() external {
+    function test_hash_functions_produce_different_results() external view {
         bytes32 structHash = keccak256("test_struct_hash");
 
         bytes32 hashWithChainId = SmartWallet(payable(testAccount))

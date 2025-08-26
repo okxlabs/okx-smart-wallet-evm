@@ -59,10 +59,7 @@ contract GasTrackingHook {
 }
 
 contract MaliciousToken is MockERC20 {
-    function transfer(
-        address to,
-        uint256 amount
-    ) public override returns (bool) {
+    function transfer(address, uint256) public pure override returns (bool) {
         // Don't actually transfer, just return true
         return true;
     }
@@ -181,8 +178,9 @@ contract HookTest is Base {
         _setHookForOwnerDirect(aliceKeyHash, address(mockHook), 0);
 
         // Verify hook is properly set
-        (address validator, address hookAddress, , , ) = IOwnersManager(_alice)
-            .getOwnerSettings(aliceKeyHash);
+        (, address hookAddress, , , ) = IOwnersManager(_alice).getOwnerSettings(
+            aliceKeyHash
+        );
         assertEq(hookAddress, address(mockHook));
 
         Call[] memory calls = new Call[](1);

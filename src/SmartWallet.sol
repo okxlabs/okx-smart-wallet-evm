@@ -192,7 +192,10 @@ contract SmartWallet is
 
         // Extract pubKeyHash and validate validator
         bytes32 pubKeyHash = bytes32(validatorData[:32]);
+
         address mockValidator = getVerifiedValidator(pubKeyHash);
+        // Use mockValidator to avoid unused variable warning since it is only used for gas measurement
+        mockValidator;
 
         if (validator == address(0)) {
             // revert Errors.InvalidKeyHash(pubKeyHash);
