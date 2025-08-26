@@ -55,7 +55,7 @@ contract MockHook is IHook {
     ) external payable {
         (address token, uint256 initialBalance, uint256 totalAmount) = abi
             .decode(preHookRet, (address, uint256, uint256));
-        
+
         // Include token address check otherwise empty calls will revert
         if (token != address(0)) {
             uint256 finalBalance = IERC20(token).balanceOf(msg.sender);
