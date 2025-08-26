@@ -57,7 +57,7 @@ async function main() {
     // Setup wallet configuration
     console.log("\n⚙️ Setting up wallet configuration...");
 
-    const salt = "0"; // Salt for deterministic address generation
+    const salt = "1"; // Salt for deterministic address generation
 
     const pubKeyX =
       "0x640c5cacef387563d0b105c7724c45ee19f8a952cb583de494a6a7ce5ed16760";
@@ -132,7 +132,7 @@ async function main() {
     });
 
     // Generate execution calldata
-    const executeCalldata = calldataUtils.generateExecuteCalldata(calls);
+    const executeCalldata = calldataUtils.generateExecuteUserOpCalldata(calls);
     console.log(
       "Execute calldata length:",
       hre.ethers.dataLength(executeCalldata)

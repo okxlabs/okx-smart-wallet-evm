@@ -9,6 +9,7 @@ import {EntryPoint} from "account-abstraction/core/EntryPoint.sol";
 import {LibClone} from "solady/utils/LibClone.sol";
 import {InitialOwner} from "../Types.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import {IERC4337Account} from "../interfaces/IERC4337Account.sol";
 
 library HelperLib {
     uint256 public constant CHALLENGE_LOCATION = 23;
@@ -218,6 +219,10 @@ contract Helper {
         uint256 salt
     ) internal pure returns (bytes32) {
         return keccak256(abi.encode(initialOwners, salt));
+    }
+
+    function getExecuteUserOpSelector() external pure returns (bytes4) {
+        return IERC4337Account.executeUserOp.selector;
     }
 }
 

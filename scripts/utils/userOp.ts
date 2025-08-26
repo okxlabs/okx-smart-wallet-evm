@@ -66,8 +66,8 @@ function createUserOperation(params: {
         callData = "0x",
         verificationGasLimit = 2000000,
         callGasLimit = 400000,
-        maxPriorityFeePerGas = ethers.parseUnits("1", "gwei"),
-        maxFeePerGas = ethers.parseUnits("10", "gwei"),
+        maxPriorityFeePerGas = ethers.parseUnits("1", "wei"),
+        maxFeePerGas = ethers.parseUnits("10", "wei"),
         preVerificationGas = 21000n,
         paymasterAndData = "0x"
     } = params;
