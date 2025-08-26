@@ -7,8 +7,7 @@ import {LibClone} from "solady/utils/LibClone.sol";
 import {Initializable} from "solady/utils/Initializable.sol";
 import {ISmartWallet} from "./interfaces/ISmartWallet.sol";
 import {ISmartWalletFactory, InitialOwner} from "./interfaces/ISmartWalletFactory.sol";
-import {Call} from "./libraries/CallLib.sol";
-import {BatchedCall} from "./libraries/BatchedCallLib.sol";
+import {Call, BatchedCall} from "./Types.sol";
 
 contract SmartWalletFactory is
     Ownable,

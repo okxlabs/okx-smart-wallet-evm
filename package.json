@@ -12,11 +12,11 @@
     "coverage": "forge coverage --report lcov && genhtml -o coverage_report lcov.info --ignore-errors inconsistent && open coverage_report/index.html",
     "test": "forge test",
     "smoke-test": "bash scripts/smoke_test/test-local.sh",
-    "deploy": "forge script scripts/DeployInit.sol --rpc-url <RPC_URL>",
-    "1-setCodeAndInitialize": "forge script scripts/smoke_test/1-setCodeAndInitialize.sol --rpc-url <RPC_URL>",
-    "2-sendTxs": "forge script scripts/smoke_test/2-sendTxs.sol --rpc-url <RPC_URL>",
-    "3-sendTxsAsRelayer": "forge script scripts/smoke_test/3-sendTxsAsRelayer.sol --rpc-url <RPC_URL>",
-    "code": "cast code <ADDRESS> --rpc-url <RPC_URL>",
+    "deploy": "forge script scripts/DeployInit.sol --rpc-url",
+    "1-setCodeAndInitialize": "forge script scripts/smoke_test/1-setCodeAndInitialize.sol --rpc-url",
+    "2-sendTxs": "forge script scripts/smoke_test/2-sendTxs.sol --rpc-url",
+    "3-sendTxsAsRelayer": "forge script scripts/smoke_test/3-sendTxsAsRelayer.sol --rpc-url",
+    "code": "cast code",
     "test-relayer": "npx mocha tests/RelayerFlow.t.ts --require ts-node/register --timeout 120000"
   },
   "pre-commit": [

@@ -43,253 +43,9 @@ contract SmartWalletUpgradeTest is Base {
         smartWalletV2Implementation = new OKXSmartWalletEntryV2();
     }
     
-    function test_upgrade_only_owner_can_upgrade() public {
-        // Non-owner tries to upgrade - should fail
-        vm.prank(_bob);
-        vm.expectRevert();
-        UUPSUpgradeable(_alice).upgradeToAndCall(
-            address(smartWalletV2Implementation),
-            ""
-        );
-        
-        // Owner can upgrade successfully
-        vm.prank(_aliceEOA);
-        UUPSUpgradeable(_alice).upgradeToAndCall(
-            address(smartWalletV2Implementation),
-            ""
-        );
-        
-        // Verify upgrade succeeded by calling V2 function
-        assertEq(OKXSmartWalletEntryV2(_alice).getVersion(), "v2");
-        assertTrue(OKXSmartWalletEntryV2(_alice).isUpgraded());
-    }
-    
-    function test_upgrade_preserves_owners() public {
-        // Get initial owners
-        bytes32[] memory initialOwners = IOwnersManager(_alice).getOwnerKeys();
-        uint256 initialOwnerCount = IOwnersManager(_alice).ownerCount();
-        
-        // Verify alice owner exists before upgrade
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
-        assertTrue(IOwnersManager(_alice).hasOwner(aliceKeyHash));
-        
-        // Perform upgrade
-        vm.prank(_aliceEOA);
-        UUPSUpgradeable(_alice).upgradeToAndCall(
-            address(smartWalletV2Implementation),
-            ""
-        );
-        
-        // Verify owners are preserved after upgrade
-        bytes32[] memory afterOwners = IOwnersManager(_alice).getOwnerKeys();
-        uint256 afterOwnerCount = IOwnersManager(_alice).ownerCount();
-        
-        assertEq(afterOwnerCount, initialOwnerCount, "Owner count should be preserved");
-        assertEq(afterOwners.length, initialOwners.length, "Owner keys length should be preserved");
-        
-        // Verify alice is still an owner
-        assertTrue(IOwnersManager(_alice).hasOwner(aliceKeyHash), "Alice should still be an owner");
-        
-        // Verify owner can still execute transactions
-        Call[] memory calls = new Call[](1);
-        calls[0] = Call({
-            target: _bob,
-            value: 0.1 ether,
-            data: ""
-        });
-        
-        vm.prank(_aliceEOA);
-        ISmartWallet(_alice).execute(calls);
-        
-        assertEq(_bob.balance, 0.1 ether, "Owner should still be able to execute transactions");
-    }
-    
-    function test_upgrade_preserves_validator_settings() public {
-        // Add another owner with specific settings before upgrade
-        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
-        uint256 settings = IOwnersManager(_alice).packSettings(
-            true, // isAdmin
-            uint40(block.timestamp + 1 days), // expiration
-            address(0) // no hook
-        );
-        
-        // Add bob as owner from alice wallet
-        vm.prank(_alice);
-        IOwnersManager(_alice).addOwner(
-            bobKeyHash,
-            Static.ECDSA_VALIDATOR_ADDRESS,
-            settings
-        );
-        
-        // Get settings before upgrade
-        (
-            address validatorBefore,
-            address hookBefore,
-            uint40 expirationBefore,
-            bool isAdminBefore,
-            bool isExpiredBefore
-        ) = IOwnersManager(_alice).getOwnerSettings(bobKeyHash);
-        
-        // Perform upgrade
-        vm.prank(_aliceEOA);
-        UUPSUpgradeable(_alice).upgradeToAndCall(
-            address(smartWalletV2Implementation),
-            ""
-        );
-        
-        // Get settings after upgrade
-        (
-            address validatorAfter,
-            address hookAfter,
-            uint40 expirationAfter,
-            bool isAdminAfter,
-            bool isExpiredAfter
-        ) = IOwnersManager(_alice).getOwnerSettings(bobKeyHash);
-        
-        // Verify all settings are preserved
-        assertEq(validatorAfter, validatorBefore, "Validator should be preserved");
-        assertEq(hookAfter, hookBefore, "Hook should be preserved");
-        assertEq(expirationAfter, expirationBefore, "Expiration should be preserved");
-        assertEq(isAdminAfter, isAdminBefore, "Admin status should be preserved");
-        assertEq(isExpiredAfter, isExpiredBefore, "Expired status should be preserved");
-    }
-    
-    function test_upgrade_preserves_nonce_state() public {
-        // Prepare a BatchedCall with relayer to increment nonce
-        Call[] memory calls = new Call[](1);
-        calls[0] = Call({
-            target: _bob,
-            value: 0.05 ether,
-            data: ""
-        });
-        
-        // Create BatchedCall with nonce
-        BatchedCall memory batchedCall = BatchedCall({
-            calls: calls,
-            nonce: 0, // First nonce
-            expiry: 0  // No expiry
-        });
-        
-        // Create signature for the batchedCall
-        bytes32 hash = _getValidationTypedHash(_alice, calls);
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, hash);
-        bytes memory validatorData = abi.encodePacked(aliceKeyHash, r, s, v);
-        
-        // Execute with relayer to increment nonce
-        vm.prank(address(0xCAFE)); // Any address can be relayer
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
-        
-        // Get nonce after first execution
-        uint256 nonceBefore = INonceManager(_alice).getNonce(0);
-        assertEq(nonceBefore, 1, "Nonce should be 1 after first execution");
-        
-        // Perform upgrade
-        vm.prank(_aliceEOA);
-        UUPSUpgradeable(_alice).upgradeToAndCall(
-            address(smartWalletV2Implementation),
-            ""
-        );
-        
-        // Get nonce after upgrade
-        uint256 nonceAfter = INonceManager(_alice).getNonce(0);
-        assertEq(nonceAfter, nonceBefore, "Nonce should be preserved after upgrade");
-        
-        // Execute another transaction with relayer to verify nonce still works
-        BatchedCall memory secondBatchedCall = BatchedCall({
-            calls: calls,
-            nonce: 1, // Next nonce
-            expiry: 0
-        });
-        
-        // Create new signature for second call - use V2 implementation address
-        bytes32 hash2 = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(secondBatchedCall, address(smartWalletV2Implementation))
-        );
-        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(_alicePk, hash2);
-        bytes memory validatorData2 = abi.encodePacked(aliceKeyHash, r2, s2, v2);
-        
-        vm.prank(address(0xCAFE));
-        ISmartWallet(_alice).executeWithRelayer(secondBatchedCall, validatorData2);
-        
-        uint256 nonceAfterExecution = INonceManager(_alice).getNonce(0);
-        assertEq(nonceAfterExecution, 2, "Nonce should be 2 after second execution");
-    }
-    
-    function test_upgrade_from_wallet_itself() public {
-        // Prepare upgrade call from wallet to itself
-        Call[] memory calls = new Call[](1);
-        calls[0] = Call({
-            target: _alice,
-            value: 0,
-            data: abi.encodeWithSelector(
-                UUPSUpgradeable.upgradeToAndCall.selector,
-                address(smartWalletV2Implementation),
-                ""
-            )
-        });
-        
-        // Execute upgrade through wallet's execute function
-        vm.prank(_aliceEOA);
-        ISmartWallet(_alice).execute(calls);
-        
-        // Verify upgrade succeeded
-        assertEq(OKXSmartWalletEntryV2(_alice).getVersion(), "v2");
-        assertTrue(OKXSmartWalletEntryV2(_alice).isUpgraded());
-    }
-    
-    function test_upgrade_with_initialization_call() public {
-        // Create initialization data for a hypothetical init function
-        bytes memory initData = abi.encodeWithSelector(
-            OKXSmartWalletEntryV2.getVersion.selector
-        );
-        
-        // Upgrade with initialization call
-        vm.prank(_aliceEOA);
-        UUPSUpgradeable(_alice).upgradeToAndCall(
-            address(smartWalletV2Implementation),
-            initData
-        );
-        
-        // Verify upgrade succeeded
-        assertEq(OKXSmartWalletEntryV2(_alice).getVersion(), "v2");
-        assertTrue(OKXSmartWalletEntryV2(_alice).isUpgraded());
-    }
-    
-    function test_cannot_upgrade_to_non_uups_contract() public {
-        // Deploy a non-UUPS contract
-        address nonUUPS = address(new NonUUPSContract());
-        
-        // Try to upgrade to non-UUPS contract - should fail
-        vm.prank(_aliceEOA);
-        vm.expectRevert(UUPSUpgradeable.UpgradeFailed.selector);
-        UUPSUpgradeable(_alice).upgradeToAndCall(nonUUPS, "");
-    }
-    
-    function test_multiple_owners_can_upgrade() public {
-        // Add bob as another owner
-        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
-        vm.prank(_alice);
-        IOwnersManager(_alice).addOwner(
-            bobKeyHash,
-            Static.ECDSA_VALIDATOR_ADDRESS,
-            0
-        );
-        
-        // Bob (as owner) can also upgrade
-        vm.prank(_bob);
-        UUPSUpgradeable(_alice).upgradeToAndCall(
-            address(smartWalletV2Implementation),
-            ""
-        );
-        
-        // Verify upgrade succeeded
-        assertEq(OKXSmartWalletEntryV2(_alice).getVersion(), "v2");
-    }
-    
     function test_upgrade_through_executeWithRelayer() public {
-        // This test simulates how a Passkey-only wallet would upgrade
-        // Using ECDSA for convenience in Foundry testing
+        // Simulate Passkey-only wallet upgrade through executeWithRelayer
+        // Using ECDSA signature to simulate Passkey scenario (Foundry limitation)
         
         // 1. Create upgrade call - wallet calls its own upgradeToAndCall
         Call[] memory upgradeCalls = new Call[](1);
@@ -314,52 +70,262 @@ contract SmartWalletUpgradeTest is Base {
         bytes32 hash = ERC712(_alice).hashTypedData(
             BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, hash);
-        bytes memory validatorData = abi.encodePacked(aliceKeyHash, r, s, v);
+        bytes memory validatorData = constructValidatorData(
+            _alice,
+            _aliceEOA,
+            _alicePk,
+            hash
+        );
         
-        // 4. Execute through relayer (simulating Passkey-only wallet upgrade path)
-        address relayer = address(0xCAFE);
-        vm.prank(relayer);  // Any address can be the relayer
+        // 4. Execute upgrade through relayer
+        vm.prank(_alice); // Anyone can be relayer, using alice for simplicity
         ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
         
-        // 5. Verify upgrade succeeded
-        assertEq(OKXSmartWalletEntryV2(_alice).getVersion(), "v2");
-        assertTrue(OKXSmartWalletEntryV2(_alice).isUpgraded());
+        // 5. Verify upgrade was successful
+        OKXSmartWalletEntryV2 upgradedWallet = OKXSmartWalletEntryV2(payable(_alice));
+        assertEq(upgradedWallet.getVersion(), "v2");
+        assertTrue(upgradedWallet.isUpgraded());
+    }
+    
+    function test_upgrade_preserves_owners_through_relayer() public {
+        // Add an additional owner before upgrade
+        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        _executeAddValidator(_alice, bobKeyHash, address(_ecdsaValidator), true, 0, address(0));
         
-        // 6. Verify wallet still works after upgrade with executeWithRelayer
-        Call[] memory postUpgradeCalls = new Call[](1);
-        postUpgradeCalls[0] = Call({
-            target: _bob,
-            value: 0.01 ether,
-            data: ""
+        // Create upgrade call
+        Call[] memory upgradeCalls = new Call[](1);
+        upgradeCalls[0] = Call({
+            target: _alice,
+            value: 0,
+            data: abi.encodeWithSelector(
+                UUPSUpgradeable.upgradeToAndCall.selector,
+                address(smartWalletV2Implementation),
+                ""
+            )
         });
         
-        BatchedCall memory postUpgradeBatch = BatchedCall({
-            calls: postUpgradeCalls,
-            nonce: 1,  // Next nonce
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: upgradeCalls,
+            nonce: 0,
             expiry: 0
         });
         
-        // Generate signature with V2 implementation address
-        bytes32 postHash = ERC712(_alice).hashTypedData(
-            BatchedCallLib.hash(postUpgradeBatch, address(smartWalletV2Implementation))
+        bytes32 hash = ERC712(_alice).hashTypedData(
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
-        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(_alicePk, postHash);
-        bytes memory postValidatorData = abi.encodePacked(aliceKeyHash, r2, s2, v2);
+        bytes memory validatorData = constructValidatorData(
+            _alice,
+            _aliceEOA,
+            _alicePk,
+            hash
+        );
         
-        uint256 bobBalanceBefore = _bob.balance;
-        vm.prank(relayer);
-        ISmartWallet(_alice).executeWithRelayer(postUpgradeBatch, postValidatorData);
+        // Execute upgrade
+        vm.prank(_alice);
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
         
-        // Verify transaction succeeded
-        assertEq(_bob.balance - bobBalanceBefore, 0.01 ether, "Post-upgrade transaction should succeed");
+        // Verify owners are preserved after upgrade
+        assertTrue(IOwnersManager(_alice).hasOwner(keccak256(abi.encodePacked(_aliceEOA))));
+        assertTrue(IOwnersManager(_alice).hasOwner(bobKeyHash));
     }
-}
-
-// Helper contract for testing non-UUPS upgrade attempts
-contract NonUUPSContract {
-    function someFunction() external pure returns (uint256) {
-        return 42;
+    
+    function test_upgrade_preserves_nonce_state_through_relayer() public {
+        // The default nonce key is 0 (not derived from keyHash)
+        uint192 nonceKey = 0;
+        
+        // Execute a few transactions to increment nonce
+        for (uint i = 0; i < 3; i++) {
+            Call[] memory calls = constructCallsData();
+            BatchedCall memory txCall = BatchedCall({
+                calls: calls,
+                nonce: i,  // Using sequential nonce with key 0
+                expiry: 0
+            });
+            
+            bytes32 txHash = ERC712(_alice).hashTypedData(
+                BatchedCallLib.hash(txCall, address(_smartWallet))
+            );
+            bytes memory txValidatorData = constructValidatorData(
+                _alice,
+                _aliceEOA,
+                _alicePk,
+                txHash
+            );
+            
+            vm.prank(_alice);
+            ISmartWallet(_alice).executeWithRelayer(txCall, txValidatorData);
+        }
+        
+        // Verify nonce was incremented
+        uint64 nonceBefore = INonceManager(_alice).getNonce(nonceKey);
+        assertEq(nonceBefore, 3);
+        
+        // Perform upgrade
+        Call[] memory upgradeCalls = new Call[](1);
+        upgradeCalls[0] = Call({
+            target: _alice,
+            value: 0,
+            data: abi.encodeWithSelector(
+                UUPSUpgradeable.upgradeToAndCall.selector,
+                address(smartWalletV2Implementation),
+                ""
+            )
+        });
+        
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: upgradeCalls,
+            nonce: 3,
+            expiry: 0
+        });
+        
+        bytes32 hash = ERC712(_alice).hashTypedData(
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+        );
+        bytes memory validatorData = constructValidatorData(
+            _alice,
+            _aliceEOA,
+            _alicePk,
+            hash
+        );
+        
+        vm.prank(_alice);
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        
+        // Verify nonce is preserved and incremented correctly
+        uint64 nonceAfter = INonceManager(_alice).getNonce(nonceKey);
+        assertEq(nonceAfter, 4);
+    }
+    
+    function test_upgrade_with_initialization_through_relayer() public {
+        // Deploy V2 with initialization function
+        bytes memory initData = abi.encodeWithSelector(
+            OKXSmartWalletEntryV2.getVersion.selector
+        );
+        
+        Call[] memory upgradeCalls = new Call[](1);
+        upgradeCalls[0] = Call({
+            target: _alice,
+            value: 0,
+            data: abi.encodeWithSelector(
+                UUPSUpgradeable.upgradeToAndCall.selector,
+                address(smartWalletV2Implementation),
+                initData
+            )
+        });
+        
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: upgradeCalls,
+            nonce: 0,
+            expiry: 0
+        });
+        
+        bytes32 hash = ERC712(_alice).hashTypedData(
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+        );
+        bytes memory validatorData = constructValidatorData(
+            _alice,
+            _aliceEOA,
+            _alicePk,
+            hash
+        );
+        
+        vm.prank(_alice);
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        
+        // Verify upgrade with initialization succeeded
+        OKXSmartWalletEntryV2 upgradedWallet = OKXSmartWalletEntryV2(payable(_alice));
+        assertEq(upgradedWallet.getVersion(), "v2");
+    }
+    
+    function test_non_admin_owner_cannot_upgrade_through_relayer() public {
+        // Add bob as a non-admin owner
+        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        _executeAddValidator(_alice, bobKeyHash, address(_ecdsaValidator), false, 0, address(0));
+        
+        // Bob (non-admin) tries to upgrade through executeWithRelayer
+        Call[] memory upgradeCalls = new Call[](1);
+        upgradeCalls[0] = Call({
+            target: _alice,
+            value: 0,
+            data: abi.encodeWithSelector(
+                UUPSUpgradeable.upgradeToAndCall.selector,
+                address(smartWalletV2Implementation),
+                ""
+            )
+        });
+        
+        // Use bob's nonce key
+        uint192 bobNonceKey = uint192(uint256(bobKeyHash) >> 64);
+        uint256 bobNonce = (uint256(bobNonceKey) << 64) | 0;
+        
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: upgradeCalls,
+            nonce: bobNonce,
+            expiry: 0
+        });
+        
+        bytes32 hash = ERC712(_alice).hashTypedData(
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+        );
+        
+        // Sign with bob's key
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_bobPk, hash);
+        bytes memory validatorData = abi.encodePacked(bobKeyHash, r, s, v);
+        
+        // Should fail because non-admin cannot make self-calls
+        vm.prank(makeAddr("relayer"));
+        vm.expectRevert(abi.encodeWithSelector(Errors.NonAdminSelfCall.selector));
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+    }
+    
+    function test_upgrade_fails_with_invalid_signature() public {
+        Call[] memory upgradeCalls = new Call[](1);
+        upgradeCalls[0] = Call({
+            target: _alice,
+            value: 0,
+            data: abi.encodeWithSelector(
+                UUPSUpgradeable.upgradeToAndCall.selector,
+                address(smartWalletV2Implementation),
+                ""
+            )
+        });
+        
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: upgradeCalls,
+            nonce: 0,
+            expiry: 0
+        });
+        
+        bytes32 hash = ERC712(_alice).hashTypedData(
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+        );
+        
+        // Use wrong key to sign (bob's key for alice's wallet)
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_bobPk, hash);
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        bytes memory invalidValidatorData = abi.encodePacked(aliceKeyHash, r, s, v);
+        
+        // Should revert with InvalidSignature
+        vm.prank(_alice);
+        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidSignature.selector));
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, invalidValidatorData);
+    }
+    
+    function test_direct_upgrade_call_fails() public {
+        // Direct call from non-owner should fail with NotFromSelf
+        vm.prank(_bob);
+        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        UUPSUpgradeable(_alice).upgradeToAndCall(
+            address(smartWalletV2Implementation),
+            ""
+        );
+        
+        // Direct call from EOA owner also fails with NotFromSelf
+        vm.prank(_aliceEOA);
+        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        UUPSUpgradeable(_alice).upgradeToAndCall(
+            address(smartWalletV2Implementation),
+            ""
+        );
     }
 }

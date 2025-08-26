@@ -241,6 +241,66 @@ contract ValidatorTest is Base {
         assertTrue(isSignerExpired(_alice, keyHash));
     }
 
+    function test_getVerifiedValidator_returns_zero_for_expired_owner() public {
+        // Add a validator with short expiration time
+        bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
+        address validatorAddress = Static.ECDSA_VALIDATOR_ADDRESS;
+        uint40 expiration = uint40(block.timestamp + 100); // Expires in 100 seconds
+
+        _executeAddValidator(
+            _alice,
+            keyHash,
+            validatorAddress,
+            false,
+            expiration,
+            address(0)
+        );
+
+        // Before expiration, getVerifiedValidator should return the validator address
+        address verifiedValidator = IOwnersManager(_alice).getVerifiedValidator(
+            keyHash
+        );
+        assertEq(
+            verifiedValidator,
+            validatorAddress,
+            "Validator should be returned before expiration"
+        );
+
+        // Verify the validator exists in ownerValidators mapping
+        address storedValidator = IOwnersManager(_alice).ownerValidators(
+            keyHash
+        );
+        assertEq(
+            storedValidator,
+            validatorAddress,
+            "Validator should exist in ownerValidators"
+        );
+
+        // Fast forward time past expiration
+        vm.warp(block.timestamp + 101);
+
+        // After expiration, getVerifiedValidator should return address(0)
+        verifiedValidator = IOwnersManager(_alice).getVerifiedValidator(
+            keyHash
+        );
+        assertEq(
+            verifiedValidator,
+            address(0),
+            "getVerifiedValidator should return address(0) for expired validator"
+        );
+
+        // But ownerValidators still returns the validator address (doesn't check expiration)
+        storedValidator = IOwnersManager(_alice).ownerValidators(keyHash);
+        assertEq(
+            storedValidator,
+            validatorAddress,
+            "ownerValidators should still return the validator address"
+        );
+
+        // Verify the owner is indeed expired
+        assertTrue(isSignerExpired(_alice, keyHash), "Owner should be expired");
+    }
+
     function test_permanent_validator_never_expires() public {
         bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
         address validatorAddress = Static.ECDSA_VALIDATOR_ADDRESS;

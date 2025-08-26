@@ -21,6 +21,7 @@ import {BatchedCallLib} from "./libraries/BatchedCallLib.sol";
 import {AllowanceManager} from "./AllowanceManager.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 import {DecodeLib} from "./libraries/DecodeLib.sol";
+import {ChainlessLib} from "./libraries/ChainlessLib.sol";
 
 // Do not set any states in this contract
 contract SmartWallet is
@@ -77,9 +78,6 @@ contract SmartWallet is
         // isAdmin = true, expiration = 0 (never expires), hook = address(0)
         uint256 settings = packSettings(true, 0, address(0));
         uint256 len = initialOwners.length;
-        if (len == 0) {
-            /// revert Errors.InvalidOwnersAndValidatorsLength();
-        }
         for (uint256 i = 0; i < len; i++) {
             bytes32 keyHash = initialOwners[i].keyHash;
             address validator = initialOwners[i].validator;
@@ -135,7 +133,9 @@ contract SmartWallet is
 
         if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
             // Validate all calls are allowed to skip chain ID validation
-            if (!_validateChainlessNonceCallData(batchedCall.calls)) {
+            if (
+                !ChainlessLib.validateChainlessNonceCallData(batchedCall.calls)
+            ) {
                 revert Errors.InvalidNonceKey(nonceKey);
             }
             dataHash = hashTypedDataSansChainId(dataHash);
@@ -274,7 +274,7 @@ contract SmartWallet is
             Call[] memory calls = abi.decode(userOp.callData[4:], (Call[]));
 
             // Validate all calls are allowed to skip chain ID validation
-            if (!_validateChainlessNonceCallData(calls)) {
+            if (!ChainlessLib.validateChainlessNonceCallData(calls)) {
                 return Static.SIG_VALIDATION_FAILED;
             }
 
@@ -345,58 +345,10 @@ contract SmartWallet is
         return Static.INVALID_VALUE;
     }
 
-    /// @notice Returns whether `functionSelector` can be called in `executeWithoutChainIdValidation`
-    /// @param functionSelector The function selector to check
-    /// @return `true` if the function selector is allowed to skip the chain ID validation, else `false`
-    /// @dev This function is used to skip the chain ID validation for the following functions:
-    ///      - addOwner
-    ///      - updateOwner
-    ///      - removeOwner
-    ///      - upgradeToAndCall
-    function canSkipChainIdValidation(
-        bytes4 functionSelector
-    ) public pure returns (bool) {
-        if (
-            functionSelector == OwnersManager.addOwner.selector ||
-            functionSelector == OwnersManager.updateOwner.selector ||
-            functionSelector == OwnersManager.removeOwner.selector ||
-            functionSelector == UUPSUpgradeable.upgradeToAndCall.selector
-        ) {
-            return true;
-        }
-        return false;
-    }
-
-    /// @notice Validates that all calls in the batch are allowed to skip chain ID validation
-    /// @param calls Array of calls to validate
-    /// @return true if all calls are allowed to skip chain ID validation, false otherwise
-    /// @dev This is used when CHAIN_LESS_NONCE_KEY is used to ensure only allowed operations are performed
-    function _validateChainlessNonceCallData(
-        Call[] memory calls
-    ) internal pure returns (bool) {
-        for (uint256 i; i < calls.length; i++) {
-            bytes memory callData = calls[i].data;
-            if (callData.length < 4) {
-                return false;
-            }
-
-            bytes4 selector;
-            assembly {
-                /// @dev truncate to only take the first 4 bytes
-                selector := mload(add(callData, 32))
-            }
-
-            if (!canSkipChainIdValidation(selector)) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     /// @inheritdoc UUPSUpgradeable
-    /// @dev Authorization logic is only based on the `msg.sender` being an owner of this account,
-    ///      or `address(this)`.
+    /// @dev Only allows the wallet itself to authorize upgrades, ensuring that upgrades
+    ///      must go through execute() or executeWithRelayer() with proper authorization
     function _authorizeUpgrade(
         address
-    ) internal view override(UUPSUpgradeable) onlyOwner {}
+    ) internal view override(UUPSUpgradeable) onlySelf {}
 }

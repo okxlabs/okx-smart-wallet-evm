@@ -127,67 +127,6 @@ contract ChainlessExecutionTest is Base {
     // Chainless Execution Function Tests
     // ================================
 
-    /**
-     * @notice Test canSkipChainIdValidation returns true for allowed selectors
-     */
-    function test_canSkipChainIdValidation_allowed_selectors() external {
-        assertTrue(
-            SmartWallet(payable(testAccount)).canSkipChainIdValidation(
-                OwnersManager.addOwner.selector
-            ),
-            "addOwner should be allowed"
-        );
-        assertTrue(
-            SmartWallet(payable(testAccount)).canSkipChainIdValidation(
-                OwnersManager.updateOwner.selector
-            ),
-            "updateOwner should be allowed"
-        );
-        assertTrue(
-            SmartWallet(payable(testAccount)).canSkipChainIdValidation(
-                OwnersManager.removeOwner.selector
-            ),
-            "removeOwner should be allowed"
-        );
-        assertTrue(
-            SmartWallet(payable(testAccount)).canSkipChainIdValidation(
-                UUPSUpgradeable.upgradeToAndCall.selector
-            ),
-            "upgradeToAndCall should be allowed"
-        );
-    }
-
-    /**
-     * @notice Test canSkipChainIdValidation returns false for disallowed selectors
-     */
-    function test_canSkipChainIdValidation_disallowed_selectors() external {
-        // Test common function selectors that should NOT be allowed
-        assertFalse(
-            SmartWallet(payable(testAccount)).canSkipChainIdValidation(
-                bytes4(keccak256("transfer(address,uint256)"))
-            ),
-            "transfer should not be allowed"
-        );
-        assertFalse(
-            SmartWallet(payable(testAccount)).canSkipChainIdValidation(
-                bytes4(keccak256("execute()"))
-            ),
-            "execute should not be allowed"
-        );
-        assertFalse(
-            SmartWallet(payable(testAccount)).canSkipChainIdValidation(
-                bytes4(0)
-            ),
-            "null selector should not be allowed"
-        );
-        assertFalse(
-            SmartWallet(payable(testAccount)).canSkipChainIdValidation(
-                bytes4(0xffffffff)
-            ),
-            "invalid selector should not be allowed"
-        );
-    }
-
     // ========================================
     // Chainless Execution - UserOperation Tests
     // ========================================

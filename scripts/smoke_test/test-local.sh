@@ -6,6 +6,9 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+# RPC URL configuration
+RPC_URL="http://localhost:8545"
+
 echo -e "${GREEN}🚀 Starting Smart Wallet Local Test${NC}"
 
 # Check if anvil is installed
@@ -43,7 +46,7 @@ if ! kill -0 $ANVIL_PID 2>/dev/null; then
 fi
 
 echo -e "${GREEN}✅ Foundry node started (PID: $ANVIL_PID)${NC}"
-echo -e "${YELLOW}🔗 Node URL: http://localhost:8545${NC}"
+echo -e "${YELLOW}🔗 Node URL: $RPC_URL${NC}"
 echo -e "${YELLOW}🆔 Chain ID: 31337${NC}"
 
 # Function to cleanup on exit
@@ -66,7 +69,7 @@ if [ -n "$DEPLOYER_PRIVATE_KEY" ]; then
     # Calculate the address from private key and send ETH from first default account
     DEPLOYER_ADDRESS=$(cast wallet address $DEPLOYER_PRIVATE_KEY)
     echo -e "${YELLOW}📍 Deployer address: $DEPLOYER_ADDRESS${NC}"
-    cast send --rpc-url http://localhost:8545 \
+    cast send --rpc-url $RPC_URL \
         --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
         --value 1000ether \
         $DEPLOYER_ADDRESS > /dev/null 2>&1
@@ -93,7 +96,7 @@ fi
 echo -e "${YELLOW}🏗️  Deploying SmartWallet contracts...${NC}"
 
 # Deploy the SmartWallet contracts and capture output
-DEPLOY_OUTPUT=$(forge script scripts/DeployInit.sol --rpc-url http://localhost:8545 --broadcast 2>&1)
+DEPLOY_OUTPUT=$(forge script scripts/DeployInit.sol --rpc-url $RPC_URL --broadcast 2>&1)
 DEPLOY_RESULT=$?
 
 if [ $DEPLOY_RESULT -eq 0 ]; then
@@ -131,9 +134,9 @@ fi
 
 echo -e "${YELLOW}🧪 Running smoke test scripts...${NC}"
 
-# Test 1: Set Code and Initialize (Forge script)
+# Test 1: Set Code and Initialize (Using yarn command from package.json)
 echo -e "${YELLOW}📝 Test 1: EIP-7702 Set Code and Initialize${NC}"
-forge script scripts/smoke_test/1-setCodeAndInitialize.sol --rpc-url http://localhost:8545 --broadcast --evm-version prague --skip-simulation
+yarn 1-setCodeAndInitialize $RPC_URL --broadcast --evm-version prague --skip-simulation
 TEST1_RESULT=$?
 
 if [ $TEST1_RESULT -eq 0 ]; then
@@ -143,9 +146,9 @@ else
     exit $TEST1_RESULT
 fi
 
-# Test 2: Send Direct Transactions (Forge script)
+# Test 2: Send Direct Transactions (Using yarn command from package.json)
 echo -e "${YELLOW}📝 Test 2: Direct execution from SmartWallet${NC}"
-forge script scripts/smoke_test/2-sendTxs.sol --rpc-url http://localhost:8545 --broadcast
+yarn 2-sendTxs $RPC_URL --broadcast
 TEST2_RESULT=$?
 
 if [ $TEST2_RESULT -eq 0 ]; then
@@ -155,9 +158,9 @@ else
     exit $TEST2_RESULT
 fi
 
-# Test 3: Send Transactions with Relayer (Forge script)
+# Test 3: Send Transactions with Relayer (Using yarn command from package.json)
 echo -e "${YELLOW}📝 Test 3: Relayer-based execution (executeWithRelayer)${NC}"
-forge script scripts/smoke_test/3-sendTxsAsRelayer.sol --rpc-url http://localhost:8545 --broadcast
+yarn 3-sendTxsAsRelayer $RPC_URL --broadcast
 TEST3_RESULT=$?
 
 if [ $TEST3_RESULT -eq 0 ]; then

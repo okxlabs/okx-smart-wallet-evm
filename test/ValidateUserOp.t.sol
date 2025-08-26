@@ -42,6 +42,25 @@ contract ValidateUserOpTest is Base {
         passkeyValidator = new PasskeyValidator();
     }
 
+    function test_entryPoint_returns_correct_address() public {
+        // Test that the entryPoint function returns the correct address
+        address expectedEntryPoint = 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
+        address actualEntryPoint = ERC4337Account(_alice).entryPoint();
+
+        assertEq(
+            actualEntryPoint,
+            expectedEntryPoint,
+            "EntryPoint address should match the expected ERC-4337 EntryPoint"
+        );
+
+        // Also verify it matches the constant defined in Base.t.sol
+        assertEq(
+            actualEntryPoint,
+            ENTRYPOINT_ADDRESS,
+            "EntryPoint should match the ENTRYPOINT_ADDRESS constant"
+        );
+    }
+
     // Allow this test contract to receive ETH from EntryPoint
     receive() external payable {}
 

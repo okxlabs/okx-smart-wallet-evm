@@ -314,4 +314,118 @@ contract PasskeyValidatorTest is Base {
         );
         console.log("Long data length:", longData.length);
     }
+
+    function test_validateSignature_short_validatorData_fails() public view {
+        // Create validatorData that is shorter than PASSKEY_PUBKEY_LENGTH (64 bytes)
+        // The function expects at least 64 bytes for the PasskeyPubKey struct
+
+        // Create a short byte array (63 bytes instead of minimum 64)
+        bytes memory shortValidatorData = new bytes(63);
+
+        // Fill it with some data (doesn't matter what since it should fail on length check)
+        for (uint256 i = 0; i < shortValidatorData.length; i++) {
+            shortValidatorData[i] = bytes1(uint8(i));
+        }
+
+        // Log the lengths for debugging
+        console.log("Short validatorData length:", shortValidatorData.length);
+        console.log("PASSKEY_PUBKEY_LENGTH constant: 64");
+
+        // Should return false due to insufficient length
+        bool isValid = passkeyValidator.validateSignature(
+            testKeyHash,
+            SIGNED_MESSAGE_HASH,
+            shortValidatorData
+        );
+
+        assertEq(
+            isValid,
+            false,
+            "Should reject validatorData shorter than PASSKEY_PUBKEY_LENGTH"
+        );
+    }
+
+    function test_executeWithRelayer_short_validatorData_fails() public {
+        // Create valid calls
+        Call[] memory calls = constructCallsData();
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: _getNonce(_alice),
+            expiry: uint48(block.timestamp + 1 hours)
+        });
+
+        // Create validatorData with only 95 bytes total (32 + 63)
+        // After extracting the first 32 bytes as keyHash, only 63 bytes remain
+        // which is less than PASSKEY_PUBKEY_LENGTH (64 bytes)
+        bytes memory shortValidatorData = new bytes(95);
+
+        // First 32 bytes: keyHash
+        bytes32 keyHash = testKeyHash;
+        for (uint256 i = 0; i < 32; i++) {
+            shortValidatorData[i] = keyHash[i];
+        }
+
+        // Remaining 63 bytes: incomplete data (should be at least 64)
+        for (uint256 i = 32; i < 95; i++) {
+            shortValidatorData[i] = bytes1(uint8(i - 32));
+        }
+
+        // Log for debugging
+        console.log("Total validatorData length:", shortValidatorData.length);
+        console.log(
+            "Data after keyHash extraction:",
+            shortValidatorData.length - 32
+        );
+
+        // Should revert with InvalidSignature because PasskeyValidator will return false
+        vm.prank(_bob);
+        vm.expectRevert(Errors.InvalidSignature.selector);
+        ISmartWallet(_alice).executeWithRelayer(
+            batchedCall,
+            shortValidatorData
+        );
+    }
+
+    function test_executeWithRelayer_incomplete_webauthn_data_fails() public {
+        // Create valid calls
+        Call[] memory calls = constructCallsData();
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: _getNonce(_alice),
+            expiry: uint48(block.timestamp + 1 hours)
+        });
+
+        // Build validatorData with valid pubkey but incomplete WebAuthnAuth
+        bytes memory pubKeyData = abi.encode(
+            PasskeyValidatorLib.PasskeyPubKey({
+                pubKeyX: _passkeyPubX,
+                pubKeyY: _passkeyPubY
+            })
+        );
+
+        // Create incomplete WebAuthnAuth data
+        // WebAuthnAuth struct needs: authenticatorData, clientDataJSON, challengeIndex, typeIndex, r, s
+        // We'll create data that's too short to properly decode
+        bytes memory incompleteAuth = new bytes(50); // Much too short for full WebAuthnAuth
+        for (uint256 i = 0; i < incompleteAuth.length; i++) {
+            incompleteAuth[i] = bytes1(uint8(i));
+        }
+
+        // Combine: keyHash (32) + pubKey (64) + incomplete auth
+        bytes memory validatorData = abi.encodePacked(
+            testKeyHash,
+            pubKeyData,
+            incompleteAuth
+        );
+
+        // Log for debugging
+        console.log("Total validatorData length:", validatorData.length);
+        console.log("PubKey data length:", pubKeyData.length);
+        console.log("Incomplete auth data length:", incompleteAuth.length);
+
+        // Should revert due to abi.decode failure or validation failure
+        vm.prank(_bob);
+        vm.expectRevert(); // May revert with decode error or InvalidSignature
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+    }
 }
