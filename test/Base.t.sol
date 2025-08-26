@@ -8,6 +8,8 @@ import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {OKXSmartWalletEntry} from "src/OKXSmartWalletEntry.sol";
 import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
+import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
+import {Helper} from "src/test/Helper.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 import {DeployInitHelper, DeployFactory} from "scripts/DeployInitHelper.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -36,6 +38,7 @@ contract Base is Test {
     uint256 internal _passkeyPubY;
     uint256 internal _passkeyPrivateKey;
     ECDSAValidator internal _ecdsaValidator; // Shared validator instance
+    PasskeyValidator internal _passkeyValidator;
     OKXSmartWalletEntry internal _smartWallet;
     SmartWalletFactory internal _factory;
     DeployFactory public deployFactory;
@@ -69,8 +72,14 @@ contract Base is Test {
         deployFactory = new DeployFactory();
         bytes32 deployFactorySalt = vm.envBytes32("DEPLOY_FACTORY_SALT");
 
-        (_ecdsaValidator, , _smartWallet, _factory, ) = DeployInitHelper
-            .deployContracts(deployFactory, deployFactorySalt);
+        Helper helper;
+        (
+            _ecdsaValidator,
+            _passkeyValidator,
+            _smartWallet,
+            _factory,
+            helper
+        ) = DeployInitHelper.deployContracts(deployFactory, deployFactorySalt);
 
         // Use factory to create a wallet for Alice instead of _setCodeToEOA
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
