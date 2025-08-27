@@ -264,8 +264,8 @@ contract SmartWallet is
             _call(calls[i]);
         }
 
-        // Only call postCheck if hook exists and settings are not expired
-        if (hookAddress != address(0) && !isSettingsExpired(settings)) {
+        // Only call postCheck if hook exists
+        if (hookAddress != address(0)) {
             IHook(hookAddress).postCheck(ret, msg.sender);
         }
     }
