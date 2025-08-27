@@ -17,6 +17,7 @@ abstract contract OwnersManager is IOwnersManager {
     EnumerableSetLib.Bytes32Set internal _ownerKeys; // Set of all owner keyHashes
     mapping(bytes32 => address) public ownerValidators; // keyHash => validator address for this owner
     mapping(bytes32 => uint256) public ownerSettings; // keyHash => packed settings (isAdmin + expiration + hook)
+    uint256 public override sequence;
 
     // ============ Modifiers ============
 
@@ -34,11 +35,14 @@ abstract contract OwnersManager is IOwnersManager {
     /// @param keyHash The public key hash to associate with this validator
     /// @param validator The address of the validator contract to be registered
     /// @param settings Packed settings value (use packSettings to create)
+    /// @param seq The nonce to validate
     function addOwner(
         bytes32 keyHash,
         address validator,
-        uint256 settings
+        uint256 settings,
+        uint256 seq
     ) external onlySelf {
+        _validateSeq(seq);
         _addOwner(keyHash, validator, settings);
     }
 
@@ -70,11 +74,14 @@ abstract contract OwnersManager is IOwnersManager {
     /// @param keyHash The public key hash to update
     /// @param newValidator The new validator address
     /// @param newSettings New packed settings value (use packSettings to create)
+    /// @param seq The nonce to validate
     function updateOwner(
         bytes32 keyHash,
         address newValidator,
-        uint256 newSettings
+        uint256 newSettings,
+        uint256 seq
     ) external onlySelf {
+        _validateSeq(seq);
         // Check if keyHash exists
         if (!_ownerKeys.contains(keyHash)) {
             revert Errors.ValidatorNotFound();
@@ -93,9 +100,19 @@ abstract contract OwnersManager is IOwnersManager {
     /// @notice Removes a validator associated with a keyHash
     /// @dev Only callable by the wallet owner
     /// @param keyHash The public key hash to remove
-    function removeOwner(bytes32 keyHash) external onlySelf {
+    /// @param seq The nonce to validate
+    function removeOwner(bytes32 keyHash, uint256 seq) external onlySelf {
+        _validateSeq(seq);
         _removeValidator(keyHash);
         emit OwnerRemoved(keyHash);
+    }
+
+    /// @notice Validate sequence
+    /// @param seq The sequence to validate
+    function _validateSeq(uint256 seq) private {
+        if (seq != sequence++) {
+            revert Errors.InvalidSequence(seq);
+        }
     }
 
     // ============ External View Functions (Interface Implementation) ============

@@ -693,7 +693,8 @@ contract ValidationTest is Base {
                 OwnersManager.updateOwner.selector,
                 ownerKeyHash,
                 address(_ecdsaValidator),
-                newSettings
+                newSettings,
+                IOwnersManager(_alice).sequence()
             )
         });
 
@@ -745,7 +746,8 @@ contract ValidationTest is Base {
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.removeOwner.selector,
-                ownerKeyHash
+                ownerKeyHash,
+                IOwnersManager(_alice).sequence()
             )
         });
 
@@ -823,9 +825,8 @@ contract ValidationTest is Base {
                 OwnersManager.addOwner.selector,
                 newOwnerKeyHash,
                 address(_ecdsaValidator),
-                false,
                 0,
-                address(0)
+                IOwnersManager(_alice).sequence()
             )
         });
 
@@ -843,7 +844,8 @@ contract ValidationTest is Base {
                 OwnersManager.updateOwner.selector,
                 aliceKeyHash,
                 address(_ecdsaValidator),
-                adminSettings
+                adminSettings,
+                IOwnersManager(_alice).sequence() + 1
             )
         });
 
@@ -959,7 +961,8 @@ contract ValidationTest is Base {
                 OwnersManager.addOwner.selector,
                 newOwnerKeyHash2,
                 address(_ecdsaValidator),
-                0 // Default settings
+                0, // Default settings
+                IOwnersManager(_alice).sequence()
             )
         });
 
@@ -976,7 +979,8 @@ contract ValidationTest is Base {
                 OwnersManager.updateOwner.selector,
                 aliceKeyHash,
                 address(_ecdsaValidator),
-                adminSettings
+                adminSettings,
+                IOwnersManager(_alice).sequence() + 1
             )
         });
 
@@ -986,7 +990,8 @@ contract ValidationTest is Base {
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.removeOwner.selector,
-                newOwnerKeyHash
+                newOwnerKeyHash,
+                IOwnersManager(_alice).sequence() + 2
             )
         });
 

@@ -30,4 +30,6 @@ library Errors {
     error InvalidNonceKey(uint256 nonce);
 
     error InvalidCaller(address owner);
+
+    error InvalidSequence(uint256 seq);
 }

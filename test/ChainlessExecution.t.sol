@@ -150,7 +150,8 @@ contract ChainlessExecutionTest is Base {
                 OwnersManager.addOwner.selector,
                 newOwnerKeyHash,
                 address(_ecdsaValidator),
-                0
+                0,
+                IOwnersManager(testAccount).sequence()
             )
         });
 
@@ -167,7 +168,8 @@ contract ChainlessExecutionTest is Base {
                 OwnersManager.updateOwner.selector,
                 aliceKeyHash,
                 address(_ecdsaValidator),
-                adminSettings
+                adminSettings,
+                IOwnersManager(testAccount).sequence() + 1
             )
         });
 
@@ -285,7 +287,8 @@ contract ChainlessExecutionTest is Base {
                 OwnersManager.addOwner.selector,
                 bobKeyHash,
                 address(_ecdsaValidator),
-                0
+                0,
+                IOwnersManager(testAccount).sequence()
             )
         });
         calls[1] = Call({target: _bob, value: 1 ether, data: ""});
@@ -413,7 +416,8 @@ contract ChainlessExecutionTest is Base {
                 OwnersManager.addOwner.selector,
                 bobKeyHash,
                 address(_ecdsaValidator),
-                0
+                0,
+                IOwnersManager(testAccount).sequence()
             )
         });
 
@@ -542,7 +546,8 @@ contract ChainlessExecutionTest is Base {
                 OwnersManager.addOwner.selector,
                 bobKeyHash,
                 address(_ecdsaValidator),
-                0
+                0,
+                IOwnersManager(testAccount).sequence()
             )
         });
 
@@ -589,7 +594,8 @@ contract ChainlessExecutionTest is Base {
         SmartWallet(payable(testAccount)).addOwner(
             keyHash,
             validator,
-            adminSettings
+            adminSettings,
+            IOwnersManager(testAccount).sequence()
         );
     }
 }

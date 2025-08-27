@@ -103,7 +103,8 @@ contract HookTest is Base {
                     true,
                     uint40(expiration),
                     hook
-                ) // Pack settings with hook
+                ), // Pack settings with hook
+                IOwnersManager(_alice).sequence()
             )
         });
 
@@ -141,7 +142,8 @@ contract HookTest is Base {
                     true,
                     uint40(expiration),
                     hook
-                ) // Pack settings with hook
+                ), // Pack settings with hook
+                IOwnersManager(_alice).sequence()
             )
         });
 
@@ -1039,7 +1041,8 @@ contract HookTest is Base {
                 OwnersManager.updateOwner.selector,
                 aliceKeyHash,
                 address(_ecdsaValidator), // Use the existing validator
-                IOwnersManager(_alice).packSettings(true, 0, address(mockHook)) // Pack settings with hook
+                IOwnersManager(_alice).packSettings(true, 0, address(mockHook)), // Pack settings with hook
+                IOwnersManager(_alice).sequence()
             )
         });
 

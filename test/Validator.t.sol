@@ -71,7 +71,7 @@ contract ValidatorTest is Base {
     }
 
     function test_addValidator_reverts_for_invalid_implementation() public {
-        address dave = vm.addr(2);
+        address dave = vm.addr(3);
 
         // Pack settings before setting expectRevert
         uint256 settings = OwnersManager(_alice).packSettings(
@@ -80,6 +80,7 @@ contract ValidatorTest is Base {
             address(0)
         );
 
+        uint256 seq = IOwnersManager(_alice).sequence();
         // Expect invalid validator implementation revert when called through execute
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidValidatorImpl.selector, dave)
@@ -88,7 +89,8 @@ contract ValidatorTest is Base {
             _alice,
             keccak256(abi.encodePacked(address(this))),
             dave,
-            settings
+            settings,
+            seq
         );
     }
 
@@ -105,13 +107,14 @@ contract ValidatorTest is Base {
             0,
             address(0)
         );
-
+        uint256 seq = IOwnersManager(_alice).sequence();
         vm.expectRevert(Errors.ValidatorAlreadyExists.selector);
         _executeAddValidatorWithSettings(
             _alice,
             keyHash,
             address(_ecdsaValidator),
-            settings
+            settings,
+            seq
         );
     }
 
@@ -163,14 +166,15 @@ contract ValidatorTest is Base {
             0,
             address(0)
         );
-
+        uint256 seq = IOwnersManager(_alice).sequence();
         // Test that we can't add another validator for the same keyHash (should revert)
         vm.expectRevert(Errors.ValidatorAlreadyExists.selector);
         _executeAddValidatorWithSettings(
             _alice,
             keyHash,
             address(_ecdsaValidator),
-            settings
+            settings,
+            seq
         );
 
         // Test removing the validator
@@ -625,7 +629,8 @@ contract ValidatorTest is Base {
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.removeOwner.selector,
-                keyHash
+                keyHash,
+                IOwnersManager(_alice).sequence()
             )
         });
 
@@ -685,7 +690,8 @@ contract ValidatorTest is Base {
                 OwnersManager.updateOwner.selector,
                 keyHash,
                 Static.PASSKEY_VALIDATOR_ADDRESS,
-                newSettings
+                newSettings,
+                IOwnersManager(_alice).sequence()
             )
         });
 
@@ -732,7 +738,8 @@ contract ValidatorTest is Base {
                 OwnersManager.updateOwner.selector,
                 nonExistentKeyHash,
                 Static.ECDSA_VALIDATOR_ADDRESS,
-                settings
+                settings,
+                IOwnersManager(_alice).sequence()
             )
         });
 
@@ -782,7 +789,8 @@ contract ValidatorTest is Base {
                 OwnersManager.updateOwner.selector,
                 keyHash,
                 _charlie, // EOA address with no code
-                settings
+                settings,
+                IOwnersManager(_alice).sequence()
             )
         });
 
@@ -874,7 +882,8 @@ contract ValidatorTest is Base {
                 OwnersManager.addOwner.selector,
                 selfKeyHash,
                 address(_ecdsaValidator),
-                OwnersManager(freshWallet).packSettings(false, 0, address(0))
+                OwnersManager(freshWallet).packSettings(false, 0, address(0)),
+                IOwnersManager(freshWallet).sequence()
             )
         });
 
