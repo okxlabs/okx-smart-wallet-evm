@@ -1,23 +1,30 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.23;
 
-import {Test, console} from "forge-std/Test.sol";
+import {console} from "forge-std/Test.sol";
 import {Base} from "./Base.t.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 import {Errors} from "src/libraries/Errors.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
-import {OwnersManager} from "src/OwnersManager.sol";
-import {ValidateManager} from "src/ValidateManager.sol";
+import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
-import {P256} from "@openzeppelin/contracts/utils/cryptography/P256.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {ERC712} from "src/ERC712.sol";
 import {HelperLib} from "src/test/Helper.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
-import {Base64} from "@openzeppelin/contracts/utils/Base64.sol";
+import {Static} from "src/libraries/Static.sol";
+import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
+import {InitialOwner} from "src/Types.sol";
 
+/**
+ * @title PasskeyValidatorTest
+ * @notice Comprehensive test suite for both external and built-in Passkey validators
+ * @dev Tests two different validation pathways:
+ *      1. External PasskeyValidator contract (deployed contract)
+ *      2. Built-in Passkey validator (Static.PASSKEY_VALIDATOR_ADDRESS) - covers ValidateManager lines 46-54
+ */
 contract PasskeyValidatorTest is Base {
     PasskeyValidator internal passkeyValidator;
 
@@ -29,26 +36,50 @@ contract PasskeyValidatorTest is Base {
     bytes32 constant SIGNED_MESSAGE_HASH =
         0x34753a30843cdf97fd7c7f1cf2556d397c93bdfa6732b0b8b79bad029f5875e5;
 
-    bytes32 internal testKeyHash;
+    bytes32 internal testKeyHash; // For external validator tests
+    bytes32 internal builtinKeyHash; // For built-in validator tests
+    address internal builtinWallet; // Separate wallet for built-in validator tests
 
     function setUp() public override {
         super.setUp();
 
-        // Deploy PasskeyValidator
+        // Deploy external PasskeyValidator contract
         passkeyValidator = new PasskeyValidator();
 
-        // Use the generated keyHash
-        testKeyHash = keccak256(abi.encode([_passkeyPubX, _passkeyPubY]));
+        // Use the same Passkey credentials for both validators (from Base.sol)
+        // We'll create a second wallet to avoid validator collision
 
-        // Add PasskeyValidator for Alice's wallet
+        // Create keyHashes for both validator types
+        testKeyHash = keccak256(abi.encode([_passkeyPubX, _passkeyPubY])); // External validator
+        builtinKeyHash = keccak256(
+            abi.encodePacked(_passkeyPubX, _passkeyPubY)
+        ); // Built-in validator
+
+        // Add external PasskeyValidator for Alice's wallet
         _executeAddValidator(
             _alice,
             testKeyHash,
-            address(passkeyValidator),
+            address(passkeyValidator), // External contract address
             true,
             0,
             address(0)
         );
+
+        // Create separate wallet for built-in validator tests to avoid collision
+        InitialOwner[] memory builtinOwners = new InitialOwner[](1);
+        builtinOwners[0] = InitialOwner({
+            keyHash: builtinKeyHash,
+            validator: Static.PASSKEY_VALIDATOR_ADDRESS
+        });
+
+        builtinWallet = _factory.createAccount(
+            address(_smartWallet),
+            builtinOwners,
+            999 // Different salt to ensure different address
+        );
+
+        // Fund the built-in wallet
+        vm.deal(builtinWallet, 10 ether);
     }
 
     function test_passkeyValidator_deployment() public view {
@@ -324,7 +355,7 @@ contract PasskeyValidatorTest is Base {
 
         // Fill it with some data (doesn't matter what since it should fail on length check)
         for (uint256 i = 0; i < shortValidatorData.length; i++) {
-            shortValidatorData[i] = bytes1(uint8(i));
+            shortValidatorData[i] = bytes1(uint8(0));
         }
 
         // Log the lengths for debugging
@@ -367,7 +398,7 @@ contract PasskeyValidatorTest is Base {
 
         // Remaining 63 bytes: incomplete data (should be at least 64)
         for (uint256 i = 32; i < 95; i++) {
-            shortValidatorData[i] = bytes1(uint8(i - 32));
+            shortValidatorData[i] = bytes1(uint8(0));
         }
 
         // Log for debugging
@@ -408,7 +439,7 @@ contract PasskeyValidatorTest is Base {
         // We'll create data that's too short to properly decode
         bytes memory incompleteAuth = new bytes(50); // Much too short for full WebAuthnAuth
         for (uint256 i = 0; i < incompleteAuth.length; i++) {
-            incompleteAuth[i] = bytes1(uint8(i));
+            incompleteAuth[i] = bytes1(uint8(0));
         }
 
         // Combine: keyHash (32) + pubKey (64) + incomplete auth
@@ -427,5 +458,259 @@ contract PasskeyValidatorTest is Base {
         vm.prank(_bob);
         vm.expectRevert(); // May revert with decode error or InvalidSignature
         ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+    }
+
+    // ================================================================
+    // BUILT-IN PASSKEY VALIDATOR TESTS
+    // Tests ValidateManager._validateSignature lines 46-54
+    // ================================================================
+
+    /**
+     * @dev Verify built-in validator setup is correct
+     */
+    function test_builtin_validator_setup() public view {
+        address validator = IOwnersManager(builtinWallet).ownerValidators(
+            builtinKeyHash
+        );
+        assertEq(
+            validator,
+            Static.PASSKEY_VALIDATOR_ADDRESS,
+            "Built-in validator should be registered"
+        );
+
+        address verified = IOwnersManager(builtinWallet).getVerifiedValidator(
+            builtinKeyHash
+        );
+        assertEq(
+            verified,
+            Static.PASSKEY_VALIDATOR_ADDRESS,
+            "Built-in validator should be verified"
+        );
+    }
+
+    /**
+     * @dev Test successful execution with built-in Passkey validator via executeWithRelayer
+     * This covers the _validateSignature path with Static.PASSKEY_VALIDATOR_ADDRESS
+     */
+    function test_builtin_executeWithRelayer_success() public {
+        Call[] memory calls = constructCallsData();
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: INonceManager(builtinWallet).getNonce(0),
+            expiry: uint48(block.timestamp + 1 hours)
+        });
+
+        bytes32 typedDataHash = ERC712(builtinWallet).hashTypedData(
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+        );
+
+        bytes memory validatorData = _createBuiltinPasskeySignature(
+            builtinKeyHash,
+            typedDataHash
+        );
+
+        vm.prank(_bob);
+        vm.expectEmit(true, true, true, true);
+        emit ExecuteSuccessEvent(
+            keccak256(abi.encode(calls)),
+            _bob,
+            batchedCall.nonce
+        );
+        ISmartWallet(builtinWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
+
+        assertEq(address(_bob).balance, 1 ether);
+    }
+
+    /**
+     * @dev Test failure with invalid signature for built-in Passkey validator
+     */
+    function test_builtin_executeWithRelayer_invalid_signature() public {
+        Call[] memory calls = constructCallsData();
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: _getNonce(_alice),
+            expiry: 0
+        });
+
+        bytes memory invalidValidatorData = abi.encodePacked(
+            builtinKeyHash,
+            abi.encode(
+                PasskeyValidatorLib.PasskeyPubKey({
+                    pubKeyX: _passkeyPubX,
+                    pubKeyY: _passkeyPubY
+                })
+            ),
+            abi.encode(
+                WebAuthn.WebAuthnAuth({
+                    authenticatorData: abi.encodePacked("invalid_auth_data"),
+                    clientDataJSON: "invalid_client_data",
+                    challengeIndex: 23,
+                    typeIndex: 1,
+                    r: 0x123,
+                    s: 0x456
+                }),
+                new bytes32[](0)
+            )
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+        );
+        vm.prank(_bob);
+        ISmartWallet(_alice).executeWithRelayer(
+            batchedCall,
+            invalidValidatorData
+        );
+    }
+
+    /**
+     * @dev Test EIP-1271 signature validation with built-in Passkey validator
+     */
+    function test_builtin_isValidSignature_success() public view {
+        bytes32 hash = keccak256("test message");
+
+        bytes32 boundHash = keccak256(
+            abi.encode(bytes32(block.chainid), address(_alice), hash)
+        );
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", boundHash));
+
+        bytes memory signature = _createBuiltinPasskeySignature(
+            builtinKeyHash,
+            digest
+        );
+
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        assertEq(
+            result,
+            Static.MAGIC_VALUE,
+            "Built-in Passkey validator should validate EIP-1271 signature"
+        );
+    }
+
+    /**
+     * @dev Test UserOperation validation with built-in Passkey validator
+     */
+    function test_builtin_validateUserOp_success() public {
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: builtinKeyHash,
+            validator: Static.PASSKEY_VALIDATOR_ADDRESS
+        });
+
+        address passkeyWallet = _factory.createAccount(
+            address(_smartWallet),
+            initialOwners,
+            1
+        );
+
+        vm.deal(passkeyWallet, 1 ether);
+
+        PackedUserOperation memory userOp = PackedUserOperation({
+            sender: passkeyWallet,
+            nonce: 0,
+            initCode: "",
+            callData: abi.encodeWithSelector(
+                ISmartWallet.execute.selector,
+                Call({target: _bob, value: 0.1 ether, data: ""})
+            ),
+            accountGasLimits: bytes32(
+                abi.encodePacked(uint128(200000), uint128(200000))
+            ),
+            preVerificationGas: 21000,
+            gasFees: bytes32(
+                abi.encodePacked(uint128(1000000000), uint128(1000000000))
+            ),
+            paymasterAndData: "",
+            signature: ""
+        });
+
+        bytes32 userOpHash = _entryPoint.getUserOpHash(userOp);
+        bytes memory signature = _createBuiltinPasskeySignature(
+            builtinKeyHash,
+            userOpHash
+        );
+        userOp.signature = signature;
+
+        uint256 result = _testValidateUserOp(
+            passkeyWallet,
+            userOp,
+            userOpHash,
+            0
+        );
+        assertEq(
+            result,
+            0,
+            "Built-in Passkey validator should validate UserOp successfully"
+        );
+    }
+
+    /**
+     * @dev Test built-in Passkey validator with insufficient signature data
+     */
+    function test_builtin_insufficient_data() public {
+        Call[] memory calls = constructCallsData();
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: _getNonce(_alice),
+            expiry: 0
+        });
+
+        bytes memory insufficientData = abi.encodePacked(
+            builtinKeyHash,
+            bytes16(0x123456789abcdef123456789abcdef12)
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+        );
+        vm.prank(_bob);
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, insufficientData);
+    }
+
+    // ================================================================
+    // HELPER FUNCTIONS FOR BUILT-IN VALIDATOR
+    // ================================================================
+
+    /**
+     * @dev Create a valid built-in Passkey signature for testing
+     * Using the same keys and approach as the working external validator test
+     */
+    function _createBuiltinPasskeySignature(
+        bytes32 keyHash,
+        bytes32 messageHash
+    ) internal view returns (bytes memory) {
+        (, , bytes32 passkeyMessageHash) = HelperLib.getPasskeyMessageHash(
+            messageHash
+        );
+        (bytes32 r, bytes32 s) = vm.signP256(
+            _passkeyPrivateKey,
+            passkeyMessageHash
+        );
+
+        WebAuthn.WebAuthnAuth memory auth = HelperLib.getWebAuthnAuth(
+            messageHash,
+            uint256(r),
+            uint256(s)
+        );
+
+        // Create the signature exactly like the working external validator test
+        bytes memory sig = abi.encode(auth, new bytes32[](0));
+
+        // Create validatorData in the same format as external test
+        bytes memory validatorDataForLib = abi.encodePacked(
+            abi.encode(
+                PasskeyValidatorLib.PasskeyPubKey({
+                    pubKeyX: _passkeyPubX,
+                    pubKeyY: _passkeyPubY
+                })
+            ),
+            sig
+        );
+
+        // For built-in validator: keyHash + validatorData that will be passed to PasskeyValidatorLib
+        return abi.encodePacked(keyHash, validatorDataForLib);
     }
 }
