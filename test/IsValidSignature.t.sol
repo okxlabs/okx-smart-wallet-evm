@@ -9,9 +9,7 @@ import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {HelperLib} from "src/test/Helper.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 
-contract ValidationTest is Base {
-    event NonceConsumed(uint192 key, uint64 nonce);
-
+contract IsValidSignatureTest is Base {
     // Passkey-related constants and variables
     uint256 internal constant TEST_SIG_R =
         112450831948757142750562360134609669473647155538405639309009281430691665378703;
@@ -50,6 +48,316 @@ contract ValidationTest is Base {
 
         bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
         assertEq(result, bytes4(0xffffffff));
+    }
+
+    // ===== Boundary Condition and Exception Tests =====
+
+    function test_isValidSignature_fails_with_empty_signature() public view {
+        bytes32 hash = keccak256("test");
+        bytes memory signature = new bytes(0);
+
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        assertEq(
+            result,
+            Static.INVALID_VALUE,
+            "Empty signature should be invalid"
+        );
+    }
+
+    function test_isValidSignature_fails_with_1_byte_signature() public view {
+        bytes32 hash = keccak256("test");
+        bytes memory signature = new bytes(1);
+        signature[0] = 0x01;
+
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        assertEq(
+            result,
+            Static.INVALID_VALUE,
+            "1-byte signature should be invalid"
+        );
+    }
+
+    function test_isValidSignature_fails_with_15_byte_signature() public view {
+        bytes32 hash = keccak256("test");
+        bytes memory signature = new bytes(15);
+        // Fill with some data
+        for (uint i = 0; i < 15; i++) {
+            signature[i] = bytes1(uint8(i + 1));
+        }
+
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        assertEq(
+            result,
+            Static.INVALID_VALUE,
+            "15-byte signature should be invalid"
+        );
+    }
+
+    function test_isValidSignature_fails_with_31_byte_signature() public view {
+        bytes32 hash = keccak256("test");
+        bytes memory signature = new bytes(31);
+        // Fill with some data
+        for (uint i = 0; i < 31; i++) {
+            signature[i] = bytes1(uint8(i + 1));
+        }
+
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        assertEq(
+            result,
+            Static.INVALID_VALUE,
+            "31-byte signature should be invalid"
+        );
+    }
+
+    function test_isValidSignature_fails_with_33_byte_signature() public view {
+        bytes32 hash = keccak256("test");
+        bytes memory signature = new bytes(33);
+
+        // Fill first 32 bytes with a valid keyHash pattern
+        bytes32 someKeyHash = keccak256("some_key");
+        assembly {
+            mstore(add(signature, 0x20), someKeyHash)
+        }
+        // Add one more byte
+        signature[32] = 0x01;
+
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        assertEq(
+            result,
+            Static.INVALID_VALUE,
+            "33-byte signature with non-existent keyHash should be invalid"
+        );
+    }
+
+    function test_isValidSignature_fails_with_64_byte_signature() public view {
+        bytes32 hash = keccak256("test");
+        bytes memory signature = new bytes(64);
+
+        // Fill first 32 bytes with a valid keyHash pattern
+        bytes32 someKeyHash = keccak256("some_key");
+        assembly {
+            mstore(add(signature, 0x20), someKeyHash)
+        }
+        // Fill remaining 32 bytes with some data
+        for (uint i = 32; i < 64; i++) {
+            signature[i] = bytes1(uint8(i));
+        }
+
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        assertEq(
+            result,
+            Static.INVALID_VALUE,
+            "64-byte signature with non-existent keyHash should be invalid"
+        );
+    }
+
+    function test_isValidSignature_fails_with_66_byte_signature() public view {
+        bytes32 hash = keccak256("test");
+        bytes memory signature = new bytes(66);
+
+        // This is longer than 65 bytes, so it should go through validator path
+        // Fill first 32 bytes with non-existent keyHash
+        bytes32 nonExistentKeyHash = keccak256("non_existent_key");
+        assembly {
+            mstore(add(signature, 0x20), nonExistentKeyHash)
+        }
+
+        // Fill remaining bytes with some data
+        for (uint i = 32; i < 66; i++) {
+            signature[i] = bytes1(uint8(i));
+        }
+
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        assertEq(
+            result,
+            Static.INVALID_VALUE,
+            "66-byte signature with non-existent keyHash should be invalid"
+        );
+    }
+
+    function test_isValidSignature_handles_very_long_signature() public view {
+        bytes32 hash = keccak256("test");
+
+        // Create a very long signature (1KB)
+        bytes memory signature = new bytes(1024);
+
+        // Fill first 32 bytes with non-existent keyHash
+        bytes32 nonExistentKeyHash = keccak256("non_existent_key");
+        assembly {
+            mstore(add(signature, 0x20), nonExistentKeyHash)
+        }
+
+        // Fill remaining bytes with pattern data
+        for (uint i = 32; i < 1024; i++) {
+            signature[i] = bytes1(uint8(i % 256));
+        }
+
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        assertEq(
+            result,
+            Static.INVALID_VALUE,
+            "Very long signature with non-existent keyHash should be invalid"
+        );
+    }
+
+    function test_isValidSignature_fails_with_malformed_65_byte_signature()
+        public
+        view
+    {
+        bytes32 hash = keccak256("test");
+
+        // Create 65-byte signature with invalid ECDSA format
+        bytes memory signature = new bytes(65);
+        // Fill with invalid ECDSA signature data
+        for (uint i = 0; i < 65; i++) {
+            signature[i] = bytes1(uint8(i));
+        }
+
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        assertEq(
+            result,
+            Static.INVALID_VALUE,
+            "Malformed 65-byte ECDSA signature should be invalid"
+        );
+    }
+
+    function test_isValidSignature_fails_with_zero_hash() public view {
+        bytes32 zeroHash = bytes32(0);
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        bytes memory sig = _signDigest(zeroHash, _alicePk);
+        bytes memory signature = abi.encodePacked(aliceKeyHash, sig);
+
+        bytes4 result = ISmartWallet(_alice).isValidSignature(
+            zeroHash,
+            signature
+        );
+        assertEq(
+            result,
+            Static.MAGIC_VALUE,
+            "Zero hash should be valid if signature is correct"
+        );
+    }
+
+    function test_isValidSignature_fails_with_max_hash() public view {
+        bytes32 maxHash = bytes32(type(uint256).max);
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        bytes memory sig = _signDigest(maxHash, _alicePk);
+        bytes memory signature = abi.encodePacked(aliceKeyHash, sig);
+
+        bytes4 result = ISmartWallet(_alice).isValidSignature(
+            maxHash,
+            signature
+        );
+        assertEq(
+            result,
+            Static.MAGIC_VALUE,
+            "Max hash should be valid if signature is correct"
+        );
+    }
+
+    function test_isValidSignature_with_repeated_bytes_signature() public view {
+        bytes32 hash = keccak256("test");
+
+        // Create signature with repeated bytes pattern
+        bytes memory signature = new bytes(100);
+        bytes32 nonExistentKeyHash = bytes32(
+            0x1111111111111111111111111111111111111111111111111111111111111111
+        );
+
+        assembly {
+            mstore(add(signature, 0x20), nonExistentKeyHash)
+        }
+
+        // Fill remaining with repeated pattern
+        for (uint i = 32; i < 100; i++) {
+            signature[i] = 0xAA;
+        }
+
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        assertEq(
+            result,
+            Static.INVALID_VALUE,
+            "Signature with repeated bytes should be invalid with non-existent keyHash"
+        );
+    }
+
+    function test_isValidSignature_with_all_zero_signature() public view {
+        bytes32 hash = keccak256("test");
+
+        // Create signature with all zeros
+        bytes memory signature = new bytes(100);
+        // signature is already initialized with zeros
+
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        assertEq(
+            result,
+            Static.INVALID_VALUE,
+            "All-zero signature should be invalid"
+        );
+    }
+
+    function test_isValidSignature_with_all_max_signature() public view {
+        bytes32 hash = keccak256("test");
+
+        // Create signature with all 0xFF bytes
+        bytes memory signature = new bytes(100);
+        for (uint i = 0; i < 100; i++) {
+            signature[i] = 0xFF;
+        }
+
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        assertEq(
+            result,
+            Static.INVALID_VALUE,
+            "All-max signature should be invalid"
+        );
+    }
+
+    function test_isValidSignature_fails_with_65_byte_wrong_signer()
+        public
+        view
+    {
+        bytes32 hash = keccak256("test_wrong_signer");
+
+        // Create bound hash for EIP-1271 validation
+        bytes32 boundHash = keccak256(
+            abi.encode(bytes32(block.chainid), _alice, hash)
+        );
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", boundHash));
+
+        // Sign with Bob's private key instead of Alice's
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_bobPk, digest);
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        assertEq(
+            result,
+            Static.INVALID_VALUE,
+            "65-byte signature from wrong signer should fail"
+        );
+    }
+
+    function test_isValidSignature_fails_with_invalid_65_byte_signature_format()
+        public
+        view
+    {
+        bytes32 hash = keccak256("test_invalid_format");
+
+        // Create invalid 65-byte signature (invalid v value)
+        bytes memory signature = new bytes(65);
+        // Fill r and s with some values
+        for (uint i = 0; i < 32; i++) {
+            signature[i] = bytes1(uint8(i + 1)); // r
+            signature[i + 32] = bytes1(uint8(i + 100)); // s
+        }
+        signature[64] = 0x99; // Invalid v value (should be 27 or 28)
+
+        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        assertEq(
+            result,
+            Static.INVALID_VALUE,
+            "Invalid 65-byte signature format should fail"
+        );
     }
 
     // ===== Built-in ECDSA Validator =====
