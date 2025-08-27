@@ -4,6 +4,7 @@ pragma solidity ^0.8.23;
 import "./Base.t.sol";
 import "src/libraries/Errors.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
+import {console} from "forge-std/console.sol";
 
 contract FactoryTest is Base {
     function setUp() public override {
@@ -296,5 +297,43 @@ contract FactoryTest is Base {
                 keccak256(abi.encodePacked(_alice))
             )
         );
+    }
+
+    function test_createAccountWithCall() external {
+        uint256 salt = 0;
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: keccak256(abi.encodePacked(_aliceEOA)),
+            validator: address(_ecdsaValidator)
+        });
+
+        address prediction = _factory.getAddress(
+            address(_smartWallet),
+            initialOwners,
+            salt
+        );
+
+        vm.deal(prediction, 2 ether);
+
+        Call[] memory calls = constructCallsData();
+        bytes32 hash = _getValidationTypedHash(_alice, calls);
+        bytes memory validatorData = constructValidatorData(
+            _alice,
+            _aliceEOA,
+            _alicePk,
+            hash
+        );
+
+        vm.prank(_alice);
+        address wallet = _factory.createAccountWithCall(
+            address(_smartWallet),
+            initialOwners,
+            salt,
+            BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+            validatorData
+        );
+
+        assertEq(wallet, prediction);
+        assertEq(address(_bob).balance, 1 ether);
     }
 }

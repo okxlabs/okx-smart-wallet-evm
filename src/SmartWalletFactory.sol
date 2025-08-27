@@ -1,27 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.29;
 
-import {Ownable} from "solady/auth/Ownable.sol";
-import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 import {LibClone} from "solady/utils/LibClone.sol";
-import {Initializable} from "solady/utils/Initializable.sol";
 import {ISmartWallet} from "./interfaces/ISmartWallet.sol";
 import {ISmartWalletFactory, InitialOwner} from "./interfaces/ISmartWalletFactory.sol";
 import {Call, BatchedCall} from "./Types.sol";
 
-contract SmartWalletFactory is
-    Ownable,
-    UUPSUpgradeable,
-    Initializable,
-    ISmartWalletFactory
-{
-    constructor() {
-        _disableInitializers();
-    }
-
-    function initialize() public initializer {
-        _initializeOwner(msg.sender);
-    }
+contract SmartWalletFactory is ISmartWalletFactory {
+    constructor() {}
 
     /// @notice create smart account with owners and validators
     /// @param implementation implementation address
@@ -90,8 +76,4 @@ contract SmartWalletFactory is
     ) internal pure returns (bytes32) {
         return keccak256(abi.encode(initialOwners, salt));
     }
-
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {}
 }
