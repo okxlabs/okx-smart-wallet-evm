@@ -190,6 +190,21 @@ contract SmartWallet is
             // revert Errors.InvalidNonce(batchedCall.nonce);
         }
 
+        uint256 nonceKey = batchedCall.nonce >> 64;
+        bytes32 dataHash = batchedCall.hash(IMPLEMENTATION);
+
+        if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
+            // Validate all calls are allowed to skip chain ID validation
+            if (
+                !ChainlessLib.validateChainlessNonceCallData(batchedCall.calls)
+            ) {
+                // revert Errors.InvalidNonceKey(nonceKey);
+            }
+            dataHash = hashTypedDataSansChainId(dataHash);
+        } else {
+            dataHash = hashTypedData(dataHash);
+        }
+
         // Extract pubKeyHash and validate validator
         bytes32 pubKeyHash = bytes32(validatorData[:32]);
 
@@ -206,7 +221,7 @@ contract SmartWallet is
             !_validateSignature(
                 validator,
                 pubKeyHash,
-                hashTypedData(batchedCall.hash(IMPLEMENTATION)),
+                dataHash,
                 validatorData[32:]
             )
         ) {
@@ -220,6 +235,7 @@ contract SmartWallet is
             msg.sender,
             batchedCall.nonce
         );
+
         revert Errors.SimulateExecution();
     }
 

@@ -42,7 +42,7 @@ contract ValidateUserOpTest is Base {
         passkeyValidator = new PasskeyValidator();
     }
 
-    function test_entryPoint_returns_correct_address() public {
+    function test_entryPoint_returns_correct_address() public view {
         // Test that the entryPoint function returns the correct address
         address expectedEntryPoint = 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
         address actualEntryPoint = ERC4337Account(_alice).entryPoint();
