@@ -665,7 +665,7 @@ contract ValidationTest is Base {
         );
     }
 
-    function test_executeWithRelayer_allows_chainless_nonce_for_updateOwner()
+    function test_executeWithRelayer_doesnt_allow_chainless_nonce_for_updateOwner()
         public
     {
         // First add an owner to update
@@ -693,8 +693,7 @@ contract ValidationTest is Base {
                 OwnersManager.updateOwner.selector,
                 ownerKeyHash,
                 address(_ecdsaValidator),
-                newSettings,
-                IOwnersManager(_alice).sequence()
+                newSettings
             )
         });
 
@@ -713,19 +712,18 @@ contract ValidationTest is Base {
             hash
         );
 
-        // Should succeed with chainless nonce for updateOwner
+        // Should not succeed with chainless nonce for updateOwner
         vm.prank(_alice);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
-
-        // Verify the owner was updated (should be admin now)
-        uint256 settings = IOwnersManager(_alice).ownerSettings(ownerKeyHash);
-        assertTrue(
-            IOwnersManager(_alice).isAdmin(settings),
-            "Owner should be admin after update"
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Errors.InvalidNonceKey.selector,
+                Static.CHAIN_LESS_NONCE_KEY
+            )
         );
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
     }
 
-    function test_executeWithRelayer_allows_chainless_nonce_for_removeOwner()
+    function test_executeWithRelayer_doesnt_allow_chainless_nonce_for_removeOwner()
         public
     {
         // First add an owner to remove
@@ -746,8 +744,7 @@ contract ValidationTest is Base {
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.removeOwner.selector,
-                ownerKeyHash,
-                IOwnersManager(_alice).sequence()
+                ownerKeyHash
             )
         });
 
@@ -768,13 +765,13 @@ contract ValidationTest is Base {
 
         // Should succeed with chainless nonce for removeOwner
         vm.prank(_alice);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
-
-        // Verify the owner was removed
-        assertFalse(
-            IOwnersManager(_alice).hasOwner(ownerKeyHash),
-            "Owner should be removed"
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Errors.InvalidNonceKey.selector,
+                Static.CHAIN_LESS_NONCE_KEY
+            )
         );
+        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
     }
 
     function test_executeWithRelayer_rejects_chainless_nonce_for_unsupported_selector()
@@ -810,7 +807,7 @@ contract ValidationTest is Base {
         ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
     }
 
-    function test_executeWithRelayer_allows_mixed_calls_with_supported_selectors()
+    function test_executeWithRelayer_doesnt_allow_mixed_calls_with_supported_selectors()
         public
     {
         // Create multiple calls with supported selectors
@@ -825,8 +822,7 @@ contract ValidationTest is Base {
                 OwnersManager.addOwner.selector,
                 newOwnerKeyHash,
                 address(_ecdsaValidator),
-                0,
-                IOwnersManager(_alice).sequence()
+                0
             )
         });
 
@@ -844,8 +840,7 @@ contract ValidationTest is Base {
                 OwnersManager.updateOwner.selector,
                 aliceKeyHash,
                 address(_ecdsaValidator),
-                adminSettings,
-                IOwnersManager(_alice).sequence() + 1
+                adminSettings
             )
         });
 
@@ -866,20 +861,13 @@ contract ValidationTest is Base {
 
         // Should succeed with all supported selectors
         vm.prank(_alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Errors.InvalidNonceKey.selector,
+                Static.CHAIN_LESS_NONCE_KEY
+            )
+        );
         ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
-
-        // Verify both operations succeeded
-        assertTrue(
-            IOwnersManager(_alice).hasOwner(newOwnerKeyHash),
-            "New owner should be added"
-        );
-        uint256 aliceSettings = IOwnersManager(_alice).ownerSettings(
-            aliceKeyHash
-        );
-        assertTrue(
-            IOwnersManager(_alice).isAdmin(aliceSettings),
-            "Alice should be admin"
-        );
     }
 
     // Test upgradeToAndCall selector support
@@ -950,7 +938,7 @@ contract ValidationTest is Base {
             address(0)
         );
 
-        Call[] memory calls = new Call[](3);
+        Call[] memory calls = new Call[](1);
 
         // 1. addOwner call (add a new owner using address(0x123))
         bytes32 newOwnerKeyHash2 = keccak256(abi.encodePacked(address(0x123)));
@@ -961,37 +949,7 @@ contract ValidationTest is Base {
                 OwnersManager.addOwner.selector,
                 newOwnerKeyHash2,
                 address(_ecdsaValidator),
-                0, // Default settings
-                IOwnersManager(_alice).sequence()
-            )
-        });
-
-        // 2. updateOwner call (make alice admin)
-        uint256 adminSettings = IOwnersManager(_alice).packSettings(
-            true,
-            0,
-            address(0)
-        );
-        calls[1] = Call({
-            target: _alice,
-            value: 0,
-            data: abi.encodeWithSelector(
-                OwnersManager.updateOwner.selector,
-                aliceKeyHash,
-                address(_ecdsaValidator),
-                adminSettings,
-                IOwnersManager(_alice).sequence() + 1
-            )
-        });
-
-        // 3. removeOwner call (remove bob)
-        calls[2] = Call({
-            target: _alice,
-            value: 0,
-            data: abi.encodeWithSelector(
-                OwnersManager.removeOwner.selector,
-                newOwnerKeyHash,
-                IOwnersManager(_alice).sequence() + 2
+                0 // Default settings
             )
         });
 
@@ -1018,17 +976,6 @@ contract ValidationTest is Base {
         assertTrue(
             IOwnersManager(_alice).hasOwner(newOwnerKeyHash2),
             "New owner should be added"
-        );
-        uint256 aliceSettings = IOwnersManager(_alice).ownerSettings(
-            aliceKeyHash
-        );
-        assertTrue(
-            IOwnersManager(_alice).isAdmin(aliceSettings),
-            "Alice should be admin"
-        );
-        assertFalse(
-            IOwnersManager(_alice).hasOwner(newOwnerKeyHash),
-            "Bob should be removed"
         );
     }
 }

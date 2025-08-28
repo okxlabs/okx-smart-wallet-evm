@@ -99,8 +99,7 @@ contract AdminPermissionsTest is Base {
                 OwnersManager.addOwner.selector,
                 keccak256("newValidator"),
                 address(_ecdsaValidator),
-                IOwnersManager(_alice).packSettings(false, 0, address(0)),
-                IOwnersManager(_alice).sequence()
+                IOwnersManager(_alice).packSettings(false, 0, address(0))
             )
         });
 
@@ -170,8 +169,7 @@ contract AdminPermissionsTest is Base {
                 OwnersManager.addOwner.selector,
                 newValidatorKeyHash,
                 address(_ecdsaValidator),
-                IOwnersManager(_alice).packSettings(false, 0, address(0)),
-                IOwnersManager(_alice).sequence()
+                IOwnersManager(_alice).packSettings(false, 0, address(0))
             )
         });
 
@@ -206,8 +204,7 @@ contract AdminPermissionsTest is Base {
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.removeOwner.selector,
-                nonAdminKeyHash,
-                IOwnersManager(_alice).sequence()
+                nonAdminKeyHash
             )
         });
 
@@ -250,8 +247,7 @@ contract AdminPermissionsTest is Base {
                 OwnersManager.updateOwner.selector,
                 nonAdminKeyHash,
                 address(_ecdsaValidator),
-                newSettings,
-                IOwnersManager(_alice).sequence()
+                newSettings
             )
         });
 
@@ -297,8 +293,7 @@ contract AdminPermissionsTest is Base {
                 OwnersManager.updateOwner.selector,
                 adminKeyHash,
                 address(_ecdsaValidator),
-                IOwnersManager(_alice).packSettings(false, 0, address(0)), // isAdmin = false
-                IOwnersManager(_alice).sequence()
+                IOwnersManager(_alice).packSettings(false, 0, address(0)) // isAdmin = false
             )
         });
 
@@ -331,8 +326,7 @@ contract AdminPermissionsTest is Base {
                 OwnersManager.addOwner.selector,
                 keccak256("shouldFail"),
                 address(_ecdsaValidator),
-                IOwnersManager(_alice).packSettings(false, 0, address(0)),
-                IOwnersManager(_alice).sequence()
+                IOwnersManager(_alice).packSettings(false, 0, address(0))
             )
         });
 
@@ -371,8 +365,7 @@ contract AdminPermissionsTest is Base {
                 OwnersManager.updateOwner.selector,
                 nonAdminKeyHash,
                 address(_ecdsaValidator),
-                IOwnersManager(_alice).packSettings(true, 0, address(0)), // isAdmin = true
-                IOwnersManager(_alice).sequence()
+                IOwnersManager(_alice).packSettings(true, 0, address(0)) // isAdmin = true
             )
         });
 
@@ -405,8 +398,7 @@ contract AdminPermissionsTest is Base {
                 OwnersManager.addOwner.selector,
                 keccak256("newAdminValidator"),
                 address(_ecdsaValidator),
-                IOwnersManager(_alice).packSettings(false, 0, address(0)),
-                IOwnersManager(_alice).sequence()
+                IOwnersManager(_alice).packSettings(false, 0, address(0))
             )
         });
 
@@ -451,8 +443,7 @@ contract AdminPermissionsTest is Base {
                 OwnersManager.addOwner.selector,
                 keccak256("mixedValidator"),
                 address(_ecdsaValidator),
-                IOwnersManager(_alice).packSettings(false, 0, address(0)),
-                IOwnersManager(_alice).sequence()
+                IOwnersManager(_alice).packSettings(false, 0, address(0))
             )
         });
 
@@ -494,8 +485,7 @@ contract AdminPermissionsTest is Base {
                 OwnersManager.addOwner.selector,
                 keccak256("shouldFailValidator"),
                 address(_ecdsaValidator),
-                IOwnersManager(_alice).packSettings(false, 0, address(0)),
-                IOwnersManager(_alice).sequence()
+                IOwnersManager(_alice).packSettings(false, 0, address(0))
             )
         });
 
@@ -538,8 +528,7 @@ contract AdminPermissionsTest is Base {
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.removeOwner.selector,
-                aliceKeyHash,
-                IOwnersManager(_alice).sequence()
+                aliceKeyHash
             )
         });
 

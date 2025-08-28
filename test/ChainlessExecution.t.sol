@@ -140,7 +140,7 @@ contract ChainlessExecutionTest is Base {
     function test_chainless_userOp_full_execution_flow() external {
         // Create comprehensive test with multiple operations
         bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(_bob));
-        Call[] memory calls = new Call[](2);
+        Call[] memory calls = new Call[](1);
 
         // 1. Add new owner
         calls[0] = Call({
@@ -150,26 +150,7 @@ contract ChainlessExecutionTest is Base {
                 OwnersManager.addOwner.selector,
                 newOwnerKeyHash,
                 address(_ecdsaValidator),
-                0,
-                IOwnersManager(testAccount).sequence()
-            )
-        });
-
-        // 2. Update Alice to admin
-        uint256 adminSettings = SmartWallet(payable(testAccount)).packSettings(
-            true,
-            0,
-            address(0)
-        );
-        calls[1] = Call({
-            target: testAccount,
-            value: 0,
-            data: abi.encodeWithSelector(
-                OwnersManager.updateOwner.selector,
-                aliceKeyHash,
-                address(_ecdsaValidator),
-                adminSettings,
-                IOwnersManager(testAccount).sequence() + 1
+                0
             )
         });
 
@@ -207,9 +188,6 @@ contract ChainlessExecutionTest is Base {
             SmartWallet(payable(testAccount)).hasOwner(newOwnerKeyHash),
             "New owner should be added"
         );
-        (, , , bool adminStatus, ) = SmartWallet(payable(testAccount))
-            .getOwnerSettings(aliceKeyHash);
-        assertTrue(adminStatus, "Alice should be admin");
     }
 
     // ==========================================
@@ -287,8 +265,7 @@ contract ChainlessExecutionTest is Base {
                 OwnersManager.addOwner.selector,
                 bobKeyHash,
                 address(_ecdsaValidator),
-                0,
-                IOwnersManager(testAccount).sequence()
+                0
             )
         });
         calls[1] = Call({target: _bob, value: 1 ether, data: ""});
@@ -416,8 +393,7 @@ contract ChainlessExecutionTest is Base {
                 OwnersManager.addOwner.selector,
                 bobKeyHash,
                 address(_ecdsaValidator),
-                0,
-                IOwnersManager(testAccount).sequence()
+                0
             )
         });
 
@@ -546,8 +522,7 @@ contract ChainlessExecutionTest is Base {
                 OwnersManager.addOwner.selector,
                 bobKeyHash,
                 address(_ecdsaValidator),
-                0,
-                IOwnersManager(testAccount).sequence()
+                0
             )
         });
 
@@ -594,8 +569,7 @@ contract ChainlessExecutionTest is Base {
         SmartWallet(payable(testAccount)).addOwner(
             keyHash,
             validator,
-            adminSettings,
-            IOwnersManager(testAccount).sequence()
+            adminSettings
         );
     }
 }

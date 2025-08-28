@@ -14,16 +14,12 @@ library ChainlessLib {
     /// @return true if the selector is allowed to skip chain ID validation, false otherwise
     /// @dev Currently allowed selectors:
     ///      - addOwner
-    ///      - updateOwner
-    ///      - removeOwner
     ///      - upgradeToAndCall
     function canSkipChainIdValidation(
         bytes4 functionSelector
     ) internal pure returns (bool) {
         if (
             functionSelector == OwnersManager.addOwner.selector ||
-            functionSelector == OwnersManager.updateOwner.selector ||
-            functionSelector == OwnersManager.removeOwner.selector ||
             functionSelector == UUPSUpgradeable.upgradeToAndCall.selector
         ) {
             return true;

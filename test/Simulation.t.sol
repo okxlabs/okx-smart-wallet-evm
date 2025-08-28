@@ -837,8 +837,7 @@ contract SimulationTest is Base {
                     )
                 ),
                 address(_ecdsaValidator),
-                0, // default settings
-                0 // sequence number
+                0 // default settings
             )
         });
 
@@ -960,8 +959,7 @@ contract SimulationTest is Base {
                     )
                 ),
                 address(_ecdsaValidator),
-                0, // settings
-                0 // sequence
+                0 // settings
             )
         });
 
@@ -976,8 +974,7 @@ contract SimulationTest is Base {
                 OwnersManager.updateOwner.selector,
                 keccak256(abi.encodePacked(_alice)),
                 address(_ecdsaValidator),
-                0, // settings
-                0 // sequence
+                0 // settings
             )
         });
 

@@ -877,7 +877,7 @@ contract ValidateUserOpTest is Base {
         );
     }
 
-    function test_validateUserOp_allows_chainless_nonce_for_updateOwner()
+    function test_validateUserOp_doesnt_allow_chainless_nonce_for_updateOwner()
         external
     {
         // Create account with ECDSA validator
@@ -939,12 +939,12 @@ contract ValidateUserOpTest is Base {
                 userOpHash,
                 missingAccountFunds
             ),
-            0,
-            "updateOwner should succeed with chainless nonce"
+            Static.SIG_VALIDATION_FAILED,
+            "updateOwner should not succeed with chainless nonce"
         );
     }
 
-    function test_validateUserOp_allows_chainless_nonce_for_removeOwner()
+    function test_validateUserOp_doesnt_allow_chainless_nonce_for_removeOwner()
         external
     {
         // Create account with ECDSA validator
@@ -1004,8 +1004,8 @@ contract ValidateUserOpTest is Base {
                 userOpHash,
                 missingAccountFunds
             ),
-            0,
-            "removeOwner should succeed with chainless nonce"
+            Static.SIG_VALIDATION_FAILED,
+            "removeOwner should not succeed with chainless nonce"
         );
     }
 
@@ -1083,7 +1083,7 @@ contract ValidateUserOpTest is Base {
 
         // Create multiple supported calls in one batch
         bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(_bob));
-        Call[] memory calls = new Call[](2);
+        Call[] memory calls = new Call[](1);
 
         // 1. addOwner call
         calls[0] = Call({
@@ -1094,23 +1094,6 @@ contract ValidateUserOpTest is Base {
                 newOwnerKeyHash,
                 address(ecdsaValidator),
                 0
-            )
-        });
-
-        // 2. updateOwner call (make alice admin)
-        uint256 adminSettings = IOwnersManager(account).packSettings(
-            true,
-            0,
-            address(0)
-        );
-        calls[1] = Call({
-            target: account,
-            value: 0,
-            data: abi.encodeWithSelector(
-                OwnersManager.updateOwner.selector,
-                _aliceKeyHash,
-                address(ecdsaValidator),
-                adminSettings
             )
         });
 

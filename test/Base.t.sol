@@ -362,8 +362,7 @@ contract Base is Test {
             wallet,
             keyHash,
             validatorAddr,
-            settings,
-            IOwnersManager(wallet).sequence()
+            settings
         );
     }
 
@@ -372,8 +371,7 @@ contract Base is Test {
         address wallet,
         bytes32 keyHash,
         address validatorAddr,
-        uint256 settings,
-        uint256 seq
+        uint256 settings
     ) internal {
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -383,8 +381,7 @@ contract Base is Test {
                 OwnersManager.addOwner.selector,
                 keyHash,
                 validatorAddr,
-                settings,
-                seq
+                settings
             )
         });
 
@@ -400,8 +397,7 @@ contract Base is Test {
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.removeOwner.selector,
-                keyHash,
-                IOwnersManager(wallet).sequence()
+                keyHash
             )
         });
 
