@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.23;
 
-import "./Base.t.sol";
+import {Base} from "./Base.t.sol";
 import {Static} from "src/libraries/Static.sol";
 import {Errors} from "src/libraries/Errors.sol";
-import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
-import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
+import {Call, BatchedCall} from "src/Types.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
 import {IERC4337Account} from "src/interfaces/IERC4337Account.sol";
-import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {OwnersManager} from "src/OwnersManager.sol";
+import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 
 /**
  * @title ChainlessExecutionTest
@@ -29,17 +28,15 @@ contract ChainlessExecutionTest is Base {
         super.setUp();
 
         // Setup test key hashes - use EOA addresses, not smart wallet addresses
-        aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        aliceKeyHash = keccak256(abi.encodePacked(_alice));
         bobKeyHash = keccak256(abi.encodePacked(_bob));
 
         // Create test account with Alice as initial owner with admin privileges
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: aliceKeyHash,
-            validator: address(_ecdsaValidator)
-        });
-
-        testAccount = _factory.createAccount(initialOwners, 0);
+        testAccount = _deployAccountSingleOwner(
+            aliceKeyHash,
+            address(_ecdsaValidator),
+            0
+        );
 
         vm.deal(testAccount, 10 ether);
     }
@@ -176,7 +173,7 @@ contract ChainlessExecutionTest is Base {
         assertEq(result, 0, "UserOp validation should succeed");
 
         // Execute the actual operations
-        vm.prank(_aliceEOA);
+        vm.prank(_alice);
         SmartWallet(payable(testAccount)).execute(calls);
 
         // Verify results
@@ -216,6 +213,53 @@ contract ChainlessExecutionTest is Base {
             SmartWallet(payable(testAccount)).hasOwner(bobKeyHash),
             "Bob should be added as owner"
         );
+    }
+
+    /**
+     * @notice Test chainless BatchedCall fails when target is not self
+     */
+    function test_chainless_batchedCall_fails_for_non_self_target() external {
+        // Create a call with allowed selector but wrong target (not self)
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: _bob, // Not self - should fail
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnersManager.addOwner.selector,
+                keccak256(abi.encodePacked(address(0x123))),
+                address(_ecdsaValidator),
+                0
+            )
+        });
+
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: Static.CHAIN_LESS_NONCE_KEY << 64,
+            expiry: 0
+        });
+
+        bytes32 dataHash = BatchedCallLib.hash(
+            batchedCall,
+            address(_smartWallet)
+        );
+        bytes32 chainlessHash = _smartWallet.hashTypedDataSansChainId(dataHash);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, chainlessHash);
+        bytes memory validatorData = abi.encodePacked(
+            keccak256(abi.encodePacked(_alice)),
+            r,
+            s,
+            v
+        );
+
+        // Should revert because target is not self
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Errors.InvalidNonceKey.selector,
+                Static.CHAIN_LESS_NONCE_KEY
+            )
+        );
+        _smartWallet.executeWithRelayer(batchedCall, validatorData);
     }
 
     /**
@@ -556,7 +600,7 @@ contract ChainlessExecutionTest is Base {
     }
 
     function _addOwnerAsAdmin(bytes32 keyHash, address validator) internal {
-        vm.prank(_aliceEOA);
+        vm.prank(_alice);
         uint256 adminSettings = SmartWallet(payable(testAccount)).packSettings(
             true,
             0,

@@ -1,17 +1,77 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.29;
 
-import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import {Base} from "./Base.t.sol";
 import {ISmartWallet} from "../src/interfaces/ISmartWallet.sol";
 import {IOwnersManager} from "../src/interfaces/IOwnersManager.sol";
 import {OwnersManager} from "../src/OwnersManager.sol";
 import {Errors} from "../src/libraries/Errors.sol";
-import {MockHook} from "../src/test/MockHook.sol";
 import {MockERC20} from "../src/test/MockERC20.sol";
 import {Call, BatchedCall} from "../src/Types.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IHook} from "../src/interfaces/IHook.sol";
+
+contract MockHook is IHook {
+    bytes4 public constant TRANSFER_SELECTOR = 0xa9059cbb;
+
+    function preCheck(
+        Call[] calldata calls,
+        address // executor
+    ) external payable returns (bytes memory preCheckRet) {
+        // For mock purposes, we'll use hardcoded values or extract from first call
+        // In real implementation, these would come from storage or other sources
+        address token = calls.length > 0 ? calls[0].target : address(0);
+        uint256 maxTotalAmount = 100 ether; // Hardcoded limit for testing
+
+        uint256 initialBalance = 0;
+        uint256 totalAmount = 0;
+
+        // Check if there is a valid token address
+        if (token != address(0)) {
+            initialBalance = IERC20(token).balanceOf(msg.sender);
+        }
+
+        for (uint256 i = 0; i < calls.length; i++) {
+            require(calls[i].target == token, "Invalid token address");
+
+            bytes4 selector = bytes4(calls[i].data[:4]);
+            require(selector == TRANSFER_SELECTOR, "Invalid operation");
+
+            (address recipientCalled, uint256 amount) = abi.decode(
+                calls[i].data[4:],
+                (address, uint256)
+            );
+
+            require(recipientCalled != address(0), "Invalid recipient address");
+            totalAmount += amount;
+        }
+
+        require(
+            totalAmount <= maxTotalAmount,
+            "Total transfer amount exceeds limit"
+        );
+
+        return abi.encode(token, initialBalance, totalAmount);
+    }
+
+    function postCheck(
+        bytes calldata preHookRet,
+        address // executor
+    ) external payable {
+        (address token, uint256 initialBalance, uint256 totalAmount) = abi
+            .decode(preHookRet, (address, uint256, uint256));
+
+        // Include token address check otherwise empty calls will revert
+        if (token != address(0)) {
+            uint256 finalBalance = IERC20(token).balanceOf(msg.sender);
+            require(
+                initialBalance - finalBalance == totalAmount,
+                "Balance mismatch: transfer amounts do not match"
+            );
+        }
+    }
+}
 
 // Test hooks for different scenarios
 contract RevertingHook {
@@ -78,10 +138,11 @@ contract HookTest is Base {
         mockToken = new MockERC20();
 
         // Calculate Alice's keyHash - this should be the EOA address
-        aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        aliceKeyHash = keccak256(abi.encodePacked(_alice));
 
         // Fund Alice with tokens for testing
-        mockToken.transfer(_alice, 1000 ether);
+        bool success = mockToken.transfer(_aliceWallet, 1000 ether);
+        require(success, "Token transfer failed");
     }
 
     // Helper functions
@@ -93,13 +154,13 @@ contract HookTest is Base {
         // Use the executeWithRelayer function to call updateOwner through the contract itself
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
-            target: address(_alice),
+            target: address(_aliceWallet),
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.updateOwner.selector,
                 keyHash,
                 address(_ecdsaValidator), // Use the existing validator
-                IOwnersManager(_alice).packSettings(
+                IOwnersManager(_aliceWallet).packSettings(
                     true,
                     uint40(expiration),
                     hook
@@ -110,17 +171,20 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     // Helper function for direct execute flow - sets hook directly using execute
@@ -131,13 +195,13 @@ contract HookTest is Base {
     ) internal {
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
-            target: address(_alice),
+            target: address(_aliceWallet),
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.updateOwner.selector,
                 keyHash,
                 address(_ecdsaValidator), // Use the existing validator
-                IOwnersManager(_alice).packSettings(
+                IOwnersManager(_aliceWallet).packSettings(
                     true,
                     uint40(expiration),
                     hook
@@ -146,8 +210,8 @@ contract HookTest is Base {
         });
 
         // Use execute with EOA as msg.sender
-        vm.prank(_aliceEOA);
-        ISmartWallet(_alice).execute(calls);
+        vm.prank(_alice);
+        ISmartWallet(_aliceWallet).execute(calls);
     }
 
     // ============ Tests for Direct Execute (EOA as msg.sender) ============
@@ -166,8 +230,8 @@ contract HookTest is Base {
         });
 
         // Use execute with EOA as msg.sender
-        vm.prank(_aliceEOA);
-        ISmartWallet(_alice).execute(calls);
+        vm.prank(_alice);
+        ISmartWallet(_aliceWallet).execute(calls);
 
         // Verify the transfer happened
         assertEq(mockToken.balanceOf(_bob), 50 ether);
@@ -178,9 +242,8 @@ contract HookTest is Base {
         _setHookForOwnerDirect(aliceKeyHash, address(mockHook), 0);
 
         // Verify hook is properly set
-        (, address hookAddress, , , ) = IOwnersManager(_alice).getOwnerSettings(
-            aliceKeyHash
-        );
+        (, address hookAddress, , , ) = IOwnersManager(_aliceWallet)
+            .getOwnerSettings(aliceKeyHash);
         assertEq(hookAddress, address(mockHook));
 
         Call[] memory calls = new Call[](1);
@@ -195,8 +258,8 @@ contract HookTest is Base {
         });
 
         // Use execute with EOA as msg.sender
-        vm.prank(_aliceEOA);
-        ISmartWallet(_alice).execute(calls);
+        vm.prank(_alice);
+        ISmartWallet(_aliceWallet).execute(calls);
 
         // Verify the transfer happened
         assertEq(mockToken.balanceOf(_bob), 50 ether);
@@ -220,9 +283,9 @@ contract HookTest is Base {
         });
 
         // Use execute with EOA as msg.sender - should revert due to hook
-        vm.prank(_aliceEOA);
+        vm.prank(_alice);
         vm.expectRevert("Invalid operation");
-        ISmartWallet(_alice).execute(calls);
+        ISmartWallet(_aliceWallet).execute(calls);
     }
 
     function test_ExecuteDirect_WithMockHook_Revert_ExceedsLimit() public {
@@ -241,9 +304,9 @@ contract HookTest is Base {
         });
 
         // Use execute with EOA as msg.sender - should revert due to hook
-        vm.prank(_aliceEOA);
+        vm.prank(_alice);
         vm.expectRevert("Total transfer amount exceeds limit");
-        ISmartWallet(_alice).execute(calls);
+        ISmartWallet(_aliceWallet).execute(calls);
     }
 
     function test_ExecuteDirect_WithHook_StatePersistence() public {
@@ -262,8 +325,8 @@ contract HookTest is Base {
             )
         });
 
-        vm.prank(_aliceEOA);
-        ISmartWallet(_alice).execute(calls1);
+        vm.prank(_alice);
+        ISmartWallet(_aliceWallet).execute(calls1);
 
         // Second call should also succeed
         Call[] memory calls2 = new Call[](1);
@@ -277,8 +340,8 @@ contract HookTest is Base {
             )
         });
 
-        vm.prank(_aliceEOA);
-        ISmartWallet(_alice).execute(calls2);
+        vm.prank(_alice);
+        ISmartWallet(_aliceWallet).execute(calls2);
 
         // Verify total transfer
         assertEq(mockToken.balanceOf(_bob), 75 ether);
@@ -305,8 +368,8 @@ contract HookTest is Base {
         });
 
         // Use execute with EOA as msg.sender - should succeed before expiration
-        vm.prank(_aliceEOA);
-        ISmartWallet(_alice).execute(calls1);
+        vm.prank(_alice);
+        ISmartWallet(_aliceWallet).execute(calls1);
 
         // Verify the transfer happened
         assertEq(mockToken.balanceOf(_bob), 50 ether);
@@ -327,9 +390,9 @@ contract HookTest is Base {
         });
 
         // Use execute with EOA as msg.sender - should fail because owner is expired
-        vm.prank(_aliceEOA);
+        vm.prank(_alice);
         vm.expectRevert(Errors.OwnerExpired.selector);
-        ISmartWallet(_alice).execute(calls2);
+        ISmartWallet(_aliceWallet).execute(calls2);
 
         // Verify no additional transfer happened (execution failed due to owner expiration)
         assertEq(mockToken.balanceOf(_bob), 50 ether);
@@ -353,17 +416,20 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
 
         // Verify the transfer happened
         assertEq(mockToken.balanceOf(_bob), 50 ether);
@@ -387,17 +453,20 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
 
         // Verify the transfer happened
         assertEq(mockToken.balanceOf(_bob), 50 ether);
@@ -421,18 +490,21 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
         vm.expectRevert("Total transfer amount exceeds limit");
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     function test_ExecuteWithRelayer_WithMockHook_InvalidToken() public {
@@ -441,7 +513,8 @@ contract HookTest is Base {
 
         // Create a different token
         MockERC20 otherToken = new MockERC20();
-        otherToken.transfer(_alice, 1000 ether);
+        bool success = otherToken.transfer(_aliceWallet, 1000 ether);
+        require(success, "Token transfer failed");
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -457,17 +530,20 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData); // Should succeed - hook allows any token contract
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        ); // Should succeed - hook allows any token contract
 
         // Verify the transfer happened
         assertEq(otherToken.balanceOf(_bob), 50 ether);
@@ -491,18 +567,21 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
         vm.expectRevert("Invalid operation");
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     function test_ExecuteWithRelayer_WithMockHook_InvalidRecipient() public {
@@ -523,18 +602,21 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
         vm.expectRevert("Invalid recipient address");
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     function test_ExecuteWithRelayer_WithMockHook_BalanceMismatch() public {
@@ -542,7 +624,8 @@ contract HookTest is Base {
         _setHookForOwnerWithRelayer(aliceKeyHash, address(mockHook), 0);
 
         MaliciousToken maliciousToken = new MaliciousToken();
-        maliciousToken.transfer(_alice, 1000 ether);
+        bool success = maliciousToken.transfer(_aliceWallet, 1000 ether);
+        require(success, "Token transfer failed");
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -558,18 +641,21 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
         vm.expectRevert("Balance mismatch: transfer amounts do not match");
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     // ============ Tests for Different Hook Types ============
@@ -584,18 +670,21 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
         vm.expectRevert("PreCheck failed");
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     function test_ExecuteWithRelayer_WithCallCountHook_Success() public {
@@ -609,17 +698,20 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
 
         // Verify the transfers happened
         assertEq(_bob.balance, 2 ether);
@@ -637,18 +729,21 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
         vm.expectRevert("Too many calls");
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     function test_ExecuteWithRelayer_WithGasTrackingHook() public {
@@ -661,17 +756,20 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
 
         // Verify gas was tracked
         assertGt(gasTrackingHook.preCheckGas(), 0);
@@ -702,18 +800,21 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
         vm.expectRevert();
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     function test_ExecuteWithRelayer_WithFutureExpiration() public {
@@ -738,18 +839,21 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
         vm.expectRevert("Total transfer amount exceeds limit");
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     // ============ Tests for Multiple Calls ============
@@ -780,17 +884,20 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
 
         // Verify total transfer (30 + 40 = 70 ether, within 100 ether limit)
         assertEq(mockToken.balanceOf(_bob), 70 ether);
@@ -824,38 +931,41 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
         vm.expectRevert("Total transfer amount exceeds limit");
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     // ============ Tests for Non-Admin Self Calls ============
 
     function test_ExecuteWithRelayer_WithHook_NonAdminSelfCall() public {
         // Set up hook without admin privileges
-        uint256 settings = IOwnersManager(_alice).packSettings(
+        uint256 settings = IOwnersManager(_aliceWallet).packSettings(
             false,
             0,
             address(mockHook)
         );
         vm.store(
-            address(_alice),
+            address(_aliceWallet),
             keccak256(abi.encode(aliceKeyHash, uint256(2))),
             bytes32(settings)
         );
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
-            target: address(_alice), // Self call
+            target: address(_aliceWallet), // Self call
             value: 0,
             data: abi.encodeWithSelector(
                 IERC20.transfer.selector,
@@ -867,18 +977,21 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
         vm.expectRevert(); // Should revert with NonAdminSelfCall error
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     function test_ExecuteWithRelayer_WithHook_AdminSelfCall() public {
@@ -899,17 +1012,20 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData); // Should succeed with admin privileges
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        ); // Should succeed with admin privileges
     }
 
     // ============ Tests for Empty Calls ============
@@ -922,17 +1038,20 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData); // Should succeed with empty calls
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        ); // Should succeed with empty calls
 
         // Verify no tokens were transferred
         assertEq(mockToken.balanceOf(_bob), 0);
@@ -949,18 +1068,21 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
         vm.expectRevert();
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     // ============ Tests for Hook State Persistence ============
@@ -983,17 +1105,20 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall1 = BatchedCall({
             calls: calls1,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData1 = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls1)
+            constructSignature(_aliceWallet, _alicePk, calls1)
         );
 
         vm.prank(_alice);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall1, validatorData1);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall1,
+            validatorData1
+        );
 
         // Second call should also succeed (hook state should be independent)
         Call[] memory calls2 = new Call[](1);
@@ -1010,17 +1135,20 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall2 = BatchedCall({
             calls: calls2,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData2 = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls2)
+            constructSignature(_aliceWallet, _alicePk, calls2)
         );
 
         vm.prank(_alice);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall2, validatorData2);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall2,
+            validatorData2
+        );
 
         // Verify total transfers
         assertEq(mockToken.balanceOf(_bob), 80 ether);
@@ -1033,36 +1161,42 @@ contract HookTest is Base {
         // Use the execute function to call updateOwner through the contract itself
         Call[] memory setupCalls = new Call[](1);
         setupCalls[0] = Call({
-            target: address(_alice),
+            target: address(_aliceWallet),
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.updateOwner.selector,
                 aliceKeyHash,
                 address(_ecdsaValidator), // Use the existing validator
-                IOwnersManager(_alice).packSettings(true, 0, address(mockHook)) // Pack settings with hook
+                IOwnersManager(_aliceWallet).packSettings(
+                    true,
+                    0,
+                    address(mockHook)
+                ) // Pack settings with hook
             )
         });
 
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory setupBatchedCall = BatchedCall({
             calls: setupCalls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory setupValidatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, setupCalls)
+            constructSignature(_aliceWallet, _alicePk, setupCalls)
         );
 
         vm.prank(_alice);
-        ISmartWallet(_alice).executeWithRelayer(
+        ISmartWallet(_aliceWallet).executeWithRelayer(
             setupBatchedCall,
             setupValidatorData
         );
 
         // Now verify the hook is set
-        uint256 settings = IOwnersManager(_alice).ownerSettings(aliceKeyHash);
+        uint256 settings = IOwnersManager(_aliceWallet).ownerSettings(
+            aliceKeyHash
+        );
         address hook = address(uint160(settings));
         console.log("Hook address after proper setup:", hook);
 
@@ -1081,18 +1215,21 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
         vm.expectRevert("Total transfer amount exceeds limit");
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     // ============ Debug Tests ============
@@ -1102,7 +1239,7 @@ contract HookTest is Base {
         _setHookForOwnerWithRelayer(aliceKeyHash, address(mockHook), 0);
 
         // Check what the contract actually reads for ownerSettings
-        uint256 contractSettings = IOwnersManager(_alice).ownerSettings(
+        uint256 contractSettings = IOwnersManager(_aliceWallet).ownerSettings(
             aliceKeyHash
         );
         console.log("Contract settings:", contractSettings);
@@ -1126,18 +1263,21 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: 0
         });
 
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
-            constructSignature(_alice, _alicePk, calls)
+            constructSignature(_aliceWallet, _alicePk, calls)
         );
 
         vm.prank(_alice);
         // This should revert if the hook is working
         vm.expectRevert("Total transfer amount exceeds limit");
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 }

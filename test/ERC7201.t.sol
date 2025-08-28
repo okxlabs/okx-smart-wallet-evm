@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.23;
 
-import "./Base.t.sol";
-import "src/libraries/Errors.sol";
+import {Base} from "./Base.t.sol";
 import {ERC7201} from "../src/ERC7201.sol";
 
 contract ERC7201Test is Base {

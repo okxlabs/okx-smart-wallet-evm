@@ -28,24 +28,32 @@ contract AdminPermissionsTest is Base {
 
         // Add admin user with admin privileges
         bytes32 adminKeyHash = keccak256(abi.encodePacked(adminUser));
-        _executeAddValidator(
-            _alice,
-            adminKeyHash,
-            address(_ecdsaValidator),
+        uint256 adminSettings = OwnersManager(_aliceWallet).packSettings(
             true, // isAdmin = true
             0,
             address(0)
         );
+        _addOwnerToAccount(
+            _alice,
+            _aliceWallet,
+            adminKeyHash,
+            address(_ecdsaValidator),
+            adminSettings
+        );
 
         // Add non-admin user without admin privileges
         bytes32 nonAdminKeyHash = keccak256(abi.encodePacked(nonAdminUser));
-        _executeAddValidator(
-            _alice,
-            nonAdminKeyHash,
-            address(_ecdsaValidator),
+        uint256 nonAdminSettings = OwnersManager(_aliceWallet).packSettings(
             false, // isAdmin = false
             0,
             address(0)
+        );
+        _addOwnerToAccount(
+            _alice,
+            _aliceWallet,
+            nonAdminKeyHash,
+            address(_ecdsaValidator),
+            nonAdminSettings
         );
     }
 
@@ -57,23 +65,23 @@ contract AdminPermissionsTest is Base {
         // Construct self-call (wallet calling itself)
         Call[] memory selfCalls = new Call[](1);
         selfCalls[0] = Call({
-            target: _alice,
+            target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.addOwner.selector,
                 keccak256("malicious"),
                 address(_ecdsaValidator),
-                IOwnersManager(_alice).packSettings(false, 0, address(0))
+                IOwnersManager(_aliceWallet).packSettings(false, 0, address(0))
             )
         });
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: selfCalls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
-        bytes32 typedDataHash = ERC712(_alice).hashTypedData(
+        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
             BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
@@ -84,7 +92,10 @@ contract AdminPermissionsTest is Base {
         // Non-admin should not be able to make self-calls
         vm.prank(_bob);
         vm.expectRevert(); // Should revert due to self-call restriction
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     function test_admin_self_call_allowed() public {
@@ -93,23 +104,23 @@ contract AdminPermissionsTest is Base {
         // Construct self-call (wallet calling itself)
         Call[] memory selfCalls = new Call[](1);
         selfCalls[0] = Call({
-            target: _alice,
+            target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.addOwner.selector,
                 keccak256("newValidator"),
                 address(_ecdsaValidator),
-                IOwnersManager(_alice).packSettings(false, 0, address(0))
+                IOwnersManager(_aliceWallet).packSettings(false, 0, address(0))
             )
         });
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: selfCalls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
-        bytes32 typedDataHash = ERC712(_alice).hashTypedData(
+        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
             BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
@@ -119,10 +130,15 @@ contract AdminPermissionsTest is Base {
 
         // Admin should be able to make self-calls
         vm.prank(_bob);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
 
         // Verify the self-call succeeded
-        assertTrue(IOwnersManager(_alice).hasOwner(keccak256("newValidator")));
+        assertTrue(
+            IOwnersManager(_aliceWallet).hasOwner(keccak256("newValidator"))
+        );
     }
 
     function test_non_admin_external_calls_allowed() public {
@@ -133,11 +149,11 @@ contract AdminPermissionsTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: externalCalls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
-        bytes32 typedDataHash = ERC712(_alice).hashTypedData(
+        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
             BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
@@ -149,7 +165,10 @@ contract AdminPermissionsTest is Base {
         vm.prank(_bob);
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(keccak256(abi.encode(externalCalls)), _bob, 0);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
 
         // Verify external call succeeded
         assertEq(address(_bob).balance, 1 ether);
@@ -163,23 +182,23 @@ contract AdminPermissionsTest is Base {
 
         Call[] memory addValidatorCalls = new Call[](1);
         addValidatorCalls[0] = Call({
-            target: _alice,
+            target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.addOwner.selector,
                 newValidatorKeyHash,
                 address(_ecdsaValidator),
-                IOwnersManager(_alice).packSettings(false, 0, address(0))
+                IOwnersManager(_aliceWallet).packSettings(false, 0, address(0))
             )
         });
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: addValidatorCalls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
-        bytes32 typedDataHash = ERC712(_alice).hashTypedData(
+        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
             BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
@@ -188,9 +207,12 @@ contract AdminPermissionsTest is Base {
         );
 
         vm.prank(_bob);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
 
-        assertTrue(IOwnersManager(_alice).hasOwner(newValidatorKeyHash));
+        assertTrue(IOwnersManager(_aliceWallet).hasOwner(newValidatorKeyHash));
     }
 
     function test_admin_can_remove_validators() public {
@@ -200,7 +222,7 @@ contract AdminPermissionsTest is Base {
         // Admin removes non-admin validator
         Call[] memory removeValidatorCalls = new Call[](1);
         removeValidatorCalls[0] = Call({
-            target: _alice,
+            target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.removeOwner.selector,
@@ -210,11 +232,11 @@ contract AdminPermissionsTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: removeValidatorCalls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
-        bytes32 typedDataHash = ERC712(_alice).hashTypedData(
+        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
             BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
@@ -223,9 +245,12 @@ contract AdminPermissionsTest is Base {
         );
 
         vm.prank(_bob);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
 
-        assertFalse(IOwnersManager(_alice).hasOwner(nonAdminKeyHash));
+        assertFalse(IOwnersManager(_aliceWallet).hasOwner(nonAdminKeyHash));
     }
 
     function test_admin_can_update_validator_settings() public {
@@ -233,7 +258,7 @@ contract AdminPermissionsTest is Base {
         bytes32 nonAdminKeyHash = keccak256(abi.encodePacked(nonAdminUser));
 
         // Admin updates non-admin validator to have expiry
-        uint256 newSettings = IOwnersManager(_alice).packSettings(
+        uint256 newSettings = IOwnersManager(_aliceWallet).packSettings(
             false,
             uint40(block.timestamp + 1 days),
             address(0)
@@ -241,7 +266,7 @@ contract AdminPermissionsTest is Base {
 
         Call[] memory updateValidatorCalls = new Call[](1);
         updateValidatorCalls[0] = Call({
-            target: _alice,
+            target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.updateOwner.selector,
@@ -253,11 +278,11 @@ contract AdminPermissionsTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: updateValidatorCalls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
-        bytes32 typedDataHash = ERC712(_alice).hashTypedData(
+        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
             BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
@@ -266,14 +291,17 @@ contract AdminPermissionsTest is Base {
         );
 
         vm.prank(_bob);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
 
         // Verify settings were updated
-        uint256 updatedSettings = IOwnersManager(_alice).ownerSettings(
+        uint256 updatedSettings = IOwnersManager(_aliceWallet).ownerSettings(
             nonAdminKeyHash
         );
         assertGt(
-            IOwnersManager(_alice).getExpiration(updatedSettings),
+            IOwnersManager(_aliceWallet).getExpiration(updatedSettings),
             block.timestamp
         );
     }
@@ -284,26 +312,26 @@ contract AdminPermissionsTest is Base {
         bytes32 adminKeyHash = keccak256(abi.encodePacked(adminUser));
 
         // First, revoke admin rights
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
         Call[] memory revokeAdminCalls = new Call[](1);
         revokeAdminCalls[0] = Call({
-            target: _alice,
+            target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.updateOwner.selector,
                 adminKeyHash,
                 address(_ecdsaValidator),
-                IOwnersManager(_alice).packSettings(false, 0, address(0)) // isAdmin = false
+                IOwnersManager(_aliceWallet).packSettings(false, 0, address(0)) // isAdmin = false
             )
         });
 
         BatchedCall memory revokeBatchedCall = BatchedCall({
             calls: revokeAdminCalls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
-        bytes32 revokeTypedDataHash = ERC712(_alice).hashTypedData(
+        bytes32 revokeTypedDataHash = ERC712(_aliceWallet).hashTypedData(
             BatchedCallLib.hash(revokeBatchedCall, address(_smartWallet))
         );
         bytes memory revokeValidatorData = abi.encodePacked(
@@ -312,7 +340,7 @@ contract AdminPermissionsTest is Base {
         );
 
         vm.prank(_bob);
-        ISmartWallet(_alice).executeWithRelayer(
+        ISmartWallet(_aliceWallet).executeWithRelayer(
             revokeBatchedCall,
             revokeValidatorData
         );
@@ -320,23 +348,23 @@ contract AdminPermissionsTest is Base {
         // Now try to use former admin to make self-call (should fail)
         Call[] memory selfCalls = new Call[](1);
         selfCalls[0] = Call({
-            target: _alice,
+            target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.addOwner.selector,
                 keccak256("shouldFail"),
                 address(_ecdsaValidator),
-                IOwnersManager(_alice).packSettings(false, 0, address(0))
+                IOwnersManager(_aliceWallet).packSettings(false, 0, address(0))
             )
         });
 
         BatchedCall memory selfCallBatch = BatchedCall({
             calls: selfCalls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
-        bytes32 selfCallTypedDataHash = ERC712(_alice).hashTypedData(
+        bytes32 selfCallTypedDataHash = ERC712(_aliceWallet).hashTypedData(
             BatchedCallLib.hash(selfCallBatch, address(_smartWallet))
         );
         bytes memory selfCallValidatorData = abi.encodePacked(
@@ -346,7 +374,7 @@ contract AdminPermissionsTest is Base {
 
         vm.prank(_bob);
         vm.expectRevert(); // Should fail because admin rights were revoked
-        ISmartWallet(_alice).executeWithRelayer(
+        ISmartWallet(_aliceWallet).executeWithRelayer(
             selfCallBatch,
             selfCallValidatorData
         );
@@ -354,28 +382,28 @@ contract AdminPermissionsTest is Base {
 
     function test_admin_rights_elevation_grants_permissions() public {
         bytes32 nonAdminKeyHash = keccak256(abi.encodePacked(nonAdminUser));
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
 
         // Elevate non-admin to admin
         Call[] memory elevateAdminCalls = new Call[](1);
         elevateAdminCalls[0] = Call({
-            target: _alice,
+            target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.updateOwner.selector,
                 nonAdminKeyHash,
                 address(_ecdsaValidator),
-                IOwnersManager(_alice).packSettings(true, 0, address(0)) // isAdmin = true
+                IOwnersManager(_aliceWallet).packSettings(true, 0, address(0)) // isAdmin = true
             )
         });
 
         BatchedCall memory elevateBatchedCall = BatchedCall({
             calls: elevateAdminCalls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
-        bytes32 elevateTypedDataHash = ERC712(_alice).hashTypedData(
+        bytes32 elevateTypedDataHash = ERC712(_aliceWallet).hashTypedData(
             BatchedCallLib.hash(elevateBatchedCall, address(_smartWallet))
         );
         bytes memory elevateValidatorData = abi.encodePacked(
@@ -384,7 +412,7 @@ contract AdminPermissionsTest is Base {
         );
 
         vm.prank(_bob);
-        ISmartWallet(_alice).executeWithRelayer(
+        ISmartWallet(_aliceWallet).executeWithRelayer(
             elevateBatchedCall,
             elevateValidatorData
         );
@@ -392,23 +420,23 @@ contract AdminPermissionsTest is Base {
         // Now the formerly non-admin user should be able to make self-calls
         Call[] memory selfCalls = new Call[](1);
         selfCalls[0] = Call({
-            target: _alice,
+            target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.addOwner.selector,
                 keccak256("newAdminValidator"),
                 address(_ecdsaValidator),
-                IOwnersManager(_alice).packSettings(false, 0, address(0))
+                IOwnersManager(_aliceWallet).packSettings(false, 0, address(0))
             )
         });
 
         BatchedCall memory selfCallBatch = BatchedCall({
             calls: selfCalls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
-        bytes32 selfCallTypedDataHash = ERC712(_alice).hashTypedData(
+        bytes32 selfCallTypedDataHash = ERC712(_aliceWallet).hashTypedData(
             BatchedCallLib.hash(selfCallBatch, address(_smartWallet))
         );
         bytes memory selfCallValidatorData = abi.encodePacked(
@@ -417,14 +445,16 @@ contract AdminPermissionsTest is Base {
         );
 
         vm.prank(_bob);
-        ISmartWallet(_alice).executeWithRelayer(
+        ISmartWallet(_aliceWallet).executeWithRelayer(
             selfCallBatch,
             selfCallValidatorData
         );
 
         // Verify the self-call succeeded
         assertTrue(
-            IOwnersManager(_alice).hasOwner(keccak256("newAdminValidator"))
+            IOwnersManager(_aliceWallet).hasOwner(
+                keccak256("newAdminValidator")
+            )
         );
     }
 
@@ -437,23 +467,23 @@ contract AdminPermissionsTest is Base {
         Call[] memory mixedCalls = new Call[](2);
         mixedCalls[0] = Call({target: _bob, value: 0.5 ether, data: ""});
         mixedCalls[1] = Call({
-            target: _alice,
+            target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.addOwner.selector,
                 keccak256("mixedValidator"),
                 address(_ecdsaValidator),
-                IOwnersManager(_alice).packSettings(false, 0, address(0))
+                IOwnersManager(_aliceWallet).packSettings(false, 0, address(0))
             )
         });
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: mixedCalls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
-        bytes32 typedDataHash = ERC712(_alice).hashTypedData(
+        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
             BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
@@ -463,12 +493,15 @@ contract AdminPermissionsTest is Base {
 
         // Admin should be able to execute mixed calls including self-calls
         vm.prank(_bob);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
 
         // Verify both calls succeeded
         assertEq(address(_bob).balance, 0.5 ether);
         assertTrue(
-            IOwnersManager(_alice).hasOwner(keccak256("mixedValidator"))
+            IOwnersManager(_aliceWallet).hasOwner(keccak256("mixedValidator"))
         );
     }
 
@@ -479,23 +512,23 @@ contract AdminPermissionsTest is Base {
         Call[] memory mixedCalls = new Call[](2);
         mixedCalls[0] = Call({target: _bob, value: 0.5 ether, data: ""});
         mixedCalls[1] = Call({
-            target: _alice,
+            target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.addOwner.selector,
                 keccak256("shouldFailValidator"),
                 address(_ecdsaValidator),
-                IOwnersManager(_alice).packSettings(false, 0, address(0))
+                IOwnersManager(_aliceWallet).packSettings(false, 0, address(0))
             )
         });
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: mixedCalls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
-        bytes32 typedDataHash = ERC712(_alice).hashTypedData(
+        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
             BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
@@ -506,12 +539,17 @@ contract AdminPermissionsTest is Base {
         // Non-admin should fail because of self-call in the batch
         vm.prank(_bob);
         vm.expectRevert(); // Should fail due to self-call restriction
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
 
         // Verify no calls executed (atomic failure)
         assertEq(address(_bob).balance, 0 ether);
         assertFalse(
-            IOwnersManager(_alice).hasOwner(keccak256("shouldFailValidator"))
+            IOwnersManager(_aliceWallet).hasOwner(
+                keccak256("shouldFailValidator")
+            )
         );
     }
 
@@ -519,12 +557,12 @@ contract AdminPermissionsTest is Base {
 
     function test_admin_cannot_remove_last_admin() public {
         bytes32 adminKeyHash = keccak256(abi.encodePacked(adminUser));
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
 
         // Try to remove the original admin (alice) when adminUser is the only other admin
         Call[] memory removeAdminCalls = new Call[](1);
         removeAdminCalls[0] = Call({
-            target: _alice,
+            target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.removeOwner.selector,
@@ -534,11 +572,11 @@ contract AdminPermissionsTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: removeAdminCalls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
-        bytes32 typedDataHash = ERC712(_alice).hashTypedData(
+        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
             BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
@@ -548,10 +586,13 @@ contract AdminPermissionsTest is Base {
 
         vm.prank(_bob);
         // This should be allowed since there's still one admin left
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
 
         // Verify alice was removed but adminUser is still there
-        assertFalse(IOwnersManager(_alice).hasOwner(aliceKeyHash));
-        assertTrue(IOwnersManager(_alice).hasOwner(adminKeyHash));
+        assertFalse(IOwnersManager(_aliceWallet).hasOwner(aliceKeyHash));
+        assertTrue(IOwnersManager(_aliceWallet).hasOwner(adminKeyHash));
     }
 }

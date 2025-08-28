@@ -4,7 +4,6 @@ pragma solidity ^0.8.29;
 import {IValidator} from "./interfaces/IValidator.sol";
 import {ECDSAValidatorLib} from "./libraries/ECDSAValidatorLib.sol";
 import {PasskeyValidatorLib} from "./libraries/PasskeyValidatorLib.sol";
-
 import {Static} from "./libraries/Static.sol";
 
 abstract contract ValidateManager {
@@ -12,7 +11,7 @@ abstract contract ValidateManager {
     /// @dev Checks if the given expiry timestamp is in the past
     /// @param expiry Unix timestamp expiry
     /// @return bool True if expired, false otherwise
-    function isExpired(uint48 expiry) internal view virtual returns (bool) {
+    function _isExpired(uint48 expiry) internal view virtual returns (bool) {
         return expiry != 0 && expiry < block.timestamp;
     }
 

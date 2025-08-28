@@ -9,7 +9,6 @@ import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {OKXSmartWalletEntry} from "src/OKXSmartWalletEntry.sol";
 import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
 import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
-import {Helper} from "src/test/Helper.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 import {DeployInitHelper, DeployFactory} from "scripts/DeployInitHelper.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -17,9 +16,42 @@ import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {ERC712} from "src/ERC712.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
 import {EntryPoint} from "account-abstraction/core/EntryPoint.sol";
-import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 import {IAccount} from "account-abstraction/interfaces/IAccount.sol";
+
+// ============ Mock Contracts for Testing ============
+
+contract MockComplexContract {
+    uint256 public counter;
+    bool public functionCalled;
+
+    receive() external payable {}
+
+    function complexFunction(
+        uint256 _number,
+        string memory _text,
+        bool _flag
+    ) external payable returns (bytes memory) {
+        functionCalled = true;
+        return abi.encode(_number, _text, _flag, msg.value, block.timestamp);
+    }
+
+    function simpleIncrement() external {
+        counter++;
+    }
+
+    function returnLargeData(
+        uint256 size
+    ) external pure returns (bytes memory) {
+        return new bytes(size);
+    }
+}
+
+contract MockRevertingContract {
+    function alwaysReverts() external pure {
+        revert("Always reverts");
+    }
+}
 
 contract Base is Test {
     string public constant NAME = "SmartWallet";
@@ -29,8 +61,8 @@ contract Base is Test {
     address constant ENTRYPOINT_ADDRESS =
         0x0000000071727De22E5E9d8BAf0edAc6f37da032;
 
-    address payable internal _alice; // Alice's smart wallet address
-    address internal _aliceEOA; // Alice's original EOA address
+    address payable internal _aliceWallet; // Alice's smart wallet address
+    address internal _alice; // Alice's EOA address
     uint256 internal _alicePk;
     address internal _bob;
     uint256 internal _bobPk;
@@ -45,7 +77,6 @@ contract Base is Test {
     EntryPoint internal _entryPoint; // EntryPoint instance
     address internal relayer;
     uint256 internal relayerPk;
-    address internal validator;
     Call[] internal relayerCalls;
     Call[] internal emptyRelayerCalls;
 
@@ -56,7 +87,7 @@ contract Base is Test {
     );
 
     function setUp() public virtual {
-        (_aliceEOA, _alicePk) = makeAddrAndKey("alice");
+        (_alice, _alicePk) = makeAddrAndKey("alice");
         (_bob, _bobPk) = makeAddrAndKey("bob");
 
         // Deploy EntryPoint and place it at the standard address
@@ -72,36 +103,155 @@ contract Base is Test {
         deployFactory = new DeployFactory();
         bytes32 deployFactorySalt = vm.envBytes32("DEPLOY_FACTORY_SALT");
 
-        Helper helper;
         (
             _ecdsaValidator,
             _passkeyValidator,
             _smartWallet,
-            _factory,
-            helper
+            _factory
         ) = DeployInitHelper.deployContracts(deployFactory, deployFactorySalt);
 
-        // Use factory to create a wallet for Alice instead of _setCodeToEOA
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: keccak256(abi.encodePacked(_aliceEOA)),
-            validator: address(_ecdsaValidator)
-        });
-
-        // Create wallet using factory with deterministic address
-        _alice = payable(
-            _factory.createAccount(
-                initialOwners,
-                0 // salt
+        // Use factory to create a wallet for Alice
+        _aliceWallet = payable(
+            _deployAccountSingleOwner(
+                keccak256(abi.encodePacked(_alice)),
+                address(_ecdsaValidator),
+                0
             )
         );
 
-        deal(_alice, 10 ether);
+        deal(_aliceWallet, 10 ether);
     }
 
-    function _setCodeToEOA(address contractCode, address eoa) internal {
+    function _setCodeToEoa(address contractCode, address eoa) internal {
         bytes memory code = address(contractCode).code;
         vm.etch(eoa, code);
+    }
+
+    // ============ Helper Functions for Test Reuse ============
+
+    /// @notice Create InitialOwner array with multiple owners
+    /// @param keyHashes Array of key hashes
+    /// @param validators Array of validator addresses
+    /// @return initialOwners Array with owner configurations
+    function _createOwners(
+        bytes32[] memory keyHashes,
+        address[] memory validators
+    ) internal pure returns (InitialOwner[] memory) {
+        require(keyHashes.length == validators.length, "Length mismatch");
+        InitialOwner[] memory initialOwners = new InitialOwner[](
+            keyHashes.length
+        );
+        for (uint256 i = 0; i < keyHashes.length; i++) {
+            initialOwners[i] = InitialOwner({
+                keyHash: keyHashes[i],
+                validator: validators[i]
+            });
+        }
+        return initialOwners;
+    }
+
+    /// @notice Create InitialOwner array with a single owner
+    /// @param keyHash The key hash for the owner
+    /// @param validator The validator address
+    /// @return initialOwners Array with single owner configuration
+    function _createSingleOwner(
+        bytes32 keyHash,
+        address validator
+    ) internal pure returns (InitialOwner[] memory) {
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: keyHash,
+            validator: validator
+        });
+        return initialOwners;
+    }
+
+    /// @notice Deploy a new wallet account with a single owner
+    /// @param keyHash The key hash for the owner
+    /// @param validator The validator address
+    /// @param salt The salt for deterministic deployment
+    /// @return account The deployed account address
+    function _deployAccountSingleOwner(
+        bytes32 keyHash,
+        address validator,
+        uint256 salt
+    ) internal returns (address account) {
+        InitialOwner[] memory initialOwners = _createSingleOwner(
+            keyHash,
+            validator
+        );
+        return _factory.createAccount(initialOwners, salt);
+    }
+
+    /// @notice Deploy a new wallet account with multiple owners
+    /// @param keyHashes Array of key hashes for the owners
+    /// @param validators Array of validator addresses
+    /// @param salt The salt for deterministic deployment
+    /// @return account The deployed account address
+    function _deployAccountWithOwners(
+        bytes32[] memory keyHashes,
+        address[] memory validators,
+        uint256 salt
+    ) internal returns (address account) {
+        InitialOwner[] memory initialOwners = _createOwners(
+            keyHashes,
+            validators
+        );
+        return _factory.createAccount(initialOwners, salt);
+    }
+
+    /// @notice Add an owner to an existing wallet account through execute flow
+    /// @param owner The owner address to execute the call
+    /// @param account The wallet account to add owner to
+    /// @param keyHash The key hash for the new owner
+    /// @param validator The validator address for the new owner
+    /// @param settings Packed settings (0 for default)
+    function _addOwnerToAccount(
+        address owner,
+        address account,
+        bytes32 keyHash,
+        address validator,
+        uint256 settings
+    ) internal {
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: account,
+            value: 0,
+            data: abi.encodeWithSelector(
+                IOwnersManager.addOwner.selector,
+                keyHash,
+                validator,
+                settings
+            )
+        });
+
+        vm.prank(owner);
+        ISmartWallet(account).execute(calls);
+    }
+
+    /// @notice Helper to build addOwner calls for expectRevert tests
+    /// @param account The wallet account to add owner to
+    /// @param keyHash The key hash for the new owner
+    /// @param validator The validator address for the new owner
+    /// @param settings Packed settings (0 for default)
+    function _buildAddOwnerCalls(
+        address account,
+        bytes32 keyHash,
+        address validator,
+        uint256 settings
+    ) internal pure returns (Call[] memory) {
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: account,
+            value: 0,
+            data: abi.encodeWithSelector(
+                IOwnersManager.addOwner.selector,
+                keyHash,
+                validator,
+                settings
+            )
+        });
+        return calls;
     }
 
     function constructSignature(
@@ -164,7 +314,7 @@ contract Base is Test {
         Call[] memory calls
     ) internal view returns (bytes32) {
         return
-            ERC712(_alice).hashTypedData(
+            ERC712(_aliceWallet).hashTypedData(
                 BatchedCallLib.hash(
                     BatchedCall({calls: calls, nonce: nonce, expiry: 0}),
                     address(_smartWallet)
@@ -208,36 +358,13 @@ contract Base is Test {
         return abi.encodePacked(r, s, v);
     }
 
-    function _addValidator(
-        address account,
-        address signer
-    ) internal returns (address) {
-        bytes32 keyHash = keccak256(abi.encodePacked(signer));
-
-        // Check if validator already exists
-        if (IOwnersManager(account).hasOwner(keyHash)) {
-            return address(_ecdsaValidator);
-        }
-
-        _executeAddValidator(
-            account,
-            keyHash,
-            address(_ecdsaValidator),
-            false,
-            0,
-            address(0)
-        );
-
-        return address(_ecdsaValidator);
-    }
-
     function constructRelayerCall(
         uint256 len,
         IERC20 token
     ) internal view returns (Call[] memory calls) {
         calls = new Call[](len);
         for (uint256 i; i < len; i++) {
-            calls[i] = constructErc20TransferCall(token, _alice, 100);
+            calls[i] = constructErc20TransferCall(token, _aliceWallet, 100);
         }
     }
 
@@ -341,53 +468,6 @@ contract Base is Test {
         return
             settings != 0 ? IOwnersManager(wallet).getExpiration(settings) : 0;
     }
-
-    // Helper function to call addValidator through execute
-    function _executeAddValidator(
-        address wallet,
-        bytes32 keyHash,
-        address validatorAddr,
-        bool adminFlag,
-        uint40 expiration,
-        address hook
-    ) internal {
-        // Get packed settings before any potential revert expectations are set
-        uint256 settings = OwnersManager(wallet).packSettings(
-            adminFlag,
-            expiration,
-            hook
-        );
-        _executeAddValidatorWithSettings(
-            wallet,
-            keyHash,
-            validatorAddr,
-            settings
-        );
-    }
-
-    // Helper function to call addValidator with pre-packed settings
-    function _executeAddValidatorWithSettings(
-        address wallet,
-        bytes32 keyHash,
-        address validatorAddr,
-        uint256 settings
-    ) internal {
-        Call[] memory calls = new Call[](1);
-        calls[0] = Call({
-            target: wallet,
-            value: 0,
-            data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
-                keyHash,
-                validatorAddr,
-                settings
-            )
-        });
-
-        vm.prank(wallet);
-        ISmartWallet(wallet).execute(calls);
-    }
-
     // Helper function to call removeValidator through execute
     function _executeRemoveValidator(address wallet, bytes32 keyHash) internal {
         Call[] memory calls = new Call[](1);
@@ -402,39 +482,5 @@ contract Base is Test {
 
         vm.prank(wallet);
         ISmartWallet(wallet).execute(calls);
-    }
-}
-
-// ============ Mock Contracts for Testing ============
-
-contract MockComplexContract {
-    uint256 public counter;
-    bool public functionCalled;
-
-    receive() external payable {}
-
-    function complexFunction(
-        uint256 _number,
-        string memory _text,
-        bool _flag
-    ) external payable returns (bytes memory) {
-        functionCalled = true;
-        return abi.encode(_number, _text, _flag, msg.value, block.timestamp);
-    }
-
-    function simpleIncrement() external {
-        counter++;
-    }
-
-    function returnLargeData(
-        uint256 size
-    ) external pure returns (bytes memory) {
-        return new bytes(size);
-    }
-}
-
-contract MockRevertingContract {
-    function alwaysReverts() external pure {
-        revert("Always reverts");
     }
 }

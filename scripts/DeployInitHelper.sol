@@ -6,8 +6,6 @@ import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
 import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
 import {DeployFactory} from "src/test/DeployFactory.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
-import "lib/forge-std/src/Test.sol";
-import {Helper} from "src/test/Helper.sol";
 
 library DeployInitHelper {
     function deployContracts(
@@ -19,8 +17,7 @@ library DeployInitHelper {
             ECDSAValidator ecdsaValidatorImpl,
             PasskeyValidator passkeyValidatorImpl,
             OKXSmartWalletEntry smartWalletImpl,
-            SmartWalletFactory factoryImpl,
-            Helper helperImpl
+            SmartWalletFactory factoryImpl
         )
     {
         // deploy ECDSAValidator
@@ -49,11 +46,6 @@ library DeployInitHelper {
                 type(SmartWalletFactory).creationCode,
                 abi.encode(address(smartWalletImpl))
             ),
-            deployFactorySalt
-        ));
-
-        helperImpl = Helper(deployFactory.deploy(
-            type(Helper).creationCode,
             deployFactorySalt
         ));
     }

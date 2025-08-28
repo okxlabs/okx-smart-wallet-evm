@@ -96,7 +96,7 @@ fi
 echo -e "${YELLOW}🏗️  Deploying SmartWallet contracts...${NC}"
 
 # Deploy the SmartWallet contracts and capture output
-DEPLOY_OUTPUT=$(forge script scripts/DeployInit.sol --rpc-url $RPC_URL --broadcast 2>&1)
+DEPLOY_OUTPUT=$(yarn deploy $RPC_URL --broadcast 2>&1)
 DEPLOY_RESULT=$?
 
 if [ $DEPLOY_RESULT -eq 0 ]; then

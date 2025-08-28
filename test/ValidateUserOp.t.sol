@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.23;
 
-import "./Base.t.sol";
+import {Base} from "./Base.t.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 import {IERC4337Account} from "src/interfaces/IERC4337Account.sol";
 import {Errors} from "src/libraries/Errors.sol";
@@ -11,14 +11,44 @@ import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {HelperLib} from "src/test/Helper.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 import {Static} from "src/libraries/Static.sol";
 import {ERC4337Account} from "src/ERC4337Account.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {Call} from "src/Types.sol";
-import {InitialOwner} from "src/Types.sol";
 import {OwnersManager} from "src/OwnersManager.sol";
+
+// Mock contract moved from end of file
+contract MockEntryPoint {
+    mapping(address => uint256) public balanceOf;
+
+    function depositTo(address to) public payable {
+        balanceOf[to] += msg.value;
+    }
+
+    function withdrawTo(address to, uint256 amount) public payable {
+        balanceOf[msg.sender] -= amount;
+        (bool success, ) = payable(to).call{value: amount}("");
+        require(success);
+    }
+
+    function validateUserOp(
+        address account,
+        PackedUserOperation memory userOp,
+        bytes32 userOpHash,
+        uint256 missingAccountFunds
+    ) public payable returns (uint256 validationData) {
+        validationData = IERC4337Account(payable(account)).validateUserOp(
+            userOp,
+            userOpHash,
+            missingAccountFunds
+        );
+    }
+
+    receive() external payable {
+        depositTo(msg.sender);
+    }
+}
 
 contract ValidateUserOpTest is Base {
     ECDSAValidator ecdsaValidator;
@@ -45,7 +75,7 @@ contract ValidateUserOpTest is Base {
     function test_entryPoint_returns_correct_address() public view {
         // Test that the entryPoint function returns the correct address
         address expectedEntryPoint = 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
-        address actualEntryPoint = ERC4337Account(_alice).entryPoint();
+        address actualEntryPoint = ERC4337Account(_aliceWallet).entryPoint();
 
         assertEq(
             actualEntryPoint,
@@ -65,7 +95,7 @@ contract ValidateUserOpTest is Base {
     receive() external payable {}
 
     // Helper function to directly test validateUserOp by pranking as EntryPoint
-    struct _TestTemps {
+    struct TestTemps {
         bytes32 userOpHash;
         address signer;
         uint256 privateKey;
@@ -79,15 +109,10 @@ contract ValidateUserOpTest is Base {
         // Test the complete ERC-4337 flow: handleOps -> validateUserOp -> executeUserOp
 
         // Create a new account with alice as owner
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: aliceKeyHash,
-            validator: address(1) // Built-in ECDSA validator
-        });
-
-        address account = _factory.createAccount(
-            initialOwners,
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        address account = _deployAccountSingleOwner(
+            aliceKeyHash,
+            address(1), // Built-in ECDSA validator
             100 // Different salt to avoid collision
         );
 
@@ -175,16 +200,11 @@ contract ValidateUserOpTest is Base {
         // Test handleOps with chainless nonce for cross-chain operations
 
         // Create a new account
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: aliceKeyHash,
-            validator: address(1)
-        });
-
-        address account = _factory.createAccount(
-            initialOwners,
+        address account = _deployAccountSingleOwner(
+            aliceKeyHash,
+            address(1),
             101 // Different salt
         );
 
@@ -199,9 +219,7 @@ contract ValidateUserOpTest is Base {
                 OwnersManager.addOwner.selector,
                 bobKeyHash,
                 address(1),
-                false,
-                0,
-                address(0)
+                OwnersManager(account).packSettings(false, 0, address(0))
             )
         });
 
@@ -254,17 +272,16 @@ contract ValidateUserOpTest is Base {
     function test_validateUserOp_with_eoa_signer() external {
         vm.prank(_alice);
 
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: _aliceKeyHash,
-            validator: address(1)
-        });
-        address account = _factory.createAccount(initialOwners, 0);
+        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
+        address account = _deployAccountSingleOwner(
+            _aliceWalletKeyHash,
+            address(1),
+            0
+        );
 
-        _TestTemps memory t;
+        TestTemps memory t;
         t.userOpHash = keccak256("123");
-        t.signer = _alice;
+        t.signer = _aliceWallet;
         t.privateKey = _alicePk;
         (t.v, t.r, t.s) = vm.sign(t.privateKey, t.userOpHash);
         t.missingAccountFunds = 123;
@@ -274,7 +291,7 @@ contract ValidateUserOpTest is Base {
         PackedUserOperation memory userOp;
         // Success returns 0.
         userOp.signature = abi.encodePacked(
-            _aliceKeyHash,
+            _aliceWalletKeyHash,
             abi.encodePacked(t.r, t.s, t.v)
         );
         assertEq(
@@ -293,7 +310,7 @@ contract ValidateUserOpTest is Base {
 
         // Failure returns 1.
         userOp.signature = abi.encodePacked(
-            _aliceKeyHash,
+            _aliceWalletKeyHash,
             abi.encodePacked(t.r, bytes32(uint256(t.s) ^ 1), t.v)
         );
 
@@ -322,29 +339,21 @@ contract ValidateUserOpTest is Base {
     function test_validateUserOp_with_eoa_signer_and_chain_less_nonce()
         external
     {
-        vm.prank(_alice);
-
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
         bytes32 _bobKeyHash = keccak256(abi.encodePacked(_bob));
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: _aliceKeyHash,
-            validator: address(1)
-        });
-        address account = _factory.createAccount(initialOwners, 0);
 
-        _TestTemps memory t;
+        TestTemps memory t;
         PackedUserOperation memory userOp;
         userOp.nonce = Static.CHAIN_LESS_NONCE_KEY << 64;
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
-            target: address(account),
+            target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.addOwner.selector,
                 _bobKeyHash,
-                address(1),
+                address(_ecdsaValidator),
                 0
             )
         });
@@ -354,24 +363,23 @@ contract ValidateUserOpTest is Base {
             calls
         );
 
-        t.userOpHash = IERC4337Account(account).getUserOpHashWithoutChainId(
-            userOp
-        );
-        t.signer = _alice;
+        t.userOpHash = IERC4337Account(_aliceWallet)
+            .getUserOpHashWithoutChainId(userOp);
+        t.signer = _alice; // 签名者是 EOA
         t.privateKey = _alicePk;
         (t.v, t.r, t.s) = vm.sign(t.privateKey, t.userOpHash);
         t.missingAccountFunds = 123;
-        vm.deal(address(account), 1 ether);
-        assertEq(address(account).balance, 1 ether);
+        vm.deal(_aliceWallet, 1 ether);
+        assertEq(_aliceWallet.balance, 1 ether);
 
         // Success returns 0.
         userOp.signature = abi.encodePacked(
-            _aliceKeyHash,
+            _aliceWalletKeyHash,
             abi.encodePacked(t.r, t.s, t.v)
         );
         assertEq(
             _testValidateUserOp(
-                address(account),
+                _aliceWallet,
                 userOp,
                 t.userOpHash,
                 t.missingAccountFunds
@@ -387,29 +395,21 @@ contract ValidateUserOpTest is Base {
     function test_uopHash_error_validateUserOp_with_eoa_signer_and_chain_less_nonce()
         external
     {
-        vm.prank(_alice);
-
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
         bytes32 _bobKeyHash = keccak256(abi.encodePacked(_bob));
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: _aliceKeyHash,
-            validator: address(1)
-        });
-        address account = _factory.createAccount(initialOwners, 0);
 
-        _TestTemps memory t;
+        TestTemps memory t;
         PackedUserOperation memory userOp;
         userOp.nonce = Static.CHAIN_LESS_NONCE_KEY << 64;
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
-            target: address(account),
+            target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.addOwner.selector,
                 _bobKeyHash,
-                address(1),
+                address(_ecdsaValidator),
                 0
             )
         });
@@ -420,21 +420,21 @@ contract ValidateUserOpTest is Base {
         );
 
         t.userOpHash = keccak256("123");
-        t.signer = _alice;
+        t.signer = _alice; // 修正：签名者是 EOA，不是账户
         t.privateKey = _alicePk;
         (t.v, t.r, t.s) = vm.sign(t.privateKey, t.userOpHash);
         t.missingAccountFunds = 123;
-        vm.deal(address(account), 1 ether);
-        assertEq(address(account).balance, 1 ether);
+        vm.deal(_aliceWallet, 1 ether); // 给账户充值
+        assertEq(_aliceWallet.balance, 1 ether);
 
         // Success returns 0.
         userOp.signature = abi.encodePacked(
-            _aliceKeyHash,
+            _aliceWalletKeyHash,
             abi.encodePacked(t.r, t.s, t.v)
         );
         assertEq(
             _testValidateUserOp(
-                address(account),
+                _aliceWallet, // 验证的是账户
                 userOp,
                 t.userOpHash,
                 t.missingAccountFunds
@@ -446,23 +446,15 @@ contract ValidateUserOpTest is Base {
     function test_calldata_error_validateUserOp_with_eoa_signer_and_chain_less_nonce()
         external
     {
-        vm.prank(_alice);
+        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
 
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: _aliceKeyHash,
-            validator: address(1)
-        });
-        address account = _factory.createAccount(initialOwners, 0);
-
-        _TestTemps memory t;
+        TestTemps memory t;
         PackedUserOperation memory userOp;
         userOp.nonce = Static.CHAIN_LESS_NONCE_KEY << 64;
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
-            target: address(account),
+            target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(OwnersManager.ownerCount.selector)
         });
@@ -473,21 +465,21 @@ contract ValidateUserOpTest is Base {
         );
 
         t.userOpHash = keccak256("123");
-        t.signer = _alice;
+        t.signer = _alice; // 签名者是 EOA
         t.privateKey = _alicePk;
         (t.v, t.r, t.s) = vm.sign(t.privateKey, t.userOpHash);
         t.missingAccountFunds = 123;
-        vm.deal(address(account), 1 ether);
-        assertEq(address(account).balance, 1 ether);
+        vm.deal(_aliceWallet, 1 ether);
+        assertEq(_aliceWallet.balance, 1 ether);
 
         // Success returns 0.
         userOp.signature = abi.encodePacked(
-            _aliceKeyHash,
+            _aliceWalletKeyHash,
             abi.encodePacked(t.r, t.s, t.v)
         );
         assertEq(
             _testValidateUserOp(
-                address(account),
+                _aliceWallet,
                 userOp,
                 t.userOpHash,
                 t.missingAccountFunds
@@ -498,16 +490,14 @@ contract ValidateUserOpTest is Base {
 
     function test_validateUserOp_with_ecdsa_validator() external {
         // Create account with ECDSA validator
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: _aliceKeyHash,
-            validator: address(ecdsaValidator)
-        });
+        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
+        address account = _deployAccountSingleOwner(
+            _aliceWalletKeyHash,
+            address(ecdsaValidator),
+            0
+        );
 
-        address account = _factory.createAccount(initialOwners, 0);
-
-        _TestTemps memory t;
+        TestTemps memory t;
         t.userOpHash = keccak256("test_ecdsa_validation");
         t.privateKey = _alicePk;
         t.missingAccountFunds = 1000;
@@ -519,7 +509,10 @@ contract ValidateUserOpTest is Base {
 
         PackedUserOperation memory userOp;
         // Test valid ECDSA signature
-        userOp.signature = abi.encodePacked(_aliceKeyHash, ecdsaSignature);
+        userOp.signature = abi.encodePacked(
+            _aliceWalletKeyHash,
+            ecdsaSignature
+        );
 
         assertEq(
             _testValidateUserOp(
@@ -538,7 +531,10 @@ contract ValidateUserOpTest is Base {
             bytes32(uint256(s) ^ 1),
             v
         );
-        userOp.signature = abi.encodePacked(_aliceKeyHash, invalidSignature);
+        userOp.signature = abi.encodePacked(
+            _aliceWalletKeyHash,
+            invalidSignature
+        );
 
         assertEq(
             _testValidateUserOp(
@@ -557,15 +553,13 @@ contract ValidateUserOpTest is Base {
         bytes32 passkeyHash = keccak256(
             abi.encodePacked(_passkeyPubX, _passkeyPubY)
         );
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: passkeyHash,
-            validator: address(passkeyValidator)
-        });
+        address account = _deployAccountSingleOwner(
+            passkeyHash,
+            address(passkeyValidator),
+            0
+        );
 
-        address account = _factory.createAccount(initialOwners, 0);
-
-        _TestTemps memory t;
+        TestTemps memory t;
         // Use a specific hash that matches the passkey test signature
         t
             .userOpHash = 0x34753a30843cdf97fd7c7f1cf2556d397c93bdfa6732b0b8b79bad029f5875e5;
@@ -636,14 +630,12 @@ contract ValidateUserOpTest is Base {
 
     function test_validateUserOp_onlyEntryPoint_modifier() external {
         // Create account
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: _aliceKeyHash,
-            validator: address(ecdsaValidator)
-        });
-
-        address account = _factory.createAccount(initialOwners, 0);
+        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
+        address account = _deployAccountSingleOwner(
+            _aliceWalletKeyHash,
+            address(ecdsaValidator),
+            0
+        );
 
         PackedUserOperation memory userOp;
         bytes32 userOpHash = keccak256("test");
@@ -679,7 +671,7 @@ contract ValidateUserOpTest is Base {
         // Create valid signature - use raw hash directly for ECDSA validator
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
         userOp.signature = abi.encodePacked(
-            _aliceKeyHash,
+            _aliceWalletKeyHash,
             abi.encodePacked(r, s, v)
         );
 
@@ -697,14 +689,12 @@ contract ValidateUserOpTest is Base {
     }
 
     function test_validateUserOp_signature_validation_edge_cases() external {
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: _aliceKeyHash,
-            validator: address(ecdsaValidator)
-        });
-
-        address account = _factory.createAccount(initialOwners, 0);
+        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
+        address account = _deployAccountSingleOwner(
+            _aliceWalletKeyHash,
+            address(ecdsaValidator),
+            0
+        );
 
         vm.deal(account, 1 ether);
 
@@ -726,7 +716,7 @@ contract ValidateUserOpTest is Base {
         );
 
         // Test 2: Only keyHash, no actual signature
-        userOp.signature = abi.encodePacked(_aliceKeyHash);
+        userOp.signature = abi.encodePacked(_aliceWalletKeyHash);
         assertEq(
             _testValidateUserOp(
                 account,
@@ -760,7 +750,7 @@ contract ValidateUserOpTest is Base {
 
         // Test 4: Malformed signature (wrong length)
         userOp.signature = abi.encodePacked(
-            _aliceKeyHash,
+            _aliceWalletKeyHash,
             bytes32(0),
             bytes32(0)
         );
@@ -780,28 +770,18 @@ contract ValidateUserOpTest is Base {
     function test_validateUserOp_allows_chainless_nonce_for_addOwner()
         external
     {
-        // Create account with ECDSA validator
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: _aliceKeyHash,
-            validator: address(ecdsaValidator)
-        });
-
-        address account = _factory.createAccount(initialOwners, 0);
-
-        vm.deal(account, 2 ether);
+        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
 
         // Create addOwner call
         bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(_bob));
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
-            target: account,
+            target: _aliceWallet, // 使用已有的 _aliceWallet 账户
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.addOwner.selector,
                 newOwnerKeyHash,
-                address(ecdsaValidator),
+                address(_ecdsaValidator),
                 0
             )
         });
@@ -814,13 +794,13 @@ contract ValidateUserOpTest is Base {
         );
 
         // Get hash without chain ID for chainless nonce
-        bytes32 userOpHash = IERC4337Account(account)
+        bytes32 userOpHash = IERC4337Account(_aliceWallet)
             .getUserOpHashWithoutChainId(userOp);
 
         // Sign the hash
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
         userOp.signature = abi.encodePacked(
-            _aliceKeyHash,
+            _aliceWalletKeyHash,
             abi.encodePacked(r, s, v)
         );
 
@@ -829,7 +809,7 @@ contract ValidateUserOpTest is Base {
         // Should succeed for addOwner with chainless nonce
         assertEq(
             _testValidateUserOp(
-                account,
+                _aliceWallet,
                 userOp,
                 userOpHash,
                 missingAccountFunds
@@ -843,14 +823,12 @@ contract ValidateUserOpTest is Base {
         external
     {
         // Create account with ECDSA validator
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: _aliceKeyHash,
-            validator: address(ecdsaValidator)
-        });
-
-        address account = _factory.createAccount(initialOwners, 0);
+        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
+        address account = _deployAccountSingleOwner(
+            _aliceWalletKeyHash,
+            address(ecdsaValidator),
+            0
+        );
 
         vm.deal(account, 2 ether);
 
@@ -866,7 +844,7 @@ contract ValidateUserOpTest is Base {
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.updateOwner.selector,
-                _aliceKeyHash,
+                _aliceWalletKeyHash,
                 address(ecdsaValidator),
                 adminSettings
             )
@@ -883,7 +861,7 @@ contract ValidateUserOpTest is Base {
             .getUserOpHashWithoutChainId(userOp);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
         userOp.signature = abi.encodePacked(
-            _aliceKeyHash,
+            _aliceWalletKeyHash,
             abi.encodePacked(r, s, v)
         );
 
@@ -906,19 +884,15 @@ contract ValidateUserOpTest is Base {
         external
     {
         // Create account with ECDSA validator
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
         bytes32 _bobKeyHash = keccak256(abi.encodePacked(_bob));
-        InitialOwner[] memory initialOwners = new InitialOwner[](2);
-        initialOwners[0] = InitialOwner({
-            keyHash: _aliceKeyHash,
-            validator: address(ecdsaValidator)
-        });
-        initialOwners[1] = InitialOwner({
-            keyHash: _bobKeyHash,
-            validator: address(ecdsaValidator)
-        });
-
-        address account = _factory.createAccount(initialOwners, 0);
+        bytes32[] memory keyHashes = new bytes32[](2);
+        keyHashes[0] = _aliceWalletKeyHash;
+        keyHashes[1] = _bobKeyHash;
+        address[] memory validators = new address[](2);
+        validators[0] = address(ecdsaValidator);
+        validators[1] = address(ecdsaValidator);
+        address account = _deployAccountWithOwners(keyHashes, validators, 0);
 
         vm.deal(account, 2 ether);
 
@@ -944,7 +918,7 @@ contract ValidateUserOpTest is Base {
             .getUserOpHashWithoutChainId(userOp);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
         userOp.signature = abi.encodePacked(
-            _aliceKeyHash,
+            _aliceWalletKeyHash,
             abi.encodePacked(r, s, v)
         );
 
@@ -967,14 +941,12 @@ contract ValidateUserOpTest is Base {
         external
     {
         // Create account with ECDSA validator
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: _aliceKeyHash,
-            validator: address(ecdsaValidator)
-        });
-
-        address account = _factory.createAccount(initialOwners, 0);
+        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
+        address account = _deployAccountSingleOwner(
+            _aliceWalletKeyHash,
+            address(ecdsaValidator),
+            0
+        );
 
         vm.deal(account, 2 ether);
 
@@ -993,7 +965,7 @@ contract ValidateUserOpTest is Base {
             .getUserOpHashWithoutChainId(userOp);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
         userOp.signature = abi.encodePacked(
-            _aliceKeyHash,
+            _aliceWalletKeyHash,
             abi.encodePacked(r, s, v)
         );
 
@@ -1016,14 +988,12 @@ contract ValidateUserOpTest is Base {
         external
     {
         // Create account with ECDSA validator
-        bytes32 _aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: _aliceKeyHash,
-            validator: address(ecdsaValidator)
-        });
-
-        address account = _factory.createAccount(initialOwners, 0);
+        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
+        address account = _deployAccountSingleOwner(
+            _aliceWalletKeyHash,
+            address(ecdsaValidator),
+            0
+        );
 
         vm.deal(account, 2 ether);
 
@@ -1042,7 +1012,6 @@ contract ValidateUserOpTest is Base {
                 0
             )
         });
-
         PackedUserOperation memory userOp;
         userOp.nonce = Static.CHAIN_LESS_NONCE_KEY << 64;
         userOp.callData = abi.encodeWithSelector(
@@ -1054,7 +1023,7 @@ contract ValidateUserOpTest is Base {
             .getUserOpHashWithoutChainId(userOp);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
         userOp.signature = abi.encodePacked(
-            _aliceKeyHash,
+            _aliceWalletKeyHash,
             abi.encodePacked(r, s, v)
         );
 
@@ -1071,37 +1040,5 @@ contract ValidateUserOpTest is Base {
             0,
             "Multiple supported selectors should succeed with chainless nonce"
         );
-    }
-}
-
-// Mock contract moved from mocks/MockEntryPoint.sol
-contract MockEntryPoint {
-    mapping(address => uint256) public balanceOf;
-
-    function depositTo(address to) public payable {
-        balanceOf[to] += msg.value;
-    }
-
-    function withdrawTo(address to, uint256 amount) public payable {
-        balanceOf[msg.sender] -= amount;
-        (bool success, ) = payable(to).call{value: amount}("");
-        require(success);
-    }
-
-    function validateUserOp(
-        address account,
-        PackedUserOperation memory userOp,
-        bytes32 userOpHash,
-        uint256 missingAccountFunds
-    ) public payable returns (uint256 validationData) {
-        validationData = IERC4337Account(payable(account)).validateUserOp(
-            userOp,
-            userOpHash,
-            missingAccountFunds
-        );
-    }
-
-    receive() external payable {
-        depositTo(msg.sender);
     }
 }

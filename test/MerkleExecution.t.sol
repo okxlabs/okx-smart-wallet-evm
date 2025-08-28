@@ -1,15 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.23;
 
-import {Test} from "forge-std/Test.sol";
 import {Base} from "./Base.t.sol";
-import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
+import {Call, BatchedCall} from "src/Types.sol";
 import {Errors} from "src/libraries/Errors.sol";
-import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
-import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
-import {OwnersManager} from "src/OwnersManager.sol";
-import {ValidateManager} from "src/ValidateManager.sol";
 import {ERC712} from "src/ERC712.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 
@@ -34,7 +29,14 @@ contract MerkleExecutionTest is Base {
         // Alice already has a validator from initialization
 
         // Now setup Charlie as a validator
-        _addValidator(_alice, charlie);
+        bytes32 charlieKeyHash = keccak256(abi.encodePacked(charlie));
+        _addOwnerToAccount(
+            _alice,
+            _aliceWallet,
+            charlieKeyHash,
+            address(_ecdsaValidator),
+            0
+        );
 
         // Setup Merkle tree for testing
         _setupMerkleTree();
@@ -57,24 +59,24 @@ contract MerkleExecutionTest is Base {
         Call[] memory calls3 = constructCallsData();
 
         // Create BatchedCall structs
-        BatchedCall memory batchedCall1 = _construct_batchedCall(
+        BatchedCall memory batchedCall1 = _constructBatchedCall(
             calls1,
-            _alice
+            _aliceWallet
         );
-        BatchedCall memory batchedCall2 = _construct_batchedCall(
+        BatchedCall memory batchedCall2 = _constructBatchedCall(
             calls2,
-            _alice
+            _aliceWallet
         );
-        BatchedCall memory batchedCall3 = _construct_batchedCall(
+        BatchedCall memory batchedCall3 = _constructBatchedCall(
             calls3,
-            _alice
+            _aliceWallet
         );
 
         // Create leaf hashes using getValidationTypedHash
         merkleLeaves = new bytes32[](3);
-        merkleLeaves[0] = _getValidationTypedHash(_alice, batchedCall1);
-        merkleLeaves[1] = _getValidationTypedHash(_alice, batchedCall2);
-        merkleLeaves[2] = _getValidationTypedHash(_alice, batchedCall3);
+        merkleLeaves[0] = _getValidationTypedHash(_aliceWallet, batchedCall1);
+        merkleLeaves[1] = _getValidationTypedHash(_aliceWallet, batchedCall2);
+        merkleLeaves[2] = _getValidationTypedHash(_aliceWallet, batchedCall3);
 
         // For simplicity, let's use a single leaf tree for now
         // This will avoid the complexity of merkle tree construction
@@ -203,7 +205,7 @@ contract MerkleExecutionTest is Base {
         return currentLevel[0];
     }
 
-    function _construct_batchedCall(
+    function _constructBatchedCall(
         Call[] memory calls,
         address account
     ) internal view returns (BatchedCall memory) {
@@ -215,7 +217,7 @@ contract MerkleExecutionTest is Base {
             });
     }
 
-    function _construct_simple_validator_data(
+    function _constructSimpleValidatorData(
         address signer,
         uint256 privateKey,
         bytes32 messageHash
@@ -228,7 +230,7 @@ contract MerkleExecutionTest is Base {
         return abi.encodePacked(keyHash, signature);
     }
 
-    function _construct_merkle_validator_data(
+    function _constructMerkleValidatorData(
         address signer,
         uint256 privateKey,
         bytes32 hashToSign,
@@ -246,10 +248,13 @@ contract MerkleExecutionTest is Base {
     function test_executeWithMerkle_succeeds_with_valid_proof() public {
         // Create a valid BatchedCall that matches our first leaf
         Call[] memory calls = constructCallsData();
-        BatchedCall memory batchedCall = _construct_batchedCall(calls, _alice);
+        BatchedCall memory batchedCall = _constructBatchedCall(
+            calls,
+            _aliceWallet
+        );
 
         // Use merkle validation with proofs
-        bytes memory validatorData = _construct_merkle_validator_data(
+        bytes memory validatorData = _constructMerkleValidatorData(
             charlie,
             charliePk,
             merkleRoot,
@@ -260,7 +265,10 @@ contract MerkleExecutionTest is Base {
         vm.prank(_bob); // Bob is the relayer
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
 
         // Verify execution succeeded
         assertEq(address(_bob).balance, 1 ether);
@@ -270,9 +278,12 @@ contract MerkleExecutionTest is Base {
 
     function test_executeWithMerkle_reverts_with_invalid_proof() public {
         Call[] memory calls = constructCallsData();
-        BatchedCall memory batchedCall = _construct_batchedCall(calls, _alice);
+        BatchedCall memory batchedCall = _constructBatchedCall(
+            calls,
+            _aliceWallet
+        );
 
-        bytes memory validatorData = _construct_merkle_validator_data(
+        bytes memory validatorData = _constructMerkleValidatorData(
             charlie,
             evePk, // Use Eve's private key to create invalid signature
             merkleRoot,
@@ -283,16 +294,22 @@ contract MerkleExecutionTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidSignature.selector)
         );
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     function test_executeWithMerkle_reverts_with_wrong_root() public {
         Call[] memory calls = constructCallsData();
-        BatchedCall memory batchedCall = _construct_batchedCall(calls, _alice);
+        BatchedCall memory batchedCall = _constructBatchedCall(
+            calls,
+            _aliceWallet
+        );
 
         // Use wrong message hash for signature
         bytes32 wrongMerkleRoot = bytes32(uint256(0x1234));
-        bytes memory validatorData = _construct_merkle_validator_data(
+        bytes memory validatorData = _constructMerkleValidatorData(
             charlie,
             charliePk,
             wrongMerkleRoot,
@@ -303,14 +320,20 @@ contract MerkleExecutionTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidSignature.selector)
         );
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     function test_executeWithMerkle_reverts_with_invalid_validator() public {
         Call[] memory calls = constructCallsData();
-        BatchedCall memory batchedCall = _construct_batchedCall(calls, _alice);
+        BatchedCall memory batchedCall = _constructBatchedCall(
+            calls,
+            _aliceWallet
+        );
 
-        bytes memory validatorData = _construct_merkle_validator_data(
+        bytes memory validatorData = _constructMerkleValidatorData(
             eve,
             evePk,
             merkleRoot,
@@ -324,7 +347,10 @@ contract MerkleExecutionTest is Base {
                 keccak256(abi.encodePacked(eve))
             )
         );
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     function test_executeWithMerkle_reverts_with_invalid_nonce() public {
@@ -332,7 +358,7 @@ contract MerkleExecutionTest is Base {
 
         // Create BatchedCall with wrong nonce
         uint192 nonceKey = uint192(0);
-        uint64 wrongNonce = uint64(_getNonce(_alice)) + 1; // Wrong nonce
+        uint64 wrongNonce = uint64(_getNonce(_aliceWallet)) + 1; // Wrong nonce
         uint256 nonce = (uint256(nonceKey) << 64) | uint256(wrongNonce);
 
         BatchedCall memory invalidNonceBatchedCall = BatchedCall({
@@ -341,7 +367,7 @@ contract MerkleExecutionTest is Base {
             expiry: uint48(block.timestamp + 1 hours)
         });
 
-        bytes memory validatorData = _construct_merkle_validator_data(
+        bytes memory validatorData = _constructMerkleValidatorData(
             charlie,
             charliePk,
             merkleRoot,
@@ -352,7 +378,7 @@ contract MerkleExecutionTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidNonce.selector, nonce)
         );
-        ISmartWallet(_alice).executeWithRelayer(
+        ISmartWallet(_aliceWallet).executeWithRelayer(
             invalidNonceBatchedCall,
             validatorData
         );
@@ -360,9 +386,12 @@ contract MerkleExecutionTest is Base {
 
     function test_executeWithMerkle_reverts_with_replay_attack() public {
         Call[] memory calls = constructCallsData();
-        BatchedCall memory batchedCall = _construct_batchedCall(calls, _alice);
+        BatchedCall memory batchedCall = _constructBatchedCall(
+            calls,
+            _aliceWallet
+        );
 
-        bytes memory validatorData = _construct_merkle_validator_data(
+        bytes memory validatorData = _constructMerkleValidatorData(
             charlie,
             charliePk,
             merkleRoot,
@@ -373,7 +402,10 @@ contract MerkleExecutionTest is Base {
         vm.prank(_bob);
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
 
         // Second execution with same nonce should fail
         vm.prank(_bob);
@@ -383,14 +415,20 @@ contract MerkleExecutionTest is Base {
                 batchedCall.nonce
             )
         );
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     function test_executeWithMerkle_reverts_with_manipulated_batchedCall()
         public
     {
         Call[] memory calls = constructCallsData();
-        BatchedCall memory batchedCall = _construct_batchedCall(calls, _alice);
+        BatchedCall memory batchedCall = _constructBatchedCall(
+            calls,
+            _aliceWallet
+        );
 
         // Create manipulated BatchedCall with different calls
         Call[] memory manipulatedCalls = new Call[](1);
@@ -402,7 +440,7 @@ contract MerkleExecutionTest is Base {
             expiry: batchedCall.expiry
         });
 
-        bytes memory validatorData = _construct_merkle_validator_data(
+        bytes memory validatorData = _constructMerkleValidatorData(
             charlie,
             charliePk,
             merkleRoot,
@@ -413,7 +451,7 @@ contract MerkleExecutionTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidSignature.selector)
         );
-        ISmartWallet(_alice).executeWithRelayer(
+        ISmartWallet(_aliceWallet).executeWithRelayer(
             manipulatedBatchedCall,
             validatorData
         );
@@ -423,7 +461,10 @@ contract MerkleExecutionTest is Base {
         public
     {
         Call[] memory calls = constructCallsData();
-        BatchedCall memory batchedCall = _construct_batchedCall(calls, _alice);
+        BatchedCall memory batchedCall = _constructBatchedCall(
+            calls,
+            _aliceWallet
+        );
 
         // Create signature that's too short (missing signature part)
         bytes memory shortValidatorData = abi.encodePacked(
@@ -435,7 +476,7 @@ contract MerkleExecutionTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidSignature.selector)
         );
-        ISmartWallet(_alice).executeWithRelayer(
+        ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             shortValidatorData
         );
@@ -449,10 +490,13 @@ contract MerkleExecutionTest is Base {
         bytes32[] memory largeLeaves = new bytes32[](numLeaves);
 
         Call[] memory calls = constructCallsData();
-        BatchedCall memory batchedCall = _construct_batchedCall(calls, _alice);
+        BatchedCall memory batchedCall = _constructBatchedCall(
+            calls,
+            _aliceWallet
+        );
 
         for (uint256 i = 0; i < numLeaves; i++) {
-            largeLeaves[i] = _getValidationTypedHash(_alice, batchedCall);
+            largeLeaves[i] = _getValidationTypedHash(_aliceWallet, batchedCall);
         }
 
         bytes32 largeMerkleRoot = _computeMerkleRootOpenZeppelin(largeLeaves);
@@ -461,7 +505,7 @@ contract MerkleExecutionTest is Base {
             0
         );
 
-        bytes memory validatorData = _construct_merkle_validator_data(
+        bytes memory validatorData = _constructMerkleValidatorData(
             charlie,
             charliePk,
             largeMerkleRoot,
@@ -471,7 +515,10 @@ contract MerkleExecutionTest is Base {
         vm.prank(_bob);
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
 
         assertEq(address(_bob).balance, 1 ether);
     }

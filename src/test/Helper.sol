@@ -41,30 +41,26 @@ library HelperLib {
         return (hash, encodeHash);
     }
 
-    function getBlocktimeStamp() internal view returns (uint256) {
-        return block.timestamp;
-    }
-
     function getPasskeyMessageHash(
         bytes32 challenge
     )
         internal
         pure
         returns (
-            string memory clientDataJSON,
+            string memory clientDataJson,
             bytes memory message,
             bytes32 messageHash
         )
     {
         string memory challengeB64url = Base64.encodeURL(abi.encode(challenge));
 
-        clientDataJSON = string.concat(
+        clientDataJson = string.concat(
             CLIENT_DATA_JSON_PRE,
             challengeB64url,
             CLIENT_DATA_JSON_POST
         );
 
-        bytes32 clientDataHash = sha256(bytes(clientDataJSON));
+        bytes32 clientDataHash = sha256(bytes(clientDataJson));
 
         message = bytes.concat(AUTHENTICATOR_DATA, clientDataHash);
         messageHash = sha256(message);
@@ -75,10 +71,10 @@ library HelperLib {
         uint256 r,
         uint256 s
     ) internal pure returns (WebAuthn.WebAuthnAuth memory webAuthnAuth) {
-        (string memory clientDataJSON, , ) = getPasskeyMessageHash(challenge);
+        (string memory clientDataJson, , ) = getPasskeyMessageHash(challenge);
         webAuthnAuth = WebAuthn.WebAuthnAuth({
             authenticatorData: AUTHENTICATOR_DATA,
-            clientDataJSON: clientDataJSON,
+            clientDataJSON: clientDataJson,
             typeIndex: TYPE_INDEX,
             challengeIndex: CHALLENGE_LOCATION,
             r: r,
@@ -129,17 +125,13 @@ contract Helper {
         return HelperLib.getPubkeyHash(pubKeyX, pubKeyY);
     }
 
-    function getBlocktimeStamp() internal view returns (uint256) {
-        return block.timestamp;
-    }
-
     function getPasskeyMessageHash(
         bytes32 challenge
     )
         external
         pure
         returns (
-            string memory clientDataJSON,
+            string memory clientDataJson,
             bytes memory message,
             bytes32 messageHash
         )

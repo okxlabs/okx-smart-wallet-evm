@@ -1,16 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.23;
 
-import "./Base.t.sol";
-import "src/libraries/Errors.sol";
+import {Base, MockComplexContract, MockRevertingContract} from "./Base.t.sol";
+import {Errors} from "src/libraries/Errors.sol";
 import {MockERC20} from "src/test/MockERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {console} from "forge-std/console.sol";
+import {OwnersManager} from "src/OwnersManager.sol";
+import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
+import {Call, BatchedCall} from "src/Types.sol";
+import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
+import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
+import {ERC712} from "src/ERC712.sol";
 
 contract ExecutionTest is Base {
     MockERC20 mockToken;
     MockERC20 mockToken2;
     address internal _charlie;
+    uint256 internal _charliePk;
 
     // Complex execution test contracts
     MockComplexContract internal complexContract;
@@ -30,10 +37,10 @@ contract ExecutionTest is Base {
     function setUp() public override {
         super.setUp();
 
-        (_charlie, ) = makeAddrAndKey("charlie");
+        (_charlie, _charliePk) = makeAddrAndKey("charlie");
         (user, userPk) = makeAddrAndKey("user");
 
-        vm.prank(_alice);
+        vm.prank(_aliceWallet);
         mockToken = new MockERC20();
 
         vm.prank(_bob);
@@ -44,24 +51,28 @@ contract ExecutionTest is Base {
         revertingContract = new MockRevertingContract();
 
         // Give wallet some tokens for testing
-        mockToken.mint(_alice, 1000 ether);
+        mockToken.mint(_aliceWallet, 1000 ether);
 
         // Add user as validator for complex tests
         bytes32 userKeyHash = keccak256(abi.encodePacked(user));
-        _executeAddValidator(
+        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+            false, // adminFlag
+            0, // expiration
+            address(0) // hook
+        );
+        _addOwnerToAccount(
             _alice,
+            _aliceWallet,
             userKeyHash,
             address(_ecdsaValidator),
-            false,
-            0,
-            address(0)
+            settings
         );
     }
 
     function test_execute_succeeds_for_owner() public {
         vm.prank(_alice);
         Call[] memory calls = constructCallsData();
-        ISmartWallet(_alice).execute(calls);
+        ISmartWallet(_aliceWallet).execute(calls);
     }
 
     function test_execute_reverts_for_non_owner() public {
@@ -70,7 +81,7 @@ contract ExecutionTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidCaller.selector, _bob)
         );
-        ISmartWallet(_alice).execute(calls);
+        ISmartWallet(_aliceWallet).execute(calls);
     }
 
     function test_execute_reverts_on_failed_call() public {
@@ -79,17 +90,24 @@ contract ExecutionTest is Base {
         calls[0] = Call({target: _bob, value: 1 ether, data: ""});
         calls[1] = Call({target: _bob, value: 1000 ether, data: ""}); // will fail
         vm.expectRevert();
-        ISmartWallet(_alice).execute(calls);
+        ISmartWallet(_aliceWallet).execute(calls);
     }
 
     function test_execute_succeeds_for_added_owner() public {
         // Add Charlie as an owner to the wallet
-        _addValidator(_alice, _charlie);
+        bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
+        _addOwnerToAccount(
+            _alice,
+            _aliceWallet,
+            charlieKeyHash,
+            address(_ecdsaValidator),
+            0
+        );
 
         // Charlie should be able to call execute() directly
         vm.prank(_charlie);
         Call[] memory calls = constructCallsData();
-        ISmartWallet(_alice).execute(calls);
+        ISmartWallet(_aliceWallet).execute(calls);
 
         // Verify the call succeeded
         assertEq(_bob.balance, 1 ether);
@@ -104,7 +122,7 @@ contract ExecutionTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidCaller.selector, dave)
         );
-        ISmartWallet(_alice).execute(calls);
+        ISmartWallet(_aliceWallet).execute(calls);
     }
 
     function test_execute_with_empty_calls_array() public {
@@ -113,7 +131,7 @@ contract ExecutionTest is Base {
 
         vm.prank(_alice);
         // Should succeed without reverting, but perform no operations
-        ISmartWallet(_alice).execute(emptyCalls);
+        ISmartWallet(_aliceWallet).execute(emptyCalls);
 
         // Verify no state changes occurred
         assertEq(_bob.balance, 0 ether);
@@ -129,19 +147,22 @@ contract ExecutionTest is Base {
         });
 
         // Sign the BatchedCall
-        bytes32 hash = ERC712(_alice).hashTypedData(
+        bytes32 hash = ERC712(_aliceWallet).hashTypedData(
             BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = constructValidatorData(
+            _aliceWallet,
             _alice,
-            _aliceEOA,
             _alicePk,
             hash
         );
 
-        vm.prank(_alice);
+        vm.prank(_aliceWallet);
         // Should succeed without reverting, but perform no operations
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
 
         // Verify no state changes occurred
         assertEq(_bob.balance, 0 ether);
@@ -153,7 +174,7 @@ contract ExecutionTest is Base {
         bytes32 keyHash = keccak256(abi.encodePacked(testAddress));
 
         // Initially Charlie should not be an owner
-        assertFalse(IOwnersManager(_alice).hasOwner(keyHash));
+        assertFalse(IOwnersManager(_aliceWallet).hasOwner(keyHash));
 
         // Charlie should not be able to call execute
         vm.prank(_charlie);
@@ -161,23 +182,30 @@ contract ExecutionTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidCaller.selector, _charlie)
         );
-        ISmartWallet(_alice).execute(calls);
+        ISmartWallet(_aliceWallet).execute(calls);
 
         // Add Charlie as owner
-        _addValidator(_alice, _charlie);
+        bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
+        _addOwnerToAccount(
+            _alice,
+            _aliceWallet,
+            charlieKeyHash,
+            address(_ecdsaValidator),
+            0
+        );
 
         // Verify Charlie is now an owner and can execute
-        assertTrue(IOwnersManager(_alice).hasOwner(keyHash));
+        assertTrue(IOwnersManager(_aliceWallet).hasOwner(keyHash));
         vm.prank(_charlie);
-        ISmartWallet(_alice).execute(calls);
+        ISmartWallet(_aliceWallet).execute(calls);
     }
 
     function test_executeFromRelayer_succeeds_as_relayer() public {
         Call[] memory calls = constructCallsData();
-        bytes32 hash = _getValidationTypedHash(_alice, calls);
+        bytes32 hash = _getValidationTypedHash(_aliceWallet, calls);
         bytes memory validatorData = constructValidatorData(
+            _aliceWallet,
             _alice,
-            _aliceEOA,
             _alicePk,
             hash
         );
@@ -187,7 +215,7 @@ contract ExecutionTest is Base {
         vm.prank(_bob);
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
-        ISmartWallet(_alice).executeWithRelayer(
+        ISmartWallet(_aliceWallet).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),
             validatorData
         );
@@ -199,35 +227,28 @@ contract ExecutionTest is Base {
     }
 
     function test_executeFromRelayer_initialization_on_first_time() public {
-        (address charlieEOA, uint256 charliePk) = makeAddrAndKey("charlieEOA");
-
         // Create charlie's wallet using factory
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: keccak256(abi.encodePacked(charlieEOA)),
-            validator: address(_ecdsaValidator)
-        });
-
-        address charlie = _factory.createAccount(
-            initialOwners,
+        address charlieWallet = _deployAccountSingleOwner(
+            keccak256(abi.encodePacked(_charlie)),
+            address(_ecdsaValidator),
             1 // Different salt
         );
-        vm.deal(charlie, 1 ether);
+        vm.deal(charlieWallet, 1 ether);
 
         Call[] memory calls = constructCallsData();
 
-        bytes32 hash = _getValidationTypedHash(charlie, calls);
+        bytes32 hash = _getValidationTypedHash(charlieWallet, calls);
         bytes memory validatorData = constructValidatorData(
-            charlie, // wallet address
-            charlieEOA, // signer address
-            charliePk,
+            charlieWallet, // wallet address
+            _charlie, // signer address
+            _charliePk,
             hash
         );
 
         vm.prank(_alice);
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _alice, 0);
-        ISmartWallet(charlie).executeWithRelayer(
+        ISmartWallet(charlieWallet).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),
             validatorData
         );
@@ -236,7 +257,7 @@ contract ExecutionTest is Base {
     }
 
     function test_executeFromRelayer_reverts_on_failed_payment() public {
-        assertEq(mockToken2.balanceOf(_alice), 0);
+        assertEq(mockToken2.balanceOf(_aliceWallet), 0);
         vm.prank(_alice);
         Call[] memory calls = new Call[](2);
         // First call is the failing payment
@@ -247,17 +268,17 @@ contract ExecutionTest is Base {
         );
         calls[1] = Call({target: _bob, value: 1 ether, data: ""});
 
-        bytes32 hash = _getValidationTypedHash(_alice, calls);
+        bytes32 hash = _getValidationTypedHash(_aliceWallet, calls);
         bytes memory validatorData = constructValidatorData(
+            _aliceWallet,
             _alice,
-            _aliceEOA,
             _alicePk,
             hash
         );
 
         // Expect revert due to insufficient balance for ERC20 transfer
         vm.expectRevert();
-        ISmartWallet(_alice).executeWithRelayer(
+        ISmartWallet(_aliceWallet).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),
             validatorData
         );
@@ -273,17 +294,17 @@ contract ExecutionTest is Base {
         );
         calls[1] = Call({target: _bob, value: 1 ether, data: ""});
 
-        bytes32 hash = _getValidationTypedHash(_alice, calls);
+        bytes32 hash = _getValidationTypedHash(_aliceWallet, calls);
         bytes memory validatorData = constructValidatorData(
+            _aliceWallet,
             _alice,
-            _aliceEOA,
             _alicePk,
             hash
         );
         vm.prank(_bob);
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
-        ISmartWallet(_alice).executeWithRelayer(
+        ISmartWallet(_aliceWallet).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),
             validatorData
         );
@@ -300,17 +321,17 @@ contract ExecutionTest is Base {
         calls[0] = Call({target: _bob, value: 1 ether, data: ""});
         calls[1] = Call({target: _bob, value: 1000 ether, data: ""}); // This will fail due to insufficient balance
 
-        bytes32 hash = _getValidationTypedHash(_alice, calls);
+        bytes32 hash = _getValidationTypedHash(_aliceWallet, calls);
         bytes memory validatorData = constructValidatorData(
+            _aliceWallet,
             _alice,
-            _aliceEOA,
             _alicePk,
             hash
         );
 
         // Expect the entire batch to revert when one call fails
         vm.expectRevert();
-        ISmartWallet(_alice).executeWithRelayer(
+        ISmartWallet(_aliceWallet).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),
             validatorData
         );
@@ -328,10 +349,10 @@ contract ExecutionTest is Base {
             10
         );
 
-        bytes32 hash = _getValidationTypedHash(_alice, calls);
+        bytes32 hash = _getValidationTypedHash(_aliceWallet, calls);
         bytes memory validatorData = constructValidatorData(
+            _aliceWallet,
             _alice,
-            _aliceEOA,
             _alicePk,
             hash
         );
@@ -339,7 +360,7 @@ contract ExecutionTest is Base {
         vm.prank(_bob);
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
-        ISmartWallet(_alice).executeWithRelayer(
+        ISmartWallet(_aliceWallet).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),
             validatorData
         );
@@ -407,11 +428,11 @@ contract ExecutionTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: mixedCalls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
-        bytes32 typedDataHash = ERC712(_alice).hashTypedData(
+        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
             BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
@@ -423,14 +444,17 @@ contract ExecutionTest is Base {
         vm.prank(_bob);
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(keccak256(abi.encode(mixedCalls)), _bob, 0);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
         uint256 gasUsed = initialGas - gasleft();
 
         // Verify all operations succeeded
         assertEq(address(_bob).balance, 0.5 ether);
         assertEq(mockToken.balanceOf(_charlie), 100 ether);
         assertEq(address(complexContract).balance, 0.3 ether);
-        assertEq(mockToken.allowance(_alice, _bob), 50 ether);
+        assertEq(mockToken.allowance(_aliceWallet, _bob), 50 ether);
         assertTrue(complexContract.functionCalled());
 
         emit LargeOperationCompleted(5, gasUsed);
@@ -455,11 +479,11 @@ contract ExecutionTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: largeBatch,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
-        bytes32 typedDataHash = ERC712(_alice).hashTypedData(
+        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
             BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
@@ -472,7 +496,7 @@ contract ExecutionTest is Base {
 
         // Should either succeed or fail due to gas limits
         try
-            ISmartWallet(_alice).executeWithRelayer{gas: 30000000}(
+            ISmartWallet(_aliceWallet).executeWithRelayer{gas: 30000000}(
                 batchedCall,
                 validatorData
             )
@@ -506,11 +530,11 @@ contract ExecutionTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: deadContractCalls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
-        bytes32 typedDataHash = ERC712(_alice).hashTypedData(
+        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
             BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
         bytes memory validatorData = abi.encodePacked(
@@ -520,14 +544,17 @@ contract ExecutionTest is Base {
 
         vm.prank(_bob);
         // Should succeed (calls to non-existent contracts succeed but return empty data)
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     function test_gas_efficiency_comparison() public {
         bytes32 userKeyHash = keccak256(abi.encodePacked(user));
 
         // Ensure wallet has enough balance for both tests
-        vm.deal(_alice, 30 ether);
+        vm.deal(_aliceWallet, 30 ether);
 
         // Test single large call vs multiple small calls
         Call[] memory singleLargeCall = new Call[](1);
@@ -545,11 +572,11 @@ contract ExecutionTest is Base {
         // Test single large call
         BatchedCall memory singleCallBatch = BatchedCall({
             calls: singleLargeCall,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
-        bytes32 singleTypedDataHash = ERC712(_alice).hashTypedData(
+        bytes32 singleTypedDataHash = ERC712(_aliceWallet).hashTypedData(
             BatchedCallLib.hash(singleCallBatch, address(_smartWallet))
         );
         bytes memory singleValidatorData = abi.encodePacked(
@@ -559,7 +586,7 @@ contract ExecutionTest is Base {
 
         uint256 gasBefore = gasleft();
         vm.prank(_bob);
-        ISmartWallet(_alice).executeWithRelayer(
+        ISmartWallet(_aliceWallet).executeWithRelayer(
             singleCallBatch,
             singleValidatorData
         );
@@ -571,11 +598,11 @@ contract ExecutionTest is Base {
         // Test multiple small calls
         BatchedCall memory multipleCallsBatch = BatchedCall({
             calls: multipleSmallCalls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
-        bytes32 multipleTypedDataHash = ERC712(_alice).hashTypedData(
+        bytes32 multipleTypedDataHash = ERC712(_aliceWallet).hashTypedData(
             BatchedCallLib.hash(multipleCallsBatch, address(_smartWallet))
         );
         bytes memory multipleValidatorData = abi.encodePacked(
@@ -585,7 +612,7 @@ contract ExecutionTest is Base {
 
         gasBefore = gasleft();
         vm.prank(_bob);
-        ISmartWallet(_alice).executeWithRelayer(
+        ISmartWallet(_aliceWallet).executeWithRelayer(
             multipleCallsBatch,
             multipleValidatorData
         );
@@ -599,5 +626,215 @@ contract ExecutionTest is Base {
 
         emit LargeOperationCompleted(1, singleCallGas);
         emit LargeOperationCompleted(10, multipleCallsGas);
+    }
+
+    function test_executeWithRelayer_wrapping_self_execute() public {
+        // Test that executeWithRelayer can wrap a self-call to the wallet's own execute function
+        // This creates a nested execution scenario: executeWithRelayer -> execute
+
+        // First, prepare the inner calls that will be executed by the wallet's execute function
+        Call[] memory innerCalls = new Call[](2);
+        innerCalls[0] = Call({target: _bob, value: 0.5 ether, data: ""});
+        innerCalls[1] = Call({
+            target: address(mockToken),
+            value: 0,
+            data: abi.encodeWithSelector(
+                IERC20.transfer.selector,
+                _charlie,
+                50 ether
+            )
+        });
+
+        // Now wrap the execute call in executeWithRelayer
+        Call[] memory outerCalls = new Call[](1);
+        outerCalls[0] = Call({
+            target: _aliceWallet, // Self-call to the wallet
+            value: 0,
+            data: abi.encodeWithSelector(
+                ISmartWallet.execute.selector,
+                innerCalls
+            )
+        });
+
+        // Create the batched call for executeWithRelayer
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: outerCalls,
+            nonce: _getNonce(_aliceWallet),
+            expiry: uint48(block.timestamp + 1 hours)
+        });
+
+        // Sign the batched call
+        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+        );
+        bytes memory validatorData = constructValidatorData(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            typedDataHash
+        );
+
+        // Execute through relayer
+        vm.prank(_bob); // Bob acts as relayer
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
+
+        // Verify the nested calls were executed successfully
+        assertEq(
+            address(_bob).balance,
+            0.5 ether,
+            "Bob should receive 0.5 ETH"
+        );
+        assertEq(
+            mockToken.balanceOf(_charlie),
+            50 ether,
+            "Charlie should receive 50 tokens"
+        );
+    }
+
+    function test_execute_calling_executeWithRelayer() public {
+        // Test the reverse scenario: execute calls executeWithRelayer
+        // This creates a nested execution: execute -> executeWithRelayer
+
+        // Prepare the inner calls for executeWithRelayer
+        Call[] memory innerCalls = new Call[](2);
+        innerCalls[0] = Call({target: _charlie, value: 0.3 ether, data: ""});
+        innerCalls[1] = Call({
+            target: address(mockToken),
+            value: 0,
+            data: abi.encodeWithSelector(
+                IERC20.transfer.selector,
+                _bob,
+                30 ether
+            )
+        });
+
+        // Create batched call for the inner executeWithRelayer
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: innerCalls,
+            nonce: _getNonce(_aliceWallet),
+            expiry: uint48(block.timestamp + 1 hours)
+        });
+
+        // Sign the batched call
+        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+        );
+        bytes memory validatorData = constructValidatorData(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            typedDataHash
+        );
+
+        // Create outer call that calls executeWithRelayer
+        Call[] memory outerCalls = new Call[](1);
+        outerCalls[0] = Call({
+            target: _aliceWallet, // Self-call to the wallet
+            value: 0,
+            data: abi.encodeWithSelector(
+                ISmartWallet.executeWithRelayer.selector,
+                batchedCall,
+                validatorData
+            )
+        });
+
+        // Execute the outer call directly as owner
+        vm.prank(_alice);
+        ISmartWallet(_aliceWallet).execute(outerCalls);
+
+        // Verify the nested calls were executed successfully
+        assertEq(
+            address(_charlie).balance,
+            0.3 ether,
+            "Charlie should receive 0.3 ETH"
+        );
+        assertEq(
+            mockToken.balanceOf(_bob),
+            30 ether,
+            "Bob should receive 30 tokens"
+        );
+    }
+
+    function test_executeWithRelayer_non_admin_self_execute_reverts() public {
+        // Add Bob as a non-admin owner to the wallet
+        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        uint256 bobSettings = 0; // Non-admin settings
+        _addOwnerToAccount(
+            _alice, // Alice adds Bob as owner
+            _aliceWallet,
+            bobKeyHash,
+            address(_ecdsaValidator),
+            bobSettings
+        );
+
+        // Verify Bob is now an owner but not admin
+        assertTrue(IOwnersManager(_aliceWallet).hasOwner(bobKeyHash));
+        assertFalse(OwnersManager(_aliceWallet).isAdmin(bobSettings));
+
+        // Prepare inner calls that execute will try to run
+        Call[] memory innerCalls = new Call[](2);
+        innerCalls[0] = Call({target: _charlie, value: 0.1 ether, data: ""});
+        innerCalls[1] = Call({
+            target: address(mockToken),
+            value: 0,
+            data: abi.encodeWithSelector(
+                IERC20.transfer.selector,
+                _charlie,
+                10 ether
+            )
+        });
+
+        // Bob tries to use executeWithRelayer to call the wallet's own execute function
+        // This is a self-call attempt by a non-admin
+        Call[] memory outerCalls = new Call[](1);
+        outerCalls[0] = Call({
+            target: _aliceWallet, // Self-call to the wallet
+            value: 0,
+            data: abi.encodeWithSelector(
+                ISmartWallet.execute.selector,
+                innerCalls
+            )
+        });
+
+        // Create the batched call for executeWithRelayer
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: outerCalls,
+            nonce: _getNonce(_aliceWallet),
+            expiry: uint48(block.timestamp + 1 hours)
+        });
+
+        // Sign the batched call with Bob's key (non-admin owner)
+        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
+            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+        );
+        bytes memory validatorData = constructValidatorData(
+            _aliceWallet,
+            _bob, // Bob is the signer
+            _bobPk,
+            typedDataHash
+        );
+
+        // Attempt to execute through relayer should revert with NonAdminSelfCall
+        vm.prank(_charlie); // Charlie acts as relayer
+        vm.expectRevert(Errors.NonAdminSelfCall.selector);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
+
+        // Verify no state changes occurred
+        assertEq(
+            address(_charlie).balance,
+            0,
+            "Charlie should not receive ETH"
+        );
+        assertEq(
+            mockToken.balanceOf(_charlie),
+            0,
+            "Charlie should not receive tokens"
+        );
     }
 }

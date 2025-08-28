@@ -23,6 +23,10 @@ library ECDSAValidatorLib {
         bytes32 messageHash,
         bytes calldata validatorData
     ) internal pure returns (bool) {
+        if (validatorData.length < ECDSA_SIGNATURE_LENGTH) {
+            return false;
+        }
+
         bytes memory signature = validatorData[:ECDSA_SIGNATURE_LENGTH];
         if (validatorData.length > ECDSA_SIGNATURE_LENGTH) {
             bytes32[] memory proofs = abi.decode(

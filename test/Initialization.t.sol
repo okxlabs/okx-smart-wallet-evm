@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.23;
 
-import "./Base.t.sol";
-import "src/libraries/Errors.sol";
+import {Base} from "./Base.t.sol";
+import {Errors} from "src/libraries/Errors.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import {InitialOwner} from "src/Types.sol";
+import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
+import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
 
 contract InitializationTest is Base {
     function setUp() public override {
@@ -12,7 +15,7 @@ contract InitializationTest is Base {
 
     function test_initialize_reverts_when_called_twice() public {
         // Set up bob with wallet code
-        _setCodeToEOA(address(_smartWallet), _bob);
+        _setCodeToEoa(address(_smartWallet), _bob);
 
         // First initialization should succeed
         vm.prank(_bob);
@@ -33,7 +36,7 @@ contract InitializationTest is Base {
 
         // Execute the function that SHOULD modify storage
         vm.prank(_bob);
-        _setCodeToEOA(address(_smartWallet), _bob);
+        _setCodeToEoa(address(_smartWallet), _bob);
 
         // Bob initializes the account with empty owners
         InitialOwner[] memory emptyOwners = new InitialOwner[](0);
@@ -51,18 +54,19 @@ contract InitializationTest is Base {
     }
 
     function test_initialize_sets_initial_owners_correctly() public {
-        _setCodeToEOA(address(_smartWallet), _bob);
+        _setCodeToEoa(address(_smartWallet), _bob);
 
         vm.prank(_bob);
-        InitialOwner[] memory initialOwners = new InitialOwner[](2);
-        initialOwners[0] = InitialOwner({
-            keyHash: keccak256(abi.encodePacked(_alice)),
-            validator: address(_ecdsaValidator)
-        });
-        initialOwners[1] = InitialOwner({
-            keyHash: keccak256(abi.encodePacked(_bob)),
-            validator: address(_ecdsaValidator)
-        });
+        bytes32[] memory keyHashes = new bytes32[](2);
+        keyHashes[0] = keccak256(abi.encodePacked(_alice));
+        keyHashes[1] = keccak256(abi.encodePacked(_bob)); // _bob 本身就是 EOA
+        address[] memory validators = new address[](2);
+        validators[0] = address(_ecdsaValidator);
+        validators[1] = address(_ecdsaValidator);
+        InitialOwner[] memory initialOwners = _createOwners(
+            keyHashes,
+            validators
+        );
 
         ISmartWallet(_bob).initialize(initialOwners);
 
@@ -81,14 +85,13 @@ contract InitializationTest is Base {
     }
 
     function test_initialize_reverts_with_zero_validator() public {
-        _setCodeToEOA(address(_smartWallet), _bob);
+        _setCodeToEoa(address(_smartWallet), _bob);
 
         vm.prank(_bob);
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: keccak256(abi.encodePacked(_alice)),
-            validator: address(0) // Zero address should revert
-        });
+        InitialOwner[] memory initialOwners = _createSingleOwner(
+            keccak256(abi.encodePacked(_alice)),
+            address(0) // Zero address should revert
+        );
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -105,7 +108,7 @@ contract InitializationTest is Base {
 
         // Execute the function that should NOT modify storage
         vm.prank(_bob);
-        _setCodeToEOA(address(_smartWallet), _bob);
+        _setCodeToEoa(address(_smartWallet), _bob);
 
         // Bob initializes the account with empty owners
         InitialOwner[] memory emptyOwners = new InitialOwner[](0);
@@ -117,11 +120,10 @@ contract InitializationTest is Base {
 
     function test_implementation_cannot_be_initialized() public {
         // Attempt to call initialize directly on the implementation
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: keccak256(abi.encodePacked(_bob)),
-            validator: address(_ecdsaValidator)
-        });
+        InitialOwner[] memory initialOwners = _createSingleOwner(
+            keccak256(abi.encodePacked(_bob)),
+            address(_ecdsaValidator)
+        );
 
         vm.expectRevert(
             abi.encodeWithSelector(Initializable.InvalidInitialization.selector)

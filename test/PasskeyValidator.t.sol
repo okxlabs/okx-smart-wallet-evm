@@ -55,14 +55,12 @@ contract PasskeyValidatorTest is Base {
             abi.encodePacked(_passkeyPubX, _passkeyPubY)
         ); // Built-in validator
 
-        // Add external PasskeyValidator for Alice's wallet
-        _executeAddValidator(
+        _addOwnerToAccount(
             _alice,
+            _aliceWallet,
             testKeyHash,
-            address(passkeyValidator), // External contract address
-            true,
-            0,
-            address(0)
+            address(passkeyValidator),
+            0
         );
 
         // Create separate wallet for built-in validator tests to avoid collision
@@ -86,7 +84,9 @@ contract PasskeyValidatorTest is Base {
     }
 
     function test_passkeyValidator_added_to_wallet() public view {
-        address validator = IOwnersManager(_alice).ownerValidators(testKeyHash);
+        address validator = IOwnersManager(_aliceWallet).ownerValidators(
+            testKeyHash
+        );
         assertEq(validator, address(passkeyValidator));
     }
 
@@ -150,12 +150,12 @@ contract PasskeyValidatorTest is Base {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
         // Get the REAL message hash that needs to be signed
-        bytes32 realTypedDataHash = ERC712(_alice).hashTypedData(
+        bytes32 realTypedDataHash = ERC712(_aliceWallet).hashTypedData(
             BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
 
@@ -169,12 +169,12 @@ contract PasskeyValidatorTest is Base {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(_aliceWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
         // Get the message hash that needs to be signed
-        ERC712(_alice).hashTypedData(
+        ERC712(_aliceWallet).hashTypedData(
             BatchedCallLib.hash(batchedCall, address(_smartWallet))
         );
 
@@ -380,7 +380,7 @@ contract PasskeyValidatorTest is Base {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(builtinWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
@@ -410,7 +410,7 @@ contract PasskeyValidatorTest is Base {
         // Should revert with InvalidSignature because PasskeyValidator will return false
         vm.prank(_bob);
         vm.expectRevert(Errors.InvalidSignature.selector);
-        ISmartWallet(_alice).executeWithRelayer(
+        ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             shortValidatorData
         );
@@ -421,7 +421,7 @@ contract PasskeyValidatorTest is Base {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(builtinWallet),
             expiry: uint48(block.timestamp + 1 hours)
         });
 
@@ -456,7 +456,10 @@ contract PasskeyValidatorTest is Base {
         // Should revert due to abi.decode failure or validation failure
         vm.prank(_bob);
         vm.expectRevert(); // May revert with decode error or InvalidSignature
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, validatorData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     // ================================================================
@@ -530,7 +533,7 @@ contract PasskeyValidatorTest is Base {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(builtinWallet),
             expiry: 0
         });
 
@@ -559,7 +562,7 @@ contract PasskeyValidatorTest is Base {
             abi.encodeWithSelector(Errors.InvalidSignature.selector)
         );
         vm.prank(_bob);
-        ISmartWallet(_alice).executeWithRelayer(
+        ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             invalidValidatorData
         );
@@ -572,7 +575,7 @@ contract PasskeyValidatorTest is Base {
         bytes32 hash = keccak256("test message");
 
         bytes32 boundHash = keccak256(
-            abi.encode(bytes32(block.chainid), address(_alice), hash)
+            abi.encode(bytes32(block.chainid), builtinWallet, hash)
         );
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", boundHash));
 
@@ -581,7 +584,10 @@ contract PasskeyValidatorTest is Base {
             digest
         );
 
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(builtinWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(
             result,
             Static.MAGIC_VALUE,
@@ -649,7 +655,7 @@ contract PasskeyValidatorTest is Base {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_alice),
+            nonce: _getNonce(builtinWallet),
             expiry: 0
         });
 
@@ -662,7 +668,10 @@ contract PasskeyValidatorTest is Base {
             abi.encodeWithSelector(Errors.InvalidSignature.selector)
         );
         vm.prank(_bob);
-        ISmartWallet(_alice).executeWithRelayer(batchedCall, insufficientData);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            insufficientData
+        );
     }
 
     // ================================================================

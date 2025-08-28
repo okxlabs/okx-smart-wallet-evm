@@ -8,6 +8,7 @@ import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {HelperLib} from "src/test/Helper.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
+import {OwnersManager} from "src/OwnersManager.sol";
 
 contract IsValidSignatureTest is Base {
     // Passkey-related constants and variables
@@ -31,13 +32,17 @@ contract IsValidSignatureTest is Base {
         );
 
         // Add PasskeyValidator for Alice's wallet
-        _executeAddValidator(
-            _alice,
-            passkeyTestKeyHash,
-            address(passkeyValidator),
+        uint256 settings = OwnersManager(_aliceWallet).packSettings(
             true,
             0,
             address(0)
+        );
+        _addOwnerToAccount(
+            _alice,
+            _aliceWallet,
+            passkeyTestKeyHash,
+            address(passkeyValidator),
+            settings
         );
     }
 
@@ -46,7 +51,10 @@ contract IsValidSignatureTest is Base {
         // Create signature with exactly 32 bytes (should be treated as invalid)
         bytes memory signature = new bytes(32);
 
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(result, bytes4(0xffffffff));
     }
 
@@ -56,7 +64,10 @@ contract IsValidSignatureTest is Base {
         bytes32 hash = keccak256("test");
         bytes memory signature = new bytes(0);
 
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(
             result,
             Static.INVALID_VALUE,
@@ -69,7 +80,10 @@ contract IsValidSignatureTest is Base {
         bytes memory signature = new bytes(1);
         signature[0] = 0x01;
 
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(
             result,
             Static.INVALID_VALUE,
@@ -85,7 +99,10 @@ contract IsValidSignatureTest is Base {
             signature[i] = bytes1(uint8(i + 1));
         }
 
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(
             result,
             Static.INVALID_VALUE,
@@ -101,7 +118,10 @@ contract IsValidSignatureTest is Base {
             signature[i] = bytes1(uint8(i + 1));
         }
 
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(
             result,
             Static.INVALID_VALUE,
@@ -121,7 +141,10 @@ contract IsValidSignatureTest is Base {
         // Add one more byte
         signature[32] = 0x01;
 
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(
             result,
             Static.INVALID_VALUE,
@@ -143,7 +166,10 @@ contract IsValidSignatureTest is Base {
             signature[i] = bytes1(uint8(i));
         }
 
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(
             result,
             Static.INVALID_VALUE,
@@ -167,7 +193,10 @@ contract IsValidSignatureTest is Base {
             signature[i] = bytes1(uint8(i));
         }
 
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(
             result,
             Static.INVALID_VALUE,
@@ -192,7 +221,10 @@ contract IsValidSignatureTest is Base {
             signature[i] = bytes1(uint8(i % 256));
         }
 
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(
             result,
             Static.INVALID_VALUE,
@@ -213,7 +245,10 @@ contract IsValidSignatureTest is Base {
             signature[i] = bytes1(uint8(i));
         }
 
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(
             result,
             Static.INVALID_VALUE,
@@ -223,11 +258,11 @@ contract IsValidSignatureTest is Base {
 
     function test_isValidSignature_fails_with_zero_hash() public view {
         bytes32 zeroHash = bytes32(0);
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
         bytes memory sig = _signDigest(zeroHash, _alicePk);
         bytes memory signature = abi.encodePacked(aliceKeyHash, sig);
 
-        bytes4 result = ISmartWallet(_alice).isValidSignature(
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
             zeroHash,
             signature
         );
@@ -240,11 +275,11 @@ contract IsValidSignatureTest is Base {
 
     function test_isValidSignature_fails_with_max_hash() public view {
         bytes32 maxHash = bytes32(type(uint256).max);
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
         bytes memory sig = _signDigest(maxHash, _alicePk);
         bytes memory signature = abi.encodePacked(aliceKeyHash, sig);
 
-        bytes4 result = ISmartWallet(_alice).isValidSignature(
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
             maxHash,
             signature
         );
@@ -273,7 +308,10 @@ contract IsValidSignatureTest is Base {
             signature[i] = 0xAA;
         }
 
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(
             result,
             Static.INVALID_VALUE,
@@ -288,7 +326,10 @@ contract IsValidSignatureTest is Base {
         bytes memory signature = new bytes(100);
         // signature is already initialized with zeros
 
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(
             result,
             Static.INVALID_VALUE,
@@ -305,7 +346,10 @@ contract IsValidSignatureTest is Base {
             signature[i] = 0xFF;
         }
 
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(
             result,
             Static.INVALID_VALUE,
@@ -329,7 +373,10 @@ contract IsValidSignatureTest is Base {
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_bobPk, digest);
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(
             result,
             Static.INVALID_VALUE,
@@ -352,7 +399,10 @@ contract IsValidSignatureTest is Base {
         }
         signature[64] = 0x99; // Invalid v value (should be 27 or 28)
 
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(
             result,
             Static.INVALID_VALUE,
@@ -372,7 +422,10 @@ contract IsValidSignatureTest is Base {
         bytes memory signature = abi.encodePacked(wrongKeyHash, sig);
 
         // Call isValidSignature with non-existent keyHash
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(result, bytes4(0xffffffff));
     }
 
@@ -383,13 +436,17 @@ contract IsValidSignatureTest is Base {
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         uint40 expiry = uint40(block.timestamp + 1 days);
 
-        _executeAddValidator(
-            _alice,
-            bobKeyHash,
-            Static.ECDSA_VALIDATOR_ADDRESS, // Use built-in ECDSA validator
+        uint256 settings = OwnersManager(_aliceWallet).packSettings(
             false,
             expiry,
             address(0)
+        );
+        _addOwnerToAccount(
+            _alice,
+            _aliceWallet,
+            bobKeyHash,
+            Static.ECDSA_VALIDATOR_ADDRESS, // Use built-in ECDSA validator
+            settings
         );
 
         // Verify validator is initially valid
@@ -397,7 +454,10 @@ contract IsValidSignatureTest is Base {
         bytes memory sig = _signDigest(hash, _bobPk);
         bytes memory signature = abi.encodePacked(bobKeyHash, sig);
 
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(
             result,
             bytes4(0x1626ba7e),
@@ -408,7 +468,7 @@ contract IsValidSignatureTest is Base {
         vm.warp(block.timestamp + 2 days);
 
         // Call isValidSignature after expiration
-        result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        result = ISmartWallet(_aliceWallet).isValidSignature(hash, signature);
         assertEq(
             result,
             bytes4(0xffffffff),
@@ -425,7 +485,7 @@ contract IsValidSignatureTest is Base {
         bytes32 hash2 = keccak256("test2");
 
         // Use validator-based signatures to test signature replay attack protection
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
 
         // Create signatures for both hashes using standard pattern
         bytes memory sig1 = _signDigest(hash1, _alicePk);
@@ -434,21 +494,21 @@ contract IsValidSignatureTest is Base {
         bytes memory signature2 = abi.encodePacked(aliceKeyHash, sig2);
 
         // Correct signature for hash1
-        bytes4 result1 = ISmartWallet(_alice).isValidSignature(
+        bytes4 result1 = ISmartWallet(_aliceWallet).isValidSignature(
             hash1,
             signature1
         );
         assertEq(result1, bytes4(0x1626ba7e));
 
         // Wrong signature for hash2 (using sig1) - should fail due to signature replay attack
-        bytes4 result2 = ISmartWallet(_alice).isValidSignature(
+        bytes4 result2 = ISmartWallet(_aliceWallet).isValidSignature(
             hash2,
             signature1
         );
         assertEq(result2, bytes4(0xffffffff));
 
         // Correct signature for hash2
-        bytes4 result3 = ISmartWallet(_alice).isValidSignature(
+        bytes4 result3 = ISmartWallet(_aliceWallet).isValidSignature(
             hash2,
             signature2
         );
@@ -465,13 +525,17 @@ contract IsValidSignatureTest is Base {
         uint256 testPubY = 987654321;
         bytes32 passkeyKeyHash = keccak256(abi.encode([testPubX, testPubY]));
 
-        _executeAddValidator(
-            _alice,
-            passkeyKeyHash,
-            Static.PASSKEY_VALIDATOR_ADDRESS, // Use built-in passkey validator address(2)
+        uint256 settings = OwnersManager(_aliceWallet).packSettings(
             true,
             0,
             address(0)
+        );
+        _addOwnerToAccount(
+            _alice,
+            _aliceWallet,
+            passkeyKeyHash,
+            Static.PASSKEY_VALIDATOR_ADDRESS, // Use built-in passkey validator address(2)
+            settings
         );
 
         bytes32 hash = keccak256("test_message_for_builtin_validator");
@@ -502,7 +566,10 @@ contract IsValidSignatureTest is Base {
         );
 
         // Call isValidSignature - this should fail due to invalid signature but test the flow
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         // Since we're using dummy signature values, this should fail
         assertEq(
             result,
@@ -543,7 +610,10 @@ contract IsValidSignatureTest is Base {
         bytes memory signature = abi.encodePacked(wrongKeyHash, validatorData);
 
         // Call isValidSignature
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(result, bytes4(0xffffffff), "Wrong keyHash should fail");
     }
 
@@ -556,13 +626,17 @@ contract IsValidSignatureTest is Base {
         bytes32 passkeyKeyHash = keccak256(abi.encode([testPubX, testPubY]));
         uint40 expiry = uint40(block.timestamp + 1 days);
 
-        _executeAddValidator(
-            _alice,
-            passkeyKeyHash,
-            Static.PASSKEY_VALIDATOR_ADDRESS, // Use built-in passkey validator
+        uint256 settings = OwnersManager(_aliceWallet).packSettings(
             false,
             expiry,
             address(0)
+        );
+        _addOwnerToAccount(
+            _alice,
+            _aliceWallet,
+            passkeyKeyHash,
+            Static.PASSKEY_VALIDATOR_ADDRESS, // Use built-in passkey validator
+            settings
         );
 
         bytes32 hash = keccak256("test");
@@ -591,7 +665,10 @@ contract IsValidSignatureTest is Base {
         );
 
         // Verify validator fails initially due to dummy signature
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(
             result,
             bytes4(0xffffffff),
@@ -602,7 +679,7 @@ contract IsValidSignatureTest is Base {
         vm.warp(block.timestamp + 2 days);
 
         // Call isValidSignature after expiration - should still fail
-        result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        result = ISmartWallet(_aliceWallet).isValidSignature(hash, signature);
         assertEq(
             result,
             bytes4(0xffffffff),
@@ -617,12 +694,15 @@ contract IsValidSignatureTest is Base {
         view
     {
         bytes32 hash = keccak256("test");
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
         bytes memory sig = _signDigest(hash, _alicePk);
         bytes memory signature = abi.encodePacked(aliceKeyHash, sig);
 
         // Call isValidSignature - this uses the custom ECDSA validator deployed in setUp
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(result, bytes4(0x1626ba7e));
     }
 
@@ -658,7 +738,10 @@ contract IsValidSignatureTest is Base {
         );
 
         // Call isValidSignature - should fail due to dummy signature values
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(
             result,
             bytes4(0xffffffff),
@@ -697,7 +780,10 @@ contract IsValidSignatureTest is Base {
         );
 
         // Call isValidSignature
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(
             result,
             bytes4(0xffffffff),
@@ -736,7 +822,7 @@ contract IsValidSignatureTest is Base {
         );
 
         // Call isValidSignature with different hash
-        bytes4 result = ISmartWallet(_alice).isValidSignature(
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
             wrongHash,
             signature
         );
@@ -766,7 +852,10 @@ contract IsValidSignatureTest is Base {
         );
 
         // Call isValidSignature
-        bytes4 result = ISmartWallet(_alice).isValidSignature(hash, signature);
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
         assertEq(
             result,
             bytes4(0xffffffff),
@@ -830,21 +919,21 @@ contract IsValidSignatureTest is Base {
         );
 
         // Both signatures should fail due to dummy signature values
-        bytes4 result1 = ISmartWallet(_alice).isValidSignature(
+        bytes4 result1 = ISmartWallet(_aliceWallet).isValidSignature(
             hash1,
             signature1
         );
         assertEq(result1, bytes4(0xffffffff));
 
         // Wrong signature for hash2 (using sig1) - should fail due to signature replay attack
-        bytes4 result2 = ISmartWallet(_alice).isValidSignature(
+        bytes4 result2 = ISmartWallet(_aliceWallet).isValidSignature(
             hash2,
             signature1
         );
         assertEq(result2, bytes4(0xffffffff));
 
         // Different signature for hash2 - should also fail due to dummy values
-        bytes4 result3 = ISmartWallet(_alice).isValidSignature(
+        bytes4 result3 = ISmartWallet(_aliceWallet).isValidSignature(
             hash2,
             signature2
         );
@@ -856,7 +945,7 @@ contract IsValidSignatureTest is Base {
         uint256 signerPk
     ) internal view returns (bytes memory) {
         bytes32 boundHash = keccak256(
-            abi.encode(bytes32(block.chainid), address(_alice), hash)
+            abi.encode(bytes32(block.chainid), address(_aliceWallet), hash)
         );
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", boundHash));
 

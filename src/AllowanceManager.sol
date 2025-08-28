@@ -40,6 +40,7 @@ abstract contract AllowanceManager is IAllowanceManager, OwnersManager {
     }
 
     /// @notice Transfer native ETH from this contract using persistent allowance
+    /// @dev This function is meant to be called by the spender after his allowance is approved
     function transferFromNative(
         address from,
         address recipient,
@@ -52,6 +53,7 @@ abstract contract AllowanceManager is IAllowanceManager, OwnersManager {
     }
 
     /// @notice Transfer tokens from this contract using persistent allowance
+    /// @dev This function is meant to be called by the spender after his allowance is approved
     function transferFromToken(
         address token,
         address from,

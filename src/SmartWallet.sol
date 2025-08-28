@@ -121,7 +121,7 @@ contract SmartWallet is
         bytes calldata validatorData
     ) external {
         // Check transaction expiry
-        if (isExpired(batchedCall.expiry))
+        if (_isExpired(batchedCall.expiry))
             revert Errors.ExpiryPassed(batchedCall.expiry);
 
         // Validate and update nonce
@@ -134,7 +134,10 @@ contract SmartWallet is
         if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
             // Validate all calls are allowed to skip chain ID validation
             if (
-                !ChainlessLib.validateChainlessNonceCallData(batchedCall.calls)
+                !ChainlessLib.validateChainlessNonceCallData(
+                    batchedCall.calls,
+                    address(this)
+                )
             ) {
                 revert Errors.InvalidNonceKey(nonceKey);
             }
@@ -181,7 +184,7 @@ contract SmartWallet is
         bytes calldata validatorData
     ) external {
         // Check transaction expiry
-        if (isExpired(batchedCall.expiry)) {
+        if (_isExpired(batchedCall.expiry)) {
             // revert Errors.ExpiryPassed(batchedCall.expiry);
         }
 
@@ -196,7 +199,10 @@ contract SmartWallet is
         if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
             // Validate all calls are allowed to skip chain ID validation
             if (
-                !ChainlessLib.validateChainlessNonceCallData(batchedCall.calls)
+                !ChainlessLib.validateChainlessNonceCallData(
+                    batchedCall.calls,
+                    address(this)
+                )
             ) {
                 // revert Errors.InvalidNonceKey(nonceKey);
             }
@@ -246,13 +252,12 @@ contract SmartWallet is
         uint256 settings = ownerSettings[keyHash];
         address hookAddress = getHook(settings);
 
-        bytes memory ret;
-
         // Allow self-calls for EIP-7702 EOAs or admins
         bool allowSelfCall = keyHash ==
             keccak256(abi.encodePacked(address(this))) ||
             isAdmin(settings);
 
+        bytes memory ret;
         if (hookAddress != address(0)) {
             ret = IHook(hookAddress).preCheck(calls, msg.sender);
         }
@@ -293,7 +298,12 @@ contract SmartWallet is
             Call[] memory calls = abi.decode(userOp.callData[4:], (Call[]));
 
             // Validate all calls are allowed to skip chain ID validation
-            if (!ChainlessLib.validateChainlessNonceCallData(calls)) {
+            if (
+                !ChainlessLib.validateChainlessNonceCallData(
+                    calls,
+                    address(this)
+                )
+            ) {
                 return Static.SIG_VALIDATION_FAILED;
             }
 

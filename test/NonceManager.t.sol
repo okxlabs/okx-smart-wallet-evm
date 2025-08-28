@@ -103,15 +103,15 @@ contract NonceManagerTest is Test {
         assertEq(nonceManager.getNonce(key2), 0);
 
         // Update key1 twice
-        uint256 packedNonce1_0 = (uint256(key1) << 64) | uint256(0);
-        uint256 packedNonce1_1 = (uint256(key1) << 64) | uint256(1);
+        uint256 packedNonce1First = (uint256(key1) << 64) | uint256(0);
+        uint256 packedNonce1Second = (uint256(key1) << 64) | uint256(1);
 
-        nonceManager.testValidateAndUpdateNonce(packedNonce1_0);
-        nonceManager.testValidateAndUpdateNonce(packedNonce1_1);
+        nonceManager.testValidateAndUpdateNonce(packedNonce1First);
+        nonceManager.testValidateAndUpdateNonce(packedNonce1Second);
 
         // Update key2 once
-        uint256 packedNonce2_0 = (uint256(key2) << 64) | uint256(0);
-        nonceManager.testValidateAndUpdateNonce(packedNonce2_0);
+        uint256 packedNonce2First = (uint256(key2) << 64) | uint256(0);
+        nonceManager.testValidateAndUpdateNonce(packedNonce2First);
 
         // Check final states
         assertEq(nonceManager.getNonce(key1), 2);
@@ -321,18 +321,16 @@ contract NonceManagerTest is Test {
 
     function test_implements_INonceManager() public {
         // Test that our contract properly implements the interface
-        INonceManager interface_reference = INonceManager(
-            address(nonceManager)
-        );
+        INonceManager interfaceReference = INonceManager(address(nonceManager));
 
         uint192 testKey = uint192(999);
-        assertEq(interface_reference.getNonce(testKey), 0);
+        assertEq(interfaceReference.getNonce(testKey), 0);
 
         // Update nonce and verify through interface
         uint256 packedNonce = (uint256(testKey) << 64) | uint256(0);
         nonceManager.testValidateAndUpdateNonce(packedNonce);
 
-        assertEq(interface_reference.getNonce(testKey), 1);
+        assertEq(interfaceReference.getNonce(testKey), 1);
     }
 
     // ============ Cross-Contract Usage Patterns ============

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.23;
 
-import "./Base.t.sol";
-import {OwnersManager} from "src/OwnersManager.sol";
+import {Base} from "./Base.t.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
+import {OwnersManager} from "src/OwnersManager.sol";
 
 contract ValidatorEnumerationTest is Base {
     address internal _charlie;
@@ -19,36 +19,48 @@ contract ValidatorEnumerationTest is Base {
 
     function test_validator_enumeration_functions() public {
         // Alice starts with 1 validator from initialization
-        assertEq(IOwnersManager(_alice).ownerCount(), 1);
+        assertEq(IOwnersManager(_aliceWallet).ownerCount(), 1);
         assertTrue(
-            IOwnersManager(_alice).hasOwner(
-                keccak256(abi.encodePacked(_aliceEOA))
+            IOwnersManager(_aliceWallet).hasOwner(
+                keccak256(abi.encodePacked(_alice))
             )
         );
 
         // Alice already has a validator from initialization
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_aliceEOA));
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
 
-        assertEq(IOwnersManager(_alice).ownerCount(), 1);
-        assertTrue(IOwnersManager(_alice).hasOwner(aliceKeyHash));
-        assertEq(IOwnersManager(_alice).ownerAt(0), aliceKeyHash);
+        assertEq(IOwnersManager(_aliceWallet).ownerCount(), 1);
+        assertTrue(IOwnersManager(_aliceWallet).hasOwner(aliceKeyHash));
+        assertEq(IOwnersManager(_aliceWallet).ownerAt(0), aliceKeyHash);
 
         // Add second validator (charlie)
-        _addValidator(_alice, _charlie);
         bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
+        _addOwnerToAccount(
+            _alice,
+            _aliceWallet,
+            charlieKeyHash,
+            address(_ecdsaValidator),
+            0
+        );
 
-        assertEq(IOwnersManager(_alice).ownerCount(), 2);
-        assertTrue(IOwnersManager(_alice).hasOwner(charlieKeyHash));
+        assertEq(IOwnersManager(_aliceWallet).ownerCount(), 2);
+        assertTrue(IOwnersManager(_aliceWallet).hasOwner(charlieKeyHash));
 
         // Add third validator
-        _addValidator(_alice, _dave);
         bytes32 daveKeyHash = keccak256(abi.encodePacked(_dave));
+        _addOwnerToAccount(
+            _alice,
+            _aliceWallet,
+            daveKeyHash,
+            address(_ecdsaValidator),
+            0
+        );
 
-        assertEq(IOwnersManager(_alice).ownerCount(), 3);
-        assertTrue(IOwnersManager(_alice).hasOwner(daveKeyHash));
+        assertEq(IOwnersManager(_aliceWallet).ownerCount(), 3);
+        assertTrue(IOwnersManager(_aliceWallet).hasOwner(daveKeyHash));
 
         // Get all validators
-        bytes32[] memory allKeys = IOwnersManager(_alice).getOwnerKeys();
+        bytes32[] memory allKeys = IOwnersManager(_aliceWallet).getOwnerKeys();
         assertEq(allKeys.length, 3);
 
         // Verify all keys are present (order may vary)
@@ -67,22 +79,22 @@ contract ValidatorEnumerationTest is Base {
         assertTrue(foundDave);
 
         // Remove a validator and check count
-        _executeRemoveValidator(_alice, charlieKeyHash);
+        _executeRemoveValidator(_aliceWallet, charlieKeyHash);
 
-        assertEq(IOwnersManager(_alice).ownerCount(), 2);
-        assertFalse(IOwnersManager(_alice).hasOwner(charlieKeyHash));
-        assertTrue(IOwnersManager(_alice).hasOwner(aliceKeyHash));
-        assertTrue(IOwnersManager(_alice).hasOwner(daveKeyHash));
+        assertEq(IOwnersManager(_aliceWallet).ownerCount(), 2);
+        assertFalse(IOwnersManager(_aliceWallet).hasOwner(charlieKeyHash));
+        assertTrue(IOwnersManager(_aliceWallet).hasOwner(aliceKeyHash));
+        assertTrue(IOwnersManager(_aliceWallet).hasOwner(daveKeyHash));
     }
 
     function test_ownerAt_reverts_on_out_of_bounds() public {
         // Alice already has one validator from initialization
         // This should work
-        IOwnersManager(_alice).ownerAt(0);
+        IOwnersManager(_aliceWallet).ownerAt(0);
 
         // This should revert (out of bounds)
         vm.expectRevert();
-        IOwnersManager(_alice).ownerAt(1);
+        IOwnersManager(_aliceWallet).ownerAt(1);
     }
 
     function test_enumeration_with_validator_settings() public {
@@ -91,32 +103,40 @@ contract ValidatorEnumerationTest is Base {
         bytes32 keyHash2 = keccak256(abi.encodePacked(_dave));
 
         // Add first validator with settings
-        _executeAddValidator(
-            _alice,
-            keyHash1,
-            address(_ecdsaValidator),
+        uint256 settings1 = OwnersManager(_aliceWallet).packSettings(
             true,
             0,
             address(0)
         );
+        _addOwnerToAccount(
+            _alice,
+            _aliceWallet,
+            keyHash1,
+            address(_ecdsaValidator),
+            settings1
+        );
 
         // Add second validator with settings
-        _executeAddValidator(
-            _alice,
-            keyHash2,
-            address(_ecdsaValidator),
+        uint256 settings2 = OwnersManager(_aliceWallet).packSettings(
             false,
             uint40(block.timestamp + 3600),
             address(0)
         );
+        _addOwnerToAccount(
+            _alice,
+            _aliceWallet,
+            keyHash2,
+            address(_ecdsaValidator),
+            settings2
+        );
 
         // Check enumeration (alice + 2 new validators = 3 total)
-        assertEq(IOwnersManager(_alice).ownerCount(), 3);
-        assertTrue(IOwnersManager(_alice).hasOwner(keyHash1));
-        assertTrue(IOwnersManager(_alice).hasOwner(keyHash2));
+        assertEq(IOwnersManager(_aliceWallet).ownerCount(), 3);
+        assertTrue(IOwnersManager(_aliceWallet).hasOwner(keyHash1));
+        assertTrue(IOwnersManager(_aliceWallet).hasOwner(keyHash2));
 
         // Verify settings are preserved
-        assertTrue(isSignerAdmin(_alice, keyHash1));
-        assertFalse(isSignerAdmin(_alice, keyHash2));
+        assertTrue(isSignerAdmin(_aliceWallet, keyHash1));
+        assertFalse(isSignerAdmin(_aliceWallet, keyHash2));
     }
 }

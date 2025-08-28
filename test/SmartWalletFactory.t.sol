@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.23;
 
-import "./Base.t.sol";
-import "src/libraries/Errors.sol";
+import {Base} from "./Base.t.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
-import {console} from "forge-std/console.sol";
+import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
+import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 
 contract FactoryTest is Base {
     function setUp() public override {
@@ -14,13 +14,12 @@ contract FactoryTest is Base {
     function test_create_wallet_with_factory() external {
         vm.prank(_alice);
 
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: keccak256(abi.encodePacked(_alice)),
-            validator: address(1)
-        });
         ISmartWallet wallet = ISmartWallet(
-            _factory.createAccount(initialOwners, 0)
+            _deployAccountSingleOwner(
+                keccak256(abi.encodePacked(_alice)),
+                address(_ecdsaValidator),
+                0
+            )
         );
 
         assertEq(
@@ -34,12 +33,16 @@ contract FactoryTest is Base {
     function test_predict_address() external {
         vm.prank(_alice);
 
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: keccak256(abi.encodePacked(_alice)),
-            validator: address(1)
-        });
-        address wallet = _factory.createAccount(initialOwners, 0);
+        address wallet = _deployAccountSingleOwner(
+            keccak256(abi.encodePacked(_alice)),
+            address(_ecdsaValidator),
+            0
+        );
+
+        InitialOwner[] memory initialOwners = _createSingleOwner(
+            keccak256(abi.encodePacked(_alice)),
+            address(_ecdsaValidator)
+        );
 
         address predictedAddress = _factory.getAddress(initialOwners, 0);
 
@@ -48,15 +51,18 @@ contract FactoryTest is Base {
 
     function test_predict_address_before_deployment() external {
         // Prepare initial owners
-        InitialOwner[] memory initialOwners = new InitialOwner[](2);
-        initialOwners[0] = InitialOwner({
-            keyHash: keccak256(abi.encodePacked(_alice)),
-            validator: address(_ecdsaValidator)
-        });
-        initialOwners[1] = InitialOwner({
-            keyHash: keccak256(abi.encodePacked(_bob)),
-            validator: address(_ecdsaValidator)
-        });
+        bytes32[] memory keyHashes = new bytes32[](2);
+        keyHashes[0] = keccak256(abi.encodePacked(_alice));
+        keyHashes[1] = keccak256(abi.encodePacked(_bob));
+
+        address[] memory validators = new address[](2);
+        validators[0] = address(_ecdsaValidator);
+        validators[1] = address(_ecdsaValidator);
+
+        InitialOwner[] memory initialOwners = _createOwners(
+            keyHashes,
+            validators
+        );
 
         uint256 salt = 12345;
 
@@ -72,7 +78,11 @@ contract FactoryTest is Base {
 
         // Step 2: Deploy the account
         vm.prank(_alice);
-        address deployedAddress = _factory.createAccount(initialOwners, salt);
+        address deployedAddress = _deployAccountWithOwners(
+            keyHashes,
+            validators,
+            salt
+        );
 
         // Step 3: Verify the deployed address matches the prediction
         assertEq(
@@ -103,11 +113,10 @@ contract FactoryTest is Base {
 
     function test_predict_address_with_different_salts() external {
         // Use same initial owners but different salts
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: keccak256(abi.encodePacked(_alice)),
-            validator: address(_ecdsaValidator)
-        });
+        InitialOwner[] memory initialOwners = _createSingleOwner(
+            keccak256(abi.encodePacked(_alice)),
+            address(_ecdsaValidator)
+        );
 
         // Predict addresses with different salts
         address predicted1 = _factory.getAddress(initialOwners, 0);
@@ -131,23 +140,35 @@ contract FactoryTest is Base {
         );
 
         // Deploy and verify each one
-        vm.startPrank(_alice);
+        vm.startPrank(_aliceWallet);
 
-        address deployed1 = _factory.createAccount(initialOwners, 0);
+        address deployed1 = _deployAccountSingleOwner(
+            keccak256(abi.encodePacked(_alice)),
+            address(_ecdsaValidator),
+            0
+        );
         assertEq(
             deployed1,
             predicted1,
             "First deployment should match prediction"
         );
 
-        address deployed2 = _factory.createAccount(initialOwners, 1);
+        address deployed2 = _deployAccountSingleOwner(
+            keccak256(abi.encodePacked(_alice)),
+            address(_ecdsaValidator),
+            1
+        );
         assertEq(
             deployed2,
             predicted2,
             "Second deployment should match prediction"
         );
 
-        address deployed3 = _factory.createAccount(initialOwners, 999);
+        address deployed3 = _deployAccountSingleOwner(
+            keccak256(abi.encodePacked(_alice)),
+            address(_ecdsaValidator),
+            999
+        );
         assertEq(
             deployed3,
             predicted3,
@@ -207,21 +228,23 @@ contract FactoryTest is Base {
     }
 
     function test_already_deployed_account_returns_same_address() external {
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: keccak256(abi.encodePacked(_alice)),
-            validator: address(_ecdsaValidator)
-        });
-
         uint256 salt = 100;
 
         // First deployment
         vm.prank(_alice);
-        address firstDeployment = _factory.createAccount(initialOwners, salt);
+        address firstDeployment = _deployAccountSingleOwner(
+            keccak256(abi.encodePacked(_alice)),
+            address(_ecdsaValidator),
+            salt
+        );
 
         // Try to deploy again with same parameters
         vm.prank(_bob); // Different caller
-        address secondDeployment = _factory.createAccount(initialOwners, salt);
+        address secondDeployment = _deployAccountSingleOwner(
+            keccak256(abi.encodePacked(_alice)),
+            address(_ecdsaValidator),
+            salt
+        );
 
         // Should return the same address (already deployed)
         assertEq(
@@ -242,7 +265,7 @@ contract FactoryTest is Base {
         uint256 salt = 0;
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
-            keyHash: keccak256(abi.encodePacked(_aliceEOA)),
+            keyHash: keccak256(abi.encodePacked(_alice)),
             validator: address(_ecdsaValidator)
         });
 
@@ -251,10 +274,10 @@ contract FactoryTest is Base {
         vm.deal(prediction, 2 ether);
 
         Call[] memory calls = constructCallsData();
-        bytes32 hash = _getValidationTypedHash(_alice, calls);
+        bytes32 hash = _getValidationTypedHash(_aliceWallet, calls);
         bytes memory validatorData = constructValidatorData(
+            _aliceWallet,
             _alice,
-            _aliceEOA,
             _alicePk,
             hash
         );

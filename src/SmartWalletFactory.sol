@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 import {LibClone} from "solady/utils/LibClone.sol";
 import {ISmartWallet} from "./interfaces/ISmartWallet.sol";
 import {ISmartWalletFactory, InitialOwner} from "./interfaces/ISmartWalletFactory.sol";
-import {Call, BatchedCall} from "./Types.sol";
+import {BatchedCall} from "./Types.sol";
 
 contract SmartWalletFactory is ISmartWalletFactory {
     address public immutable implementation;
@@ -21,7 +21,7 @@ contract SmartWalletFactory is ISmartWalletFactory {
     function createAccount(
         InitialOwner[] calldata initialOwners,
         uint256 salt
-    ) public payable returns (address acount) {
+    ) public payable returns (address account) {
         (bool alreadyDeployed, address instance) = LibClone
             .createDeterministicERC1967(
                 msg.value,
@@ -34,7 +34,7 @@ contract SmartWalletFactory is ISmartWalletFactory {
         }
 
         emit AccountCreated(instance, implementation, initialOwners, salt);
-        acount = instance;
+        account = instance;
     }
 
     /// @notice create smart account with owners and validators
