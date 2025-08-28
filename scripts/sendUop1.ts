@@ -79,7 +79,6 @@ async function main() {
     console.log("\n🔍 Generating initCode and predicting sender...");
     const { sender, initCode } = await calldataUtils.generateInitCode(
       await factory.getAddress(),
-      await smartWalletImpl.getAddress(),
       initialOwners,
       salt
     );

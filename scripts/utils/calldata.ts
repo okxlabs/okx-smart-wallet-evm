@@ -32,7 +32,6 @@ export interface InitialOwner {
  */
 async function generateInitCode(
   factoryAddress: string,
-  implementationAddress: string,
   owners: InitialOwner[],
   salt: string | number
 ): Promise<{ sender: string; initCode: string }> {
@@ -43,7 +42,6 @@ async function generateInitCode(
 
   console.log("🔧 Debug generateInitCode:");
   console.log("  Factory address:", factoryAddress);
-  console.log("  Implementation address:", implementationAddress);
   console.log("  Owners:", owners);
   console.log("  Salt:", salt);
 
@@ -56,7 +54,6 @@ async function generateInitCode(
     // Check if account already exists by trying to create it
     // Use estimateGas to see what would happen without actually sending transaction
     const gasEstimate = await factory.createAccount.estimateGas(
-      implementationAddress,
       owners,
       salt
     );
@@ -80,8 +77,8 @@ async function generateInitCode(
 
       // Calculate fallback address
       const fallbackSeed = hre.ethers.solidityPackedKeccak256(
-        ["address", "address", "bytes32", "uint256"],
-        [factoryAddress, implementationAddress, owners[0].keyHash, salt]
+        ["address",  "bytes32", "uint256"],
+        [factoryAddress,  owners[0].keyHash, salt]
       );
       sender = "0x" + fallbackSeed.slice(-40);
     } else {
@@ -91,7 +88,6 @@ async function generateInitCode(
   }
 
   sender = await factory.getFunction("getAddress")(
-    implementationAddress,
     owners,
     salt
   );
@@ -100,7 +96,7 @@ async function generateInitCode(
   // Generate factory call
   const factoryCalldata = factory.interface.encodeFunctionData(
     "createAccount",
-    [implementationAddress, owners, salt]
+    [ owners, salt]
   );
 
   // Combine factory address and calldata for initCode
