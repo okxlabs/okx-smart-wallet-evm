@@ -73,7 +73,6 @@ contract PasskeyValidatorTest is Base {
         });
 
         builtinWallet = _factory.createAccount(
-            address(_smartWallet),
             builtinOwners,
             999 // Different salt to ensure different address
         );
@@ -600,11 +599,7 @@ contract PasskeyValidatorTest is Base {
             validator: Static.PASSKEY_VALIDATOR_ADDRESS
         });
 
-        address passkeyWallet = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            1
-        );
+        address passkeyWallet = _factory.createAccount(initialOwners, 1);
 
         vm.deal(passkeyWallet, 1 ether);
 

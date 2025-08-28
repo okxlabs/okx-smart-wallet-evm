@@ -12,21 +12,17 @@ interface ISmartWalletFactory {
     );
 
     /// @notice create smart account with owners and validators
-    /// @param implementation: implementation address
     /// @param initialOwners: initial owners
     /// @param salt: salt
     function createAccount(
-        address implementation,
         InitialOwner[] calldata initialOwners,
         uint256 salt
     ) external payable returns (address acount);
 
     /// @notice predict deterministic address
-    /// @param implementation: implementation address
     /// @param initialOwners: initial owners
     /// @param salt: salt
     function getAddress(
-        address implementation,
         InitialOwner[] calldata initialOwners,
         uint256 salt
     ) external view returns (address);

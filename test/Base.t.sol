@@ -91,7 +91,6 @@ contract Base is Test {
         // Create wallet using factory with deterministic address
         _alice = payable(
             _factory.createAccount(
-                address(_smartWallet),
                 initialOwners,
                 0 // salt
             )

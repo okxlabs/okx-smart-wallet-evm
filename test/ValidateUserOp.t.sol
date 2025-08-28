@@ -87,7 +87,6 @@ contract ValidateUserOpTest is Base {
         });
 
         address account = _factory.createAccount(
-            address(_smartWallet),
             initialOwners,
             100 // Different salt to avoid collision
         );
@@ -185,7 +184,6 @@ contract ValidateUserOpTest is Base {
         });
 
         address account = _factory.createAccount(
-            address(_smartWallet),
             initialOwners,
             101 // Different salt
         );
@@ -262,11 +260,7 @@ contract ValidateUserOpTest is Base {
             keyHash: _aliceKeyHash,
             validator: address(1)
         });
-        address account = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            0
-        );
+        address account = _factory.createAccount(initialOwners, 0);
 
         _TestTemps memory t;
         t.userOpHash = keccak256("123");
@@ -337,11 +331,7 @@ contract ValidateUserOpTest is Base {
             keyHash: _aliceKeyHash,
             validator: address(1)
         });
-        address account = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            0
-        );
+        address account = _factory.createAccount(initialOwners, 0);
 
         _TestTemps memory t;
         PackedUserOperation memory userOp;
@@ -406,11 +396,7 @@ contract ValidateUserOpTest is Base {
             keyHash: _aliceKeyHash,
             validator: address(1)
         });
-        address account = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            0
-        );
+        address account = _factory.createAccount(initialOwners, 0);
 
         _TestTemps memory t;
         PackedUserOperation memory userOp;
@@ -468,11 +454,7 @@ contract ValidateUserOpTest is Base {
             keyHash: _aliceKeyHash,
             validator: address(1)
         });
-        address account = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            0
-        );
+        address account = _factory.createAccount(initialOwners, 0);
 
         _TestTemps memory t;
         PackedUserOperation memory userOp;
@@ -523,11 +505,7 @@ contract ValidateUserOpTest is Base {
             validator: address(ecdsaValidator)
         });
 
-        address account = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            0
-        );
+        address account = _factory.createAccount(initialOwners, 0);
 
         _TestTemps memory t;
         t.userOpHash = keccak256("test_ecdsa_validation");
@@ -585,11 +563,7 @@ contract ValidateUserOpTest is Base {
             validator: address(passkeyValidator)
         });
 
-        address account = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            0
-        );
+        address account = _factory.createAccount(initialOwners, 0);
 
         _TestTemps memory t;
         // Use a specific hash that matches the passkey test signature
@@ -669,11 +643,7 @@ contract ValidateUserOpTest is Base {
             validator: address(ecdsaValidator)
         });
 
-        address account = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            0
-        );
+        address account = _factory.createAccount(initialOwners, 0);
 
         PackedUserOperation memory userOp;
         bytes32 userOpHash = keccak256("test");
@@ -734,11 +704,7 @@ contract ValidateUserOpTest is Base {
             validator: address(ecdsaValidator)
         });
 
-        address account = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            0
-        );
+        address account = _factory.createAccount(initialOwners, 0);
 
         vm.deal(account, 1 ether);
 
@@ -822,11 +788,7 @@ contract ValidateUserOpTest is Base {
             validator: address(ecdsaValidator)
         });
 
-        address account = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            0
-        );
+        address account = _factory.createAccount(initialOwners, 0);
 
         vm.deal(account, 2 ether);
 
@@ -888,11 +850,7 @@ contract ValidateUserOpTest is Base {
             validator: address(ecdsaValidator)
         });
 
-        address account = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            0
-        );
+        address account = _factory.createAccount(initialOwners, 0);
 
         vm.deal(account, 2 ether);
 
@@ -960,11 +918,7 @@ contract ValidateUserOpTest is Base {
             validator: address(ecdsaValidator)
         });
 
-        address account = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            0
-        );
+        address account = _factory.createAccount(initialOwners, 0);
 
         vm.deal(account, 2 ether);
 
@@ -1020,11 +974,7 @@ contract ValidateUserOpTest is Base {
             validator: address(ecdsaValidator)
         });
 
-        address account = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            0
-        );
+        address account = _factory.createAccount(initialOwners, 0);
 
         vm.deal(account, 2 ether);
 
@@ -1073,11 +1023,7 @@ contract ValidateUserOpTest is Base {
             validator: address(ecdsaValidator)
         });
 
-        address account = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            0
-        );
+        address account = _factory.createAccount(initialOwners, 0);
 
         vm.deal(account, 2 ether);
 

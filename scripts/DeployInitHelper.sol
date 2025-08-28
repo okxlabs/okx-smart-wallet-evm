@@ -45,7 +45,10 @@ library DeployInitHelper {
         smartWalletImpl = OKXSmartWalletEntry(smartWalletAddr);
 
         factoryImpl = SmartWalletFactory(deployFactory.deploy(
-            type(SmartWalletFactory).creationCode,
+            abi.encodePacked(
+                type(SmartWalletFactory).creationCode,
+                abi.encode(address(smartWalletImpl))
+            ),
             deployFactorySalt
         ));
 

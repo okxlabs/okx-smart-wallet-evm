@@ -20,7 +20,7 @@ contract FactoryTest is Base {
             validator: address(1)
         });
         ISmartWallet wallet = ISmartWallet(
-            _factory.createAccount(address(_smartWallet), initialOwners, 0)
+            _factory.createAccount(initialOwners, 0)
         );
 
         assertEq(
@@ -39,17 +39,9 @@ contract FactoryTest is Base {
             keyHash: keccak256(abi.encodePacked(_alice)),
             validator: address(1)
         });
-        address wallet = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            0
-        );
+        address wallet = _factory.createAccount(initialOwners, 0);
 
-        address predictedAddress = _factory.getAddress(
-            address(_smartWallet),
-            initialOwners,
-            0
-        );
+        address predictedAddress = _factory.getAddress(initialOwners, 0);
 
         assertEq(wallet, predictedAddress);
     }
@@ -69,11 +61,7 @@ contract FactoryTest is Base {
         uint256 salt = 12345;
 
         // Step 1: Predict the address before deployment
-        address predictedAddress = _factory.getAddress(
-            address(_smartWallet),
-            initialOwners,
-            salt
-        );
+        address predictedAddress = _factory.getAddress(initialOwners, salt);
 
         // Verify the predicted address is not yet deployed
         assertEq(
@@ -84,11 +72,7 @@ contract FactoryTest is Base {
 
         // Step 2: Deploy the account
         vm.prank(_alice);
-        address deployedAddress = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            salt
-        );
+        address deployedAddress = _factory.createAccount(initialOwners, salt);
 
         // Step 3: Verify the deployed address matches the prediction
         assertEq(
@@ -126,23 +110,11 @@ contract FactoryTest is Base {
         });
 
         // Predict addresses with different salts
-        address predicted1 = _factory.getAddress(
-            address(_smartWallet),
-            initialOwners,
-            0
-        );
+        address predicted1 = _factory.getAddress(initialOwners, 0);
 
-        address predicted2 = _factory.getAddress(
-            address(_smartWallet),
-            initialOwners,
-            1
-        );
+        address predicted2 = _factory.getAddress(initialOwners, 1);
 
-        address predicted3 = _factory.getAddress(
-            address(_smartWallet),
-            initialOwners,
-            999
-        );
+        address predicted3 = _factory.getAddress(initialOwners, 999);
 
         // All predictions should be different
         assertTrue(
@@ -161,33 +133,21 @@ contract FactoryTest is Base {
         // Deploy and verify each one
         vm.startPrank(_alice);
 
-        address deployed1 = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            0
-        );
+        address deployed1 = _factory.createAccount(initialOwners, 0);
         assertEq(
             deployed1,
             predicted1,
             "First deployment should match prediction"
         );
 
-        address deployed2 = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            1
-        );
+        address deployed2 = _factory.createAccount(initialOwners, 1);
         assertEq(
             deployed2,
             predicted2,
             "Second deployment should match prediction"
         );
 
-        address deployed3 = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            999
-        );
+        address deployed3 = _factory.createAccount(initialOwners, 999);
         assertEq(
             deployed3,
             predicted3,
@@ -208,21 +168,9 @@ contract FactoryTest is Base {
         uint256 salt = 42;
 
         // Predict the address multiple times - should always be the same
-        address prediction1 = _factory.getAddress(
-            address(_smartWallet),
-            initialOwners,
-            salt
-        );
-        address prediction2 = _factory.getAddress(
-            address(_smartWallet),
-            initialOwners,
-            salt
-        );
-        address prediction3 = _factory.getAddress(
-            address(_smartWallet),
-            initialOwners,
-            salt
-        );
+        address prediction1 = _factory.getAddress(initialOwners, salt);
+        address prediction2 = _factory.getAddress(initialOwners, salt);
+        address prediction3 = _factory.getAddress(initialOwners, salt);
 
         assertEq(
             prediction1,
@@ -249,7 +197,6 @@ contract FactoryTest is Base {
         });
 
         address differentPrediction = _factory.getAddress(
-            address(_smartWallet),
             differentOwners,
             salt
         );
@@ -270,19 +217,11 @@ contract FactoryTest is Base {
 
         // First deployment
         vm.prank(_alice);
-        address firstDeployment = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            salt
-        );
+        address firstDeployment = _factory.createAccount(initialOwners, salt);
 
         // Try to deploy again with same parameters
         vm.prank(_bob); // Different caller
-        address secondDeployment = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            salt
-        );
+        address secondDeployment = _factory.createAccount(initialOwners, salt);
 
         // Should return the same address (already deployed)
         assertEq(
@@ -307,11 +246,7 @@ contract FactoryTest is Base {
             validator: address(_ecdsaValidator)
         });
 
-        address prediction = _factory.getAddress(
-            address(_smartWallet),
-            initialOwners,
-            salt
-        );
+        address prediction = _factory.getAddress(initialOwners, salt);
 
         vm.deal(prediction, 2 ether);
 
@@ -326,7 +261,6 @@ contract FactoryTest is Base {
 
         vm.prank(_alice);
         address wallet = _factory.createAccountWithCall(
-            address(_smartWallet),
             initialOwners,
             salt,
             BatchedCall({calls: calls, nonce: 0, expiry: 0}),

@@ -7,14 +7,18 @@ import {ISmartWalletFactory, InitialOwner} from "./interfaces/ISmartWalletFactor
 import {Call, BatchedCall} from "./Types.sol";
 
 contract SmartWalletFactory is ISmartWalletFactory {
-    constructor() {}
+    address public immutable implementation;
+
+    /// @notice constructor
+    /// @param _implementation implementation address
+    constructor(address _implementation) {
+        implementation = _implementation;
+    }
 
     /// @notice create smart account with owners and validators
-    /// @param implementation implementation address
     /// @param initialOwners initial owners
     /// @param salt salt
     function createAccount(
-        address implementation,
         InitialOwner[] calldata initialOwners,
         uint256 salt
     ) public payable returns (address acount) {
@@ -34,28 +38,24 @@ contract SmartWalletFactory is ISmartWalletFactory {
     }
 
     /// @notice create smart account with owners and validators
-    /// @param implementation implementation address
     /// @param initialOwners initial owners
     /// @param salt salt
     /// @param batchedCall batched call
     /// @param validatorData validator data
     function createAccountWithCall(
-        address implementation,
         InitialOwner[] calldata initialOwners,
         uint256 salt,
         BatchedCall calldata batchedCall,
         bytes calldata validatorData
     ) external payable returns (address acount) {
-        acount = createAccount(implementation, initialOwners, salt);
+        acount = createAccount(initialOwners, salt);
         ISmartWallet(acount).executeWithRelayer(batchedCall, validatorData);
     }
 
     /// @notice predict deterministic address
-    /// @param implementation implementation address
     /// @param initialOwners initial owners
     /// @param salt salt
     function getAddress(
-        address implementation,
         InitialOwner[] calldata initialOwners,
         uint256 salt
     ) external view returns (address) {

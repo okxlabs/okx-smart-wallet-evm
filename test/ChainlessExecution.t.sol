@@ -39,11 +39,7 @@ contract ChainlessExecutionTest is Base {
             validator: address(_ecdsaValidator)
         });
 
-        testAccount = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            0
-        );
+        testAccount = _factory.createAccount(initialOwners, 0);
 
         vm.deal(testAccount, 10 ether);
     }

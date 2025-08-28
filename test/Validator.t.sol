@@ -1125,11 +1125,7 @@ contract ValidatorTest is Base {
             keyHash: aliceKeyHash,
             validator: address(externalEcdsaValidator)
         });
-        address account = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            0
-        );
+        address account = _factory.createAccount(initialOwners, 0);
 
         vm.deal(address(account), 1 ether);
 
@@ -1161,11 +1157,7 @@ contract ValidatorTest is Base {
             keyHash: aliceKeyHash,
             validator: address(externalEcdsaValidator)
         });
-        address account = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            0
-        );
+        address account = _factory.createAccount(initialOwners, 0);
 
         vm.deal(address(account), 1 ether);
 
@@ -1195,11 +1187,7 @@ contract ValidatorTest is Base {
             keyHash: aliceKeyHash,
             validator: address(externalEcdsaValidator)
         });
-        address account = _factory.createAccount(
-            address(_smartWallet),
-            initialOwners,
-            0
-        );
+        address account = _factory.createAccount(initialOwners, 0);
 
         vm.deal(address(account), 1 ether);
 

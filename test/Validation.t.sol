@@ -326,7 +326,9 @@ contract ValidationTest is Base {
         SmartWallet independentImplementation = new SmartWallet();
 
         // Deploy a new Factory (constructor disables initializers)
-        SmartWalletFactory independentFactory = new SmartWalletFactory();
+        SmartWalletFactory independentFactory = new SmartWalletFactory(
+            address(independentImplementation)
+        );
 
         // Create a wallet using the independent factory with same pubKeyHash as alice
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
@@ -336,7 +338,6 @@ contract ValidationTest is Base {
         });
 
         address independentWallet = independentFactory.createAccount(
-            address(independentImplementation),
             initialOwners,
             0 // Same salt as alice's wallet for maximum similarity
         );
@@ -425,7 +426,6 @@ contract ValidationTest is Base {
 
         // Deploy second wallet with different salt
         address secondWallet = _factory.createAccount(
-            address(_smartWallet),
             initialOwners,
             999 // Different salt to get different address
         );

@@ -209,7 +209,6 @@ contract ExecutionTest is Base {
         });
 
         address charlie = _factory.createAccount(
-            address(_smartWallet),
             initialOwners,
             1 // Different salt
         );
