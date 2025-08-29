@@ -58,24 +58,18 @@ interface IAllowanceManager {
     /// @notice Error thrown when token allowance is exceeded
     error TokenAllowanceExceeded();
 
-    /// @notice Approve a spender to use native ETH (persistent)
-    /// @param spender The address to approve
-    /// @param amount The amount to approve
-    /// @return success True if approval succeeded
-    function approveNative(
-        address spender,
-        uint256 amount
-    ) external returns (bool success);
+    /// @notice Error thrown when batch operation arrays have mismatched lengths
+    error BatchLengthMismatch();
 
-    /// @notice Approve a spender to use ERC20 tokens (persistent)
-    /// @param token The ERC20 token address
-    /// @param spender The address to approve
-    /// @param amount The amount to approve
-    /// @return success True if approval succeeded
-    function approveToken(
-        address token,
-        address spender,
-        uint256 amount
+    /// @notice Batch approve multiple spenders for multiple tokens (native ETH and ERC20)
+    /// @param tokens Array of token addresses (use Static.NATIVE_ETH for native ETH)
+    /// @param spenders Array of spender addresses
+    /// @param amounts Array of amounts to approve
+    /// @return success True if all approvals succeeded
+    function batchApproveToken(
+        address[] calldata tokens,
+        address[] calldata spenders,
+        uint256[] calldata amounts
     ) external returns (bool success);
 
     /// @notice Transfer native ETH from this contract using persistent allowance

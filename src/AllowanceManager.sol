@@ -18,24 +18,36 @@ abstract contract AllowanceManager is IAllowanceManager, OwnersManager {
     mapping(address token => mapping(address spender => uint256 allowance))
         public tokenAllowance;
 
-    /// @notice Approve a spender to use native ETH (persistent)
-    function approveNative(
-        address spender,
-        uint256 amount
+    /// @notice Batch approve multiple spenders for multiple tokens (native ETH and ERC20)
+    /// @dev All arrays must have the same length.
+    /// @param tokens Array of token addresses (use Static.NATIVE_ETH for native ETH)
+    /// @param spenders Array of spender addresses
+    /// @param amounts Array of amounts to approve
+    /// @return success True if all approvals succeeded
+    function batchApproveToken(
+        address[] calldata tokens,
+        address[] calldata spenders,
+        uint256[] calldata amounts
     ) external onlySelf returns (bool) {
-        tokenAllowance[Static.NATIVE_ETH][spender] = amount;
-        emit ApproveNative(address(this), spender, amount);
-        return true;
-    }
+        uint256 length = tokens.length;
+        if (length != spenders.length || length != amounts.length) {
+            revert BatchLengthMismatch();
+        }
 
-    /// @notice Approve a spender to use ERC20 tokens (persistent)
-    function approveToken(
-        address token,
-        address spender,
-        uint256 amount
-    ) external onlySelf returns (bool) {
-        tokenAllowance[token][spender] = amount;
-        emit ApproveToken(token, spender, amount);
+        for (uint256 i = 0; i < length; ) {
+            tokenAllowance[tokens[i]][spenders[i]] = amounts[i];
+
+            // Emit appropriate event based on token type
+            if (tokens[i] == Static.NATIVE_ETH) {
+                emit ApproveNative(address(this), spenders[i], amounts[i]);
+            } else {
+                emit ApproveToken(tokens[i], spenders[i], amounts[i]);
+            }
+
+            unchecked {
+                ++i;
+            }
+        }
         return true;
     }
 
