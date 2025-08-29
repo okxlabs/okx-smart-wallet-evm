@@ -19,30 +19,25 @@ abstract contract AllowanceManager is IAllowanceManager, OwnersManager {
         public tokenAllowance;
 
     /// @notice Batch approve multiple spenders for multiple tokens (native ETH and ERC20)
-    /// @dev All arrays must have the same length.
-    /// @param tokens Array of token addresses (use Static.NATIVE_ETH for native ETH)
-    /// @param spenders Array of spender addresses
-    /// @param amounts Array of amounts to approve
+    /// @dev More readable and less error-prone using struct encapsulation
+    /// @param approvals Array of ApprovalInfo structs
     /// @return success True if all approvals succeeded
     function batchApproveToken(
-        address[] calldata tokens,
-        address[] calldata spenders,
-        uint256[] calldata amounts
+        ApprovalInfo[] calldata approvals
     ) external onlySelf returns (bool) {
-        uint256 length = tokens.length;
-        if (length != spenders.length || length != amounts.length) {
-            revert BatchLengthMismatch();
-        }
+        uint256 length = approvals.length;
 
         for (uint256 i = 0; i < length; ) {
-            tokenAllowance[tokens[i]][spenders[i]] = amounts[i];
+            ApprovalInfo calldata approval = approvals[i];
+            tokenAllowance[approval.token][approval.spender] = approval.amount;
 
-            // Emit appropriate event based on token type
-            if (tokens[i] == Static.NATIVE_ETH) {
-                emit ApproveNative(address(this), spenders[i], amounts[i]);
-            } else {
-                emit ApproveToken(tokens[i], spenders[i], amounts[i]);
-            }
+            // Emit event for all approvals (both native ETH and ERC20 tokens)
+            emit ApproveToken(
+                address(this),
+                approval.token,
+                approval.spender,
+                approval.amount
+            );
 
             unchecked {
                 ++i;
@@ -74,7 +69,7 @@ abstract contract AllowanceManager is IAllowanceManager, OwnersManager {
     ) external returns (bool) {
         if (amount == 0) return true;
         _transferFromToken(token, from, recipient, amount);
-        emit TransferFromToken(token, recipient, amount);
+        emit TransferFromToken(address(this), token, recipient, amount);
         return true;
     }
 
@@ -147,6 +142,8 @@ abstract contract AllowanceManager is IAllowanceManager, OwnersManager {
         } catch {
             revert TokenTransferFailed();
         }
+
+        emit TransferFromToken(address(this), token, recipient, amount);
     }
 
     /// @notice Get the current persistent native ETH allowance

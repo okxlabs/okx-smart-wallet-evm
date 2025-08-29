@@ -9,7 +9,7 @@ import {Call, BatchedCall} from "../src/Types.sol";
 import {Static} from "../src/libraries/Static.sol";
 import {BatchedCallLib} from "../src/libraries/BatchedCallLib.sol";
 import {ERC712} from "../src/ERC712.sol";
-import {console} from "forge-std/console.sol";
+import {AllowanceManager} from "../src/AllowanceManager.sol";
 
 // Contract that rejects ETH transfers
 contract ETHRejectingContract {
@@ -60,13 +60,8 @@ contract AllowanceManagerTest is Base {
     address public recipient;
     address public unauthorized;
 
-    event ApproveNative(
-        address indexed owner,
-        address indexed spender,
-        uint256 amount
-    );
-
     event ApproveToken(
+        address indexed owner,
         address indexed token,
         address indexed spender,
         uint256 amount
@@ -79,6 +74,7 @@ contract AllowanceManagerTest is Base {
     );
 
     event TransferFromToken(
+        address indexed owner,
         address indexed token,
         address indexed recipient,
         uint256 amount
@@ -136,20 +132,18 @@ contract AllowanceManagerTest is Base {
 
     // Helper function to approve native ETH allowance
     function _approveNative(address spenderAddr, uint256 amount) internal {
-        address[] memory tokens = new address[](1);
-        address[] memory spenders = new address[](1);
-        uint256[] memory amounts = new uint256[](1);
-
-        tokens[0] = Static.NATIVE_ETH;
-        spenders[0] = spenderAddr;
-        amounts[0] = amount;
+        IAllowanceManager.ApprovalInfo[]
+            memory approvals = new IAllowanceManager.ApprovalInfo[](1);
+        approvals[0] = IAllowanceManager.ApprovalInfo({
+            token: Static.NATIVE_ETH,
+            spender: spenderAddr,
+            amount: amount
+        });
 
         _executeApprove(
             abi.encodeWithSelector(
-                IAllowanceManager.batchApproveToken.selector,
-                tokens,
-                spenders,
-                amounts
+                AllowanceManager.batchApproveToken.selector,
+                approvals
             )
         );
     }
@@ -160,20 +154,18 @@ contract AllowanceManagerTest is Base {
         address spenderAddr,
         uint256 amount
     ) internal {
-        address[] memory tokens = new address[](1);
-        address[] memory spenders = new address[](1);
-        uint256[] memory amounts = new uint256[](1);
-
-        tokens[0] = token;
-        spenders[0] = spenderAddr;
-        amounts[0] = amount;
+        IAllowanceManager.ApprovalInfo[]
+            memory approvals = new IAllowanceManager.ApprovalInfo[](1);
+        approvals[0] = IAllowanceManager.ApprovalInfo({
+            token: token,
+            spender: spenderAddr,
+            amount: amount
+        });
 
         _executeApprove(
             abi.encodeWithSelector(
-                IAllowanceManager.batchApproveToken.selector,
-                tokens,
-                spenders,
-                amounts
+                AllowanceManager.batchApproveToken.selector,
+                approvals
             )
         );
     }
@@ -183,20 +175,18 @@ contract AllowanceManagerTest is Base {
         address spenderAddr,
         uint256 amount
     ) internal {
-        address[] memory tokens = new address[](1);
-        address[] memory spenders = new address[](1);
-        uint256[] memory amounts = new uint256[](1);
-
-        tokens[0] = Static.NATIVE_ETH;
-        spenders[0] = spenderAddr;
-        amounts[0] = amount;
+        IAllowanceManager.ApprovalInfo[]
+            memory approvals = new IAllowanceManager.ApprovalInfo[](1);
+        approvals[0] = IAllowanceManager.ApprovalInfo({
+            token: Static.NATIVE_ETH,
+            spender: spenderAddr,
+            amount: amount
+        });
 
         _executeApproveWithRelayer(
             abi.encodeWithSelector(
-                IAllowanceManager.batchApproveToken.selector,
-                tokens,
-                spenders,
-                amounts
+                AllowanceManager.batchApproveToken.selector,
+                approvals
             )
         );
     }
@@ -207,20 +197,18 @@ contract AllowanceManagerTest is Base {
         address spenderAddr,
         uint256 amount
     ) internal {
-        address[] memory tokens = new address[](1);
-        address[] memory spenders = new address[](1);
-        uint256[] memory amounts = new uint256[](1);
-
-        tokens[0] = token;
-        spenders[0] = spenderAddr;
-        amounts[0] = amount;
+        IAllowanceManager.ApprovalInfo[]
+            memory approvals = new IAllowanceManager.ApprovalInfo[](1);
+        approvals[0] = IAllowanceManager.ApprovalInfo({
+            token: token,
+            spender: spenderAddr,
+            amount: amount
+        });
 
         _executeApproveWithRelayer(
             abi.encodeWithSelector(
-                IAllowanceManager.batchApproveToken.selector,
-                tokens,
-                spenders,
-                amounts
+                AllowanceManager.batchApproveToken.selector,
+                approvals
             )
         );
     }
@@ -296,24 +284,35 @@ contract AllowanceManagerTest is Base {
         // Test 1: Should fail for unauthorized user - trying to call directly
         vm.prank(unauthorized);
         vm.expectRevert();
-        aliceSmartWallet.batchApproveToken(
-            new address[](1),
-            new address[](1),
-            new uint256[](1)
-        );
+        IAllowanceManager.ApprovalInfo[]
+            memory approvals1 = new IAllowanceManager.ApprovalInfo[](1);
+        approvals1[0] = IAllowanceManager.ApprovalInfo({
+            token: Static.NATIVE_ETH,
+            spender: spender,
+            amount: amount
+        });
+        aliceSmartWallet.batchApproveToken(approvals1);
 
         // Test 2: Should fail for external address (Bob)
         vm.prank(_bob);
         vm.expectRevert();
-        aliceSmartWallet.batchApproveToken(
-            new address[](1),
-            new address[](1),
-            new uint256[](1)
-        );
+        IAllowanceManager.ApprovalInfo[]
+            memory approvals2 = new IAllowanceManager.ApprovalInfo[](1);
+        approvals2[0] = IAllowanceManager.ApprovalInfo({
+            token: Static.NATIVE_ETH,
+            spender: spender,
+            amount: amount
+        });
+        aliceSmartWallet.batchApproveToken(approvals2);
 
         // Test 3: Should succeed for wallet owner (Alice) through execute
         vm.expectEmit(true, true, false, true);
-        emit ApproveNative(address(aliceSmartWallet), spender, amount);
+        emit ApproveToken(
+            address(aliceSmartWallet),
+            Static.NATIVE_ETH,
+            spender,
+            amount
+        );
 
         _approveNative(spender, amount);
 
@@ -426,24 +425,35 @@ contract AllowanceManagerTest is Base {
         // Test 1: Should fail for unauthorized user
         vm.prank(unauthorized);
         vm.expectRevert();
-        aliceSmartWallet.batchApproveToken(
-            new address[](1),
-            new address[](1),
-            new uint256[](1)
-        );
+        IAllowanceManager.ApprovalInfo[]
+            memory approvals1 = new IAllowanceManager.ApprovalInfo[](1);
+        approvals1[0] = IAllowanceManager.ApprovalInfo({
+            token: address(mockToken),
+            spender: spender,
+            amount: amount
+        });
+        aliceSmartWallet.batchApproveToken(approvals1);
 
         // Test 2: Should fail for external address (Bob)
         vm.prank(_bob);
         vm.expectRevert();
-        aliceSmartWallet.batchApproveToken(
-            new address[](1),
-            new address[](1),
-            new uint256[](1)
-        );
+        IAllowanceManager.ApprovalInfo[]
+            memory approvals2 = new IAllowanceManager.ApprovalInfo[](1);
+        approvals2[0] = IAllowanceManager.ApprovalInfo({
+            token: address(mockToken),
+            spender: spender,
+            amount: amount
+        });
+        aliceSmartWallet.batchApproveToken(approvals2);
 
         // Test 3: Should succeed for wallet owner (Alice) through execute
         vm.expectEmit(true, true, false, true);
-        emit ApproveToken(address(mockToken), spender, amount);
+        emit ApproveToken(
+            address(aliceSmartWallet),
+            address(mockToken),
+            spender,
+            amount
+        );
 
         _approveToken(address(mockToken), spender, amount);
 
@@ -463,7 +473,12 @@ contract AllowanceManagerTest is Base {
         uint256 initialBalance = mockToken.balanceOf(recipient);
 
         vm.expectEmit(true, true, false, true);
-        emit TransferFromToken(address(mockToken), recipient, transferAmount);
+        emit TransferFromToken(
+            address(aliceSmartWallet),
+            address(mockToken),
+            recipient,
+            transferAmount
+        );
 
         _transferFromTokenCallAsSpender(
             address(mockToken),
@@ -843,7 +858,12 @@ contract AllowanceManagerTest is Base {
         uint256 amount = 1 ether;
 
         vm.expectEmit(true, true, false, true);
-        emit ApproveNative(address(aliceSmartWallet), spender, amount);
+        emit ApproveToken(
+            address(aliceSmartWallet),
+            Static.NATIVE_ETH,
+            spender,
+            amount
+        );
 
         _approveNativeWithRelayer(spender, amount);
 
@@ -859,7 +879,12 @@ contract AllowanceManagerTest is Base {
         uint256 amount = 100 * 10 ** 18;
 
         vm.expectEmit(true, true, false, true);
-        emit ApproveToken(address(mockToken), spender, amount);
+        emit ApproveToken(
+            address(aliceSmartWallet),
+            address(mockToken),
+            spender,
+            amount
+        );
 
         _approveTokenWithRelayer(address(mockToken), spender, amount);
 
@@ -872,162 +897,163 @@ contract AllowanceManagerTest is Base {
     // ============ Batch Approve Token Tests ============
 
     function test_BatchApproveToken_Success() public {
-        address[] memory tokens = new address[](3);
-        address[] memory spenders = new address[](3);
-        uint256[] memory amounts = new uint256[](3);
+        IAllowanceManager.ApprovalInfo[]
+            memory approvals = new IAllowanceManager.ApprovalInfo[](3);
 
-        tokens[0] = address(mockToken);
-        tokens[1] = address(mockToken2);
-        tokens[2] = Static.NATIVE_ETH; // Test native ETH in batch
-
-        spenders[0] = spender;
-        spenders[1] = spender;
-        spenders[2] = recipient;
-
-        amounts[0] = 100 * 10 ** 18;
-        amounts[1] = 200 * 10 ** 18;
-        amounts[2] = 1 ether; // Native ETH amount
+        approvals[0] = IAllowanceManager.ApprovalInfo({
+            token: address(mockToken),
+            spender: spender,
+            amount: 100 * 10 ** 18
+        });
+        approvals[1] = IAllowanceManager.ApprovalInfo({
+            token: address(mockToken2),
+            spender: spender,
+            amount: 200 * 10 ** 18
+        });
+        approvals[2] = IAllowanceManager.ApprovalInfo({
+            token: Static.NATIVE_ETH,
+            spender: recipient,
+            amount: 1 ether
+        });
 
         // Expect events for each approval
         vm.expectEmit(true, true, false, true);
-        emit ApproveToken(address(mockToken), spender, amounts[0]);
+        emit ApproveToken(
+            address(aliceSmartWallet),
+            address(mockToken),
+            spender,
+            100 * 10 ** 18
+        );
         vm.expectEmit(true, true, false, true);
-        emit ApproveToken(address(mockToken2), spender, amounts[1]);
+        emit ApproveToken(
+            address(aliceSmartWallet),
+            address(mockToken2),
+            spender,
+            200 * 10 ** 18
+        );
         vm.expectEmit(true, true, false, true);
-        emit ApproveNative(address(aliceSmartWallet), recipient, amounts[2]);
+        emit ApproveToken(
+            address(aliceSmartWallet),
+            Static.NATIVE_ETH,
+            recipient,
+            1 ether
+        );
 
         _executeApprove(
             abi.encodeWithSelector(
-                IAllowanceManager.batchApproveToken.selector,
-                tokens,
-                spenders,
-                amounts
+                AllowanceManager.batchApproveToken.selector,
+                approvals
             )
         );
 
         // Verify all allowances were set correctly
         assertEq(
             aliceSmartWallet.tokenAllowance(address(mockToken), spender),
-            amounts[0]
+            100 * 10 ** 18
         );
         assertEq(
             aliceSmartWallet.tokenAllowance(address(mockToken2), spender),
-            amounts[1]
+            200 * 10 ** 18
         );
         assertEq(
             aliceSmartWallet.tokenAllowance(Static.NATIVE_ETH, recipient),
-            amounts[2]
+            1 ether
         );
-        assertEq(aliceSmartWallet.nativeAllowance(recipient), amounts[2]);
+        assertEq(aliceSmartWallet.nativeAllowance(recipient), 1 ether);
     }
 
     function test_BatchApproveToken_WithRelayer() public {
-        address[] memory tokens = new address[](2);
-        address[] memory spenders = new address[](2);
-        uint256[] memory amounts = new uint256[](2);
+        IAllowanceManager.ApprovalInfo[]
+            memory approvals = new IAllowanceManager.ApprovalInfo[](2);
 
-        tokens[0] = address(mockToken);
-        tokens[1] = Static.NATIVE_ETH; // Test native ETH
-
-        spenders[0] = spender;
-        spenders[1] = recipient;
-
-        amounts[0] = 100 * 10 ** 18;
-        amounts[1] = 2 ether; // Native ETH amount
+        approvals[0] = IAllowanceManager.ApprovalInfo({
+            token: address(mockToken),
+            spender: spender,
+            amount: 100 * 10 ** 18
+        });
+        approvals[1] = IAllowanceManager.ApprovalInfo({
+            token: Static.NATIVE_ETH,
+            spender: recipient,
+            amount: 2 ether
+        });
 
         // Expect events for each approval
         vm.expectEmit(true, true, false, true);
-        emit ApproveToken(address(mockToken), spender, amounts[0]);
+        emit ApproveToken(
+            address(aliceSmartWallet),
+            address(mockToken),
+            spender,
+            100 * 10 ** 18
+        );
         vm.expectEmit(true, true, false, true);
-        emit ApproveNative(address(aliceSmartWallet), recipient, amounts[1]);
+        emit ApproveToken(
+            address(aliceSmartWallet),
+            Static.NATIVE_ETH,
+            recipient,
+            2 ether
+        );
 
         _executeApproveWithRelayer(
             abi.encodeWithSelector(
-                IAllowanceManager.batchApproveToken.selector,
-                tokens,
-                spenders,
-                amounts
+                AllowanceManager.batchApproveToken.selector,
+                approvals
             )
         );
 
         // Verify all allowances were set correctly
         assertEq(
             aliceSmartWallet.tokenAllowance(address(mockToken), spender),
-            amounts[0]
+            100 * 10 ** 18
         );
         assertEq(
             aliceSmartWallet.tokenAllowance(Static.NATIVE_ETH, recipient),
-            amounts[1]
+            2 ether
         );
-        assertEq(aliceSmartWallet.nativeAllowance(recipient), amounts[1]);
-    }
-
-    function test_BatchApproveToken_LengthMismatch() public {
-        address[] memory tokens = new address[](2);
-        address[] memory spenders = new address[](3); // Mismatched length
-        uint256[] memory amounts = new uint256[](2);
-
-        tokens[0] = address(mockToken);
-        tokens[1] = address(mockToken2);
-
-        spenders[0] = spender;
-        spenders[1] = recipient;
-        spenders[2] = unauthorized; // Extra spender
-
-        amounts[0] = 100 * 10 ** 18;
-        amounts[1] = 200 * 10 ** 18;
-
-        vm.expectRevert(IAllowanceManager.BatchLengthMismatch.selector);
-        _executeApprove(
-            abi.encodeWithSelector(
-                IAllowanceManager.batchApproveToken.selector,
-                tokens,
-                spenders,
-                amounts
-            )
-        );
+        assertEq(aliceSmartWallet.nativeAllowance(recipient), 2 ether);
     }
 
     function test_BatchApproveToken_EmptyArrays() public {
-        address[] memory tokens = new address[](0);
-        address[] memory spenders = new address[](0);
-        uint256[] memory amounts = new uint256[](0);
+        IAllowanceManager.ApprovalInfo[]
+            memory approvals = new IAllowanceManager.ApprovalInfo[](0);
 
-        // Should succeed with empty arrays
         _executeApprove(
             abi.encodeWithSelector(
-                IAllowanceManager.batchApproveToken.selector,
-                tokens,
-                spenders,
-                amounts
+                AllowanceManager.batchApproveToken.selector,
+                approvals
             )
         );
+
+        // Should succeed without any state changes
     }
 
     function test_BatchApproveToken_SingleElement() public {
-        address[] memory tokens = new address[](1);
-        address[] memory spenders = new address[](1);
-        uint256[] memory amounts = new uint256[](1);
+        IAllowanceManager.ApprovalInfo[]
+            memory approvals = new IAllowanceManager.ApprovalInfo[](1);
 
-        tokens[0] = address(mockToken);
-        spenders[0] = spender;
-        amounts[0] = 100 * 10 ** 18;
+        approvals[0] = IAllowanceManager.ApprovalInfo({
+            token: address(mockToken),
+            spender: spender,
+            amount: 100 * 10 ** 18
+        });
 
         vm.expectEmit(true, true, false, true);
-        emit ApproveToken(address(mockToken), spender, amounts[0]);
+        emit ApproveToken(
+            address(aliceSmartWallet),
+            address(mockToken),
+            spender,
+            100 * 10 ** 18
+        );
 
         _executeApprove(
             abi.encodeWithSelector(
-                IAllowanceManager.batchApproveToken.selector,
-                tokens,
-                spenders,
-                amounts
+                AllowanceManager.batchApproveToken.selector,
+                approvals
             )
         );
 
         assertEq(
             aliceSmartWallet.tokenAllowance(address(mockToken), spender),
-            amounts[0]
+            100 * 10 ** 18
         );
     }
 
@@ -1036,94 +1062,108 @@ contract AllowanceManagerTest is Base {
         _approveToken(address(mockToken), spender, 50 * 10 ** 18);
         _approveNative(recipient, 75 * 10 ** 18);
 
-        // Now batch overwrite them
-        address[] memory tokens = new address[](2);
-        address[] memory spenders = new address[](2);
-        uint256[] memory amounts = new uint256[](2);
+        // Now overwrite them using batch approach
+        IAllowanceManager.ApprovalInfo[]
+            memory approvals = new IAllowanceManager.ApprovalInfo[](2);
 
-        tokens[0] = address(mockToken);
-        tokens[1] = Static.NATIVE_ETH;
-
-        spenders[0] = spender;
-        spenders[1] = recipient;
-
-        amounts[0] = 150 * 10 ** 18; // New amount
-        amounts[1] = 250 * 10 ** 18; // New amount
+        approvals[0] = IAllowanceManager.ApprovalInfo({
+            token: address(mockToken),
+            spender: spender,
+            amount: 150 * 10 ** 18
+        });
+        approvals[1] = IAllowanceManager.ApprovalInfo({
+            token: Static.NATIVE_ETH,
+            spender: recipient,
+            amount: 250 * 10 ** 18
+        });
 
         vm.expectEmit(true, true, false, true);
-        emit ApproveToken(address(mockToken), spender, amounts[0]);
+        emit ApproveToken(
+            address(aliceSmartWallet),
+            address(mockToken),
+            spender,
+            150 * 10 ** 18
+        );
         vm.expectEmit(true, true, false, true);
-        emit ApproveNative(address(aliceSmartWallet), recipient, amounts[1]);
+        emit ApproveToken(
+            address(aliceSmartWallet),
+            Static.NATIVE_ETH,
+            recipient,
+            250 * 10 ** 18
+        );
 
         _executeApprove(
             abi.encodeWithSelector(
-                IAllowanceManager.batchApproveToken.selector,
-                tokens,
-                spenders,
-                amounts
+                AllowanceManager.batchApproveToken.selector,
+                approvals
             )
         );
 
         // Verify allowances were overwritten
         assertEq(
             aliceSmartWallet.tokenAllowance(address(mockToken), spender),
-            amounts[0]
+            150 * 10 ** 18
         );
         assertEq(
             aliceSmartWallet.tokenAllowance(Static.NATIVE_ETH, recipient),
-            amounts[1]
+            250 * 10 ** 18
         );
-        assertEq(aliceSmartWallet.nativeAllowance(recipient), amounts[1]);
     }
 
     function test_BatchApproveToken_UnauthorizedAccess() public {
-        address[] memory tokens = new address[](1);
-        address[] memory spenders = new address[](1);
-        uint256[] memory amounts = new uint256[](1);
-
-        tokens[0] = address(mockToken);
-        spenders[0] = spender;
-        amounts[0] = 100 * 10 ** 18;
+        IAllowanceManager.ApprovalInfo[]
+            memory approvals = new IAllowanceManager.ApprovalInfo[](1);
+        approvals[0] = IAllowanceManager.ApprovalInfo({
+            token: address(mockToken),
+            spender: spender,
+            amount: 100 * 10 ** 18
+        });
 
         // Try to call directly as unauthorized user
         vm.prank(unauthorized);
         vm.expectRevert();
-        aliceSmartWallet.batchApproveToken(tokens, spenders, amounts);
+        aliceSmartWallet.batchApproveToken(approvals);
 
         // Try to call as external address (Bob)
         vm.prank(_bob);
         vm.expectRevert();
-        aliceSmartWallet.batchApproveToken(tokens, spenders, amounts);
+        aliceSmartWallet.batchApproveToken(approvals);
     }
 
     function testFuzz_BatchApproveToken(uint256[] calldata amounts) public {
         vm.assume(amounts.length <= 5); // Reduced upper bound to avoid gas issues
         vm.assume(amounts.length > 0);
 
-        address[] memory tokens = new address[](amounts.length);
-        address[] memory spenders = new address[](amounts.length);
+        IAllowanceManager.ApprovalInfo[]
+            memory approvals = new IAllowanceManager.ApprovalInfo[](
+                amounts.length
+            );
 
         for (uint256 i = 0; i < amounts.length; i++) {
             vm.assume(amounts[i] <= type(uint128).max); // Reasonable bounds
-            tokens[i] = i % 2 == 0 ? address(mockToken) : address(mockToken2);
-            spenders[i] = i % 3 == 0
-                ? spender
-                : (i % 3 == 1 ? recipient : unauthorized);
+            approvals[i] = IAllowanceManager.ApprovalInfo({
+                token: i % 2 == 0 ? address(mockToken) : address(mockToken2),
+                spender: i % 3 == 0
+                    ? spender
+                    : (i % 3 == 1 ? recipient : unauthorized),
+                amount: amounts[i]
+            });
         }
 
         _executeApprove(
             abi.encodeWithSelector(
-                IAllowanceManager.batchApproveToken.selector,
-                tokens,
-                spenders,
-                amounts
+                AllowanceManager.batchApproveToken.selector,
+                approvals
             )
         );
 
         // Verify all allowances were set correctly
         for (uint256 i = 0; i < amounts.length; i++) {
             assertEq(
-                aliceSmartWallet.tokenAllowance(tokens[i], spenders[i]),
+                aliceSmartWallet.tokenAllowance(
+                    approvals[i].token,
+                    approvals[i].spender
+                ),
                 amounts[i]
             );
         }

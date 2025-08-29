@@ -5,15 +5,9 @@ pragma solidity ^0.8.29;
 /// @notice Interface for managing both native ETH and ERC20 token allowances using a unified mapping
 /// @dev Native ETH allowances are stored using Static.NATIVE_ETH as the token address
 interface IAllowanceManager {
-    /// @notice Emitted when a native ETH allowance is set
-    event ApproveNative(
-        address indexed owner,
-        address indexed spender,
-        uint256 amount
-    );
-
-    /// @notice Emitted when an ERC20 token allowance is set
+    /// @notice Event emitted when token allowance is approved (both native ETH and ERC20 tokens)
     event ApproveToken(
+        address indexed owner,
         address indexed token,
         address indexed spender,
         uint256 amount
@@ -28,6 +22,7 @@ interface IAllowanceManager {
 
     /// @notice Emitted when tokens are transferred using allowance
     event TransferFromToken(
+        address indexed owner,
         address indexed token,
         address indexed recipient,
         uint256 amount
@@ -61,15 +56,18 @@ interface IAllowanceManager {
     /// @notice Error thrown when batch operation arrays have mismatched lengths
     error BatchLengthMismatch();
 
+    /// @notice Struct for encapsulating approval data
+    struct ApprovalInfo {
+        address token;
+        address spender;
+        uint256 amount;
+    }
+
     /// @notice Batch approve multiple spenders for multiple tokens (native ETH and ERC20)
-    /// @param tokens Array of token addresses (use Static.NATIVE_ETH for native ETH)
-    /// @param spenders Array of spender addresses
-    /// @param amounts Array of amounts to approve
+    /// @param approvals Array of ApprovalInfo structs
     /// @return success True if all approvals succeeded
     function batchApproveToken(
-        address[] calldata tokens,
-        address[] calldata spenders,
-        uint256[] calldata amounts
+        ApprovalInfo[] calldata approvals
     ) external returns (bool success);
 
     /// @notice Transfer native ETH from this contract using persistent allowance
