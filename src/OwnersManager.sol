@@ -222,7 +222,7 @@ abstract contract OwnersManager is IOwnersManager {
     /// @param settings Packed settings value
     /// @return isAdmin True if signer has admin privileges
     function isAdmin(uint256 settings) public pure returns (bool) {
-        return (settings >> 200) != 0;
+        return ((settings >> 200) & 0xff) == 1;
     }
 
     // ============ Internal Functions ============
