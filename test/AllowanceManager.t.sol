@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.29;
 
-import {Base} from "./Base.t.sol";
+import {Base, MockERC20} from "./Base.t.sol";
 import {SmartWallet} from "../src/SmartWallet.sol";
 import {IAllowanceManager} from "../src/interfaces/IAllowanceManager.sol";
 import {ISmartWallet} from "../src/interfaces/ISmartWallet.sol";
-import {MockERC20} from "../src/test/MockERC20.sol";
 import {Call, BatchedCall} from "../src/Types.sol";
 import {Static} from "../src/libraries/Static.sol";
 import {BatchedCallLib} from "../src/libraries/BatchedCallLib.sol";

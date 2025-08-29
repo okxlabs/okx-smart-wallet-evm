@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.23;
 
-import {Base} from "./Base.t.sol";
+import {Base, MockERC20} from "./Base.t.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {Errors} from "src/libraries/Errors.sol";
 import {console} from "forge-std/console.sol";
-import {MockERC20} from "src/test/MockERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Static} from "src/libraries/Static.sol";

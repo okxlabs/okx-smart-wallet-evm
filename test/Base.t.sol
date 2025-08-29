@@ -10,8 +10,10 @@ import {OKXSmartWalletEntry} from "src/OKXSmartWalletEntry.sol";
 import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
 import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
-import {DeployInitHelper, DeployFactory} from "scripts/DeployInitHelper.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {DeployInitHelper} from "scripts/deploy/DeployInitHelper.sol";
+import {IDeployFactory} from "scripts/utils/IDeployFactory.sol";
+import {EIP2470} from "scripts/deploy/EIP2470.sol";
+import {IERC20, ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {ERC712} from "src/ERC712.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
@@ -53,6 +55,16 @@ contract MockRevertingContract {
     }
 }
 
+contract MockERC20 is ERC20 {
+    constructor() ERC20("MockToken", "MTK") {
+        _mint(msg.sender, 1000 ether);
+    }
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+}
+
 contract Base is Test {
     string public constant NAME = "SmartWallet";
     string public constant VERSION = "1.0.0";
@@ -73,7 +85,7 @@ contract Base is Test {
     PasskeyValidator internal _passkeyValidator;
     OKXSmartWalletEntry internal _smartWallet;
     SmartWalletFactory internal _factory;
-    DeployFactory public deployFactory;
+    IDeployFactory public deployFactory;
     EntryPoint internal _entryPoint; // EntryPoint instance
     address internal relayer;
     uint256 internal relayerPk;
@@ -99,16 +111,21 @@ contract Base is Test {
         _passkeyPubX = 0xac3363644e2570764491a4ef772d7a2df4322a6f6830330baa85f2bf5edf4cb1;
         _passkeyPubY = 0x293e49491e2b881d16d17aa6cacee25feccbfb74acce4ff15402f09c2ee9f9f5;
         _passkeyPrivateKey = 0x305cfeb0eecbb0cdb260b8c93b0f9b1f812d601261c135fce04bb8de6a310f0f;
-        // Deploy Factory
-        deployFactory = new DeployFactory();
+
+        // Ensure EIP-2470 Singleton Factory is deployed and use it through the interface
+        address singletonFactory = EIP2470.ensureDeployed(vm);
+        deployFactory = IDeployFactory(singletonFactory);
         bytes32 deployFactorySalt = vm.envBytes32("DEPLOY_FACTORY_SALT");
 
-        (
-            _ecdsaValidator,
-            _passkeyValidator,
-            _smartWallet,
-            _factory
-        ) = DeployInitHelper.deployContracts(deployFactory, deployFactorySalt);
+        // Deploy validators separately
+        _ecdsaValidator = new ECDSAValidator();
+        _passkeyValidator = new PasskeyValidator();
+
+        // Deploy SmartWallet and Factory using DeployInitHelper
+        (_smartWallet, _factory) = DeployInitHelper.deployContracts(
+            deployFactory,
+            deployFactorySalt
+        );
 
         // Use factory to create a wallet for Alice
         _aliceWallet = payable(

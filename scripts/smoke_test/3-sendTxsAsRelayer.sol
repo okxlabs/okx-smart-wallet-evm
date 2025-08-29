@@ -8,8 +8,8 @@ import "src/interfaces/IOwnersManager.sol";
 import "src/libraries/BatchedCallLib.sol";
 import "src/Types.sol";
 
-/// @title CreateDeployFactory
-/// @notice A script for creating a deploy factory
+/// @title SendTxsAsRelayer
+/// @notice A script for sending transactions as a relayer using executeWithRelayer
 contract SendTxsAsRelayer is Script {
     function run() external {
         uint256 senderPk = vm.envUint("DEPLOYER_PRIVATE_KEY");

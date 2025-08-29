@@ -7,6 +7,7 @@ import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {IAllowanceManager} from "src/interfaces/IAllowanceManager.sol";
 import {ISmartWalletFactory} from "src/interfaces/ISmartWalletFactory.sol";
+import {ExecuteManager} from "src/ExecuteManager.sol";
 
 /// @title EventTopics
 /// @notice A script for printing the event topics of all contract events
@@ -45,5 +46,10 @@ contract EventTopics is Script {
         console.log("\n=== ISmartWalletFactory Events ===");
         console.log("AccountCreated:");
         console.logBytes32(ISmartWalletFactory.AccountCreated.selector);
+
+        // ExecuteManager events
+        console.log("\n=== ExecuteManager Events ===");
+        console.log("ExecuteSuccessEvent:");
+        console.logBytes32(ExecuteManager.ExecuteSuccessEvent.selector);
     }
 }

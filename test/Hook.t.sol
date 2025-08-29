@@ -2,12 +2,11 @@
 pragma solidity ^0.8.29;
 
 import {console} from "forge-std/console.sol";
-import {Base} from "./Base.t.sol";
+import {Base, MockERC20} from "./Base.t.sol";
 import {ISmartWallet} from "../src/interfaces/ISmartWallet.sol";
 import {IOwnersManager} from "../src/interfaces/IOwnersManager.sol";
 import {OwnersManager} from "../src/OwnersManager.sol";
 import {Errors} from "../src/libraries/Errors.sol";
-import {MockERC20} from "../src/test/MockERC20.sol";
 import {Call, BatchedCall} from "../src/Types.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IHook} from "../src/interfaces/IHook.sol";

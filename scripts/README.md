@@ -11,7 +11,7 @@ anvil --hardfork prague
 ./scripts/smoke_test/deploy-factory.sh
 # Check your .env file
 # Deploy AA contracts
-forge script scripts/DeployInit.sol --rpc-url http://localhost:8545 --broadcast
+forge script scripts/deploy/DeployInit.sol --rpc-url http://localhost:8545 --broadcast
 ```
 
 ## Files Overview

@@ -12,7 +12,7 @@ import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {ERC712} from "src/ERC712.sol";
-import {HelperLib} from "src/test/Helper.sol";
+import {HelperLib} from "scripts/utils/Helper.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {Static} from "src/libraries/Static.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";

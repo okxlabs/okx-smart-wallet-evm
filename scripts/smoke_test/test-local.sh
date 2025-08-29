@@ -80,16 +80,16 @@ if [ -n "$DEPLOYER_PRIVATE_KEY" ]; then
     fi
 fi
 
-echo -e "${YELLOW}🏭 Deploying DeployFactory (EIP-2470)...${NC}"
+echo -e "${YELLOW}🏭 Deploying EIP-2470 Singleton Factory and DeployFactory...${NC}"
 
-# Deploy the DeployFactory first
-bash scripts/smoke_test/deploy-factory.sh
+# Deploy the EIP-2470 Singleton Factory and DeployFactory using Forge script
+yarn deploy-factory $RPC_URL --broadcast -vvv
 FACTORY_RESULT=$?
 
 if [ $FACTORY_RESULT -eq 0 ]; then
-    echo -e "${GREEN}✅ DeployFactory deployed successfully!${NC}"
+    echo -e "${GREEN}✅ EIP-2470 Singleton Factory and DeployFactory deployed successfully!${NC}"
 else
-    echo -e "${RED}❌ DeployFactory deployment failed with exit code $FACTORY_RESULT${NC}"
+    echo -e "${RED}❌ Factory deployment failed with exit code $FACTORY_RESULT${NC}"
     exit $FACTORY_RESULT
 fi
 
@@ -177,9 +177,12 @@ echo -e "${GREEN}🎉 All smoke tests completed successfully!${NC}"
 # cat anvil.log
 
 # Keep the node running for manual testing (optional)
-read -p "$(echo -e ${YELLOW}Keep node running for manual testing? [y/N]:${NC} )" -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo -e "${GREEN}🔄 Node is still running. Press Ctrl+C to stop.${NC}"
-    wait $ANVIL_PID
+# Only prompt if running interactively
+if [ -t 0 ]; then
+    read -p "$(echo -e ${YELLOW}Keep node running for manual testing? [y/N]:${NC} )" -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo -e "${GREEN}🔄 Node is still running. Press Ctrl+C to stop.${NC}"
+        wait $ANVIL_PID
+    fi
 fi

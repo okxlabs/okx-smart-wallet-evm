@@ -5,7 +5,7 @@ import {InitialOwner} from "../Types.sol";
 interface ISmartWalletFactory {
     /// @notice event when account is created
     event AccountCreated(
-        address indexed acount,
+        address indexed account,
         address indexed implementation,
         InitialOwner[] initialOwners,
         uint256 salt
@@ -17,7 +17,7 @@ interface ISmartWalletFactory {
     function createAccount(
         InitialOwner[] calldata initialOwners,
         uint256 salt
-    ) external payable returns (address acount);
+    ) external payable returns (address account);
 
     /// @notice predict deterministic address
     /// @param initialOwners: initial owners

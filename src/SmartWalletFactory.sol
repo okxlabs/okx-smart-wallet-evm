@@ -7,12 +7,12 @@ import {ISmartWalletFactory, InitialOwner} from "./interfaces/ISmartWalletFactor
 import {BatchedCall} from "./Types.sol";
 
 contract SmartWalletFactory is ISmartWalletFactory {
-    address public immutable implementation;
+    address public immutable IMPLEMENTATION;
 
     /// @notice constructor
     /// @param _implementation implementation address
     constructor(address _implementation) {
-        implementation = _implementation;
+        IMPLEMENTATION = _implementation;
     }
 
     /// @notice create smart account with owners and validators
@@ -25,7 +25,7 @@ contract SmartWalletFactory is ISmartWalletFactory {
         (bool alreadyDeployed, address instance) = LibClone
             .createDeterministicERC1967(
                 msg.value,
-                implementation,
+                IMPLEMENTATION,
                 _getSalt(initialOwners, salt)
             );
 
@@ -33,7 +33,7 @@ contract SmartWalletFactory is ISmartWalletFactory {
             ISmartWallet(instance).initialize(initialOwners);
         }
 
-        emit AccountCreated(instance, implementation, initialOwners, salt);
+        emit AccountCreated(instance, IMPLEMENTATION, initialOwners, salt);
         account = instance;
     }
 
@@ -61,7 +61,7 @@ contract SmartWalletFactory is ISmartWalletFactory {
     ) external view returns (address) {
         return
             LibClone.predictDeterministicAddressERC1967(
-                implementation,
+                IMPLEMENTATION,
                 _getSalt(initialOwners, salt),
                 address(this)
             );

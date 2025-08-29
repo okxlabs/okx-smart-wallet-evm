@@ -6,7 +6,7 @@ import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {Static} from "src/libraries/Static.sol";
 import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
-import {HelperLib} from "src/test/Helper.sol";
+import {HelperLib} from "scripts/utils/Helper.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {OwnersManager} from "src/OwnersManager.sol";
 

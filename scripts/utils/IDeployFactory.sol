@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.29;
 
-// EIP-2740 deploy factory to mimic the methods
-contract DeployFactory {
+// Interface for EIP-2470 Singleton Factory
+interface IDeployFactory {
     /// @notice Deploys `_initCode` using `_salt` for defining the deterministic address.
     /// @param _initCode Initialization code.
     /// @param _salt Arbitrary value to modify resulting address.
@@ -10,14 +10,5 @@ contract DeployFactory {
     function deploy(
         bytes memory _initCode,
         bytes32 _salt
-    ) public returns (address payable createdContract) {
-        assembly {
-            createdContract := create2(
-                0,
-                add(_initCode, 0x20),
-                mload(_initCode),
-                _salt
-            )
-        }
-    }
+    ) external returns (address payable createdContract);
 }

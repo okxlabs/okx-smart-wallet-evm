@@ -7,9 +7,9 @@ import {UserOperationLib} from "account-abstraction/core/UserOperationLib.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {EntryPoint} from "account-abstraction/core/EntryPoint.sol";
 import {LibClone} from "solady/utils/LibClone.sol";
-import {InitialOwner} from "../Types.sol";
+import {InitialOwner} from "src/Types.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
-import {IERC4337Account} from "../interfaces/IERC4337Account.sol";
+import {IERC4337Account} from "src/interfaces/IERC4337Account.sol";
 
 library HelperLib {
     uint256 public constant CHALLENGE_LOCATION = 23;

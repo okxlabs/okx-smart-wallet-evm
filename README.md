@@ -109,7 +109,7 @@ git submodule update --init --recursive
 Deploy on XLayer Mainnet:
 ```bash
 RPC_URL=https://rpc.xlayer.tech
-forge script scripts/DeployInit.sol --rpc-url $RPC_URL --legacy --broadcast
+forge script scripts/deploy/DeployInit.sol --rpc-url $RPC_URL --legacy --broadcast
 ```
 
 Deploy and initialize 7702 wallet on local

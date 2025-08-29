@@ -5,8 +5,8 @@ import "lib/forge-std/src/Script.sol";
 import "src/interfaces/ISmartWallet.sol";
 import "src/Types.sol";
 
-/// @title CreateDeployFactory
-/// @notice A script for creating a deploy factory
+/// @title SendTxs
+/// @notice A script for sending transactions through SmartWallet
 contract SendTxs is Script {
     function run() external {
         vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));

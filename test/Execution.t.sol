@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.23;
 
-import {Base, MockComplexContract, MockRevertingContract} from "./Base.t.sol";
+import {Base, MockComplexContract, MockRevertingContract, MockERC20} from "./Base.t.sol";
 import {Errors} from "src/libraries/Errors.sol";
-import {MockERC20} from "src/test/MockERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {console} from "forge-std/console.sol";
 import {OwnersManager} from "src/OwnersManager.sol";

@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import "lib/forge-std/src/Script.sol";
 import {DeployInitHelper} from "./DeployInitHelper.sol";
-import {DeployFactory} from "src/test/DeployFactory.sol";
+import {IDeployFactory} from "../utils/IDeployFactory.sol";
 import {OwnersManager} from "src/OwnersManager.sol";
 import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
 import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
@@ -19,8 +19,8 @@ contract DeployInit is Script {
         address deployOwner = vm.addr(vm.envUint("DEPLOYER_PRIVATE_KEY"));
         console.log("Deploy owner: %s", deployOwner);
 
-        // Create a new DeployFactory for local testing instead of using pre-deployed one
-        DeployFactory deployFactory = DeployFactory(
+        // Use the EIP-2470 Singleton Factory through the interface
+        IDeployFactory deployFactory = IDeployFactory(
             vm.envAddress("DEPLOY_FACTORY_ADDRESS")
         );
         bytes32 deployFactorySalt = vm.envBytes32("DEPLOY_FACTORY_SALT");
@@ -35,14 +35,10 @@ contract DeployInit is Script {
 
         // Deploy the contracts using DeployInitHelper
         (
-            ECDSAValidator ecdsaValidator_,
-            PasskeyValidator passkeyValidator_,
             SmartWallet smartWallet_,
             SmartWalletFactory factory_
         ) = DeployInitHelper.deployContracts(deployFactory, deployFactorySalt);
 
-        console.log("ECDSAValidator address: %s", address(ecdsaValidator_));
-        console.log("PasskeyValidator address: %s", address(passkeyValidator_));
         console.log("SmartWallet address: %s", address(smartWallet_));
         console.log("SmartWalletFactory address: %s", address(factory_));
         console.log("Completed DeployInit script");
