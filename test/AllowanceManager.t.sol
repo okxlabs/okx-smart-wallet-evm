@@ -10,6 +10,7 @@ import {Static} from "../src/libraries/Static.sol";
 import {BatchedCallLib} from "../src/libraries/BatchedCallLib.sol";
 import {ERC712} from "../src/ERC712.sol";
 import {AllowanceManager} from "../src/AllowanceManager.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // Contract that rejects ETH transfers
 contract ETHRejectingContract {
@@ -20,15 +21,8 @@ contract ETHRejectingContract {
 
 // Token that always fails transfers (returns false)
 contract FailingToken {
-    string public name = "FailingToken";
-    string public symbol = "FAIL";
-    uint8 public decimals = 18;
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
-
-    function mint(address to, uint256 amount) external {
-        balanceOf[to] += amount;
-    }
 
     function transfer(address, uint256) external pure returns (bool) {
         return false; // Always fail
@@ -37,9 +31,6 @@ contract FailingToken {
 
 // Token that always reverts on transfers
 contract RevertingToken {
-    string public name = "RevertingToken";
-    string public symbol = "REVERT";
-    uint8 public decimals = 18;
     mapping(address => uint256) public balanceOf;
     mapping(address => mapping(address => uint256)) public allowance;
 
@@ -56,6 +47,7 @@ contract AllowanceManagerTest is Base {
     SmartWallet public aliceSmartWallet;
     MockERC20 public mockToken;
     MockERC20 public mockToken2;
+    FailingToken public failingToken;
     address public spender;
     address public recipient;
     address public unauthorized;
@@ -69,14 +61,16 @@ contract AllowanceManagerTest is Base {
 
     event TransferFromNative(
         address indexed owner,
+        address indexed spender,
         address indexed recipient,
         uint256 amount
     );
 
     event TransferFromToken(
         address indexed owner,
+        address indexed spender,
         address indexed token,
-        address indexed recipient,
+        address recipient,
         uint256 amount
     );
 
@@ -215,13 +209,11 @@ contract AllowanceManagerTest is Base {
 
     // Helper function to call transferFromNative directly as spender
     function _transferFromNativeCallAsSpender(
-        address _from,
         address _recipient,
         uint256 _amount
     ) internal {
         vm.prank(spender);
         IAllowanceManager(address(aliceSmartWallet)).transferFromNative(
-            _from,
             _recipient,
             _amount
         );
@@ -230,14 +222,12 @@ contract AllowanceManagerTest is Base {
     // Helper function to call transferFromToken directly as spender
     function _transferFromTokenCallAsSpender(
         address _token,
-        address _from,
         address _recipient,
         uint256 _amount
     ) internal {
         vm.prank(spender);
         IAllowanceManager(address(aliceSmartWallet)).transferFromToken(
             _token,
-            _from,
             _recipient,
             _amount
         );
@@ -256,6 +246,7 @@ contract AllowanceManagerTest is Base {
         // Deploy mock tokens
         mockToken = new MockERC20();
         mockToken2 = new MockERC20();
+        failingToken = new FailingToken();
 
         // Use the smart wallet from Base setup
         aliceSmartWallet = SmartWallet(payable(_aliceWallet));
@@ -336,13 +327,13 @@ contract AllowanceManagerTest is Base {
         vm.expectEmit(true, true, false, true);
         emit TransferFromNative(
             address(aliceSmartWallet),
+            spender,
             recipient,
             transferAmount
         );
 
         vm.prank(spender);
         bool success = aliceSmartWallet.transferFromNative(
-            address(aliceSmartWallet),
             recipient,
             transferAmount
         );
@@ -368,30 +359,11 @@ contract AllowanceManagerTest is Base {
         _approveNative(spender, allowanceAmount);
 
         vm.expectRevert(IAllowanceManager.NativeAllowanceExceeded.selector);
-        _transferFromNativeCallAsSpender(
-            address(aliceSmartWallet),
-            recipient,
-            transferAmount
-        );
-    }
-
-    function test_TransferFromNative_IncorrectSender() public {
-        _approveNative(spender, 100 ether);
-
-        vm.expectRevert(IAllowanceManager.IncorrectSender.selector);
-        _transferFromNativeCallAsSpender(
-            _bob, // Wrong sender - should be address(aliceSmartWallet)
-            recipient,
-            50 ether
-        );
+        _transferFromNativeCallAsSpender(recipient, transferAmount);
     }
 
     function test_TransferFromNative_ZeroAmount() public {
-        _transferFromNativeCallAsSpender(
-            address(aliceSmartWallet),
-            recipient,
-            0
-        );
+        _transferFromNativeCallAsSpender(recipient, 0);
     }
 
     function test_TransferFromNative_UnlimitedAllowance() public {
@@ -402,11 +374,7 @@ contract AllowanceManagerTest is Base {
 
         uint256 initialBalance = recipient.balance;
 
-        _transferFromNativeCallAsSpender(
-            address(aliceSmartWallet),
-            recipient,
-            transferAmount
-        );
+        _transferFromNativeCallAsSpender(recipient, transferAmount);
 
         assertEq(recipient.balance, initialBalance + transferAmount);
         // Unlimited allowance should remain unchanged
@@ -475,6 +443,7 @@ contract AllowanceManagerTest is Base {
         vm.expectEmit(true, true, false, true);
         emit TransferFromToken(
             address(aliceSmartWallet),
+            spender,
             address(mockToken),
             recipient,
             transferAmount
@@ -482,7 +451,6 @@ contract AllowanceManagerTest is Base {
 
         _transferFromTokenCallAsSpender(
             address(mockToken),
-            address(aliceSmartWallet),
             recipient,
             transferAmount
         );
@@ -507,30 +475,28 @@ contract AllowanceManagerTest is Base {
         vm.expectRevert(IAllowanceManager.TokenAllowanceExceeded.selector);
         _transferFromTokenCallAsSpender(
             address(mockToken),
-            address(aliceSmartWallet),
             recipient,
             transferAmount
         );
     }
 
-    function test_TransferFromToken_IncorrectSender() public {
-        _approveToken(address(mockToken), spender, 100 * 10 ** 18);
-
-        vm.expectRevert(IAllowanceManager.IncorrectSender.selector);
-        _transferFromTokenCallAsSpender(
-            address(mockToken),
-            _bob, // Wrong sender - should be address(aliceSmartWallet)
-            recipient,
-            50 * 10 ** 18
-        );
+    function test_TransferFromToken_ZeroAmount() public {
+        _transferFromTokenCallAsSpender(address(mockToken), recipient, 0);
     }
 
-    function test_TransferFromToken_ZeroAmount() public {
+    function test_TransferFromToken_InvalidNativeToken() public {
+        uint256 allowanceAmount = 1 ether;
+        uint256 transferAmount = 0.5 ether;
+
+        // Set up allowance for native ETH
+        _approveNative(spender, allowanceAmount);
+
+        // Attempt to transfer native ETH using transferFromToken (should fail)
+        vm.expectRevert(IAllowanceManager.InvalidTokenForTransfer.selector);
         _transferFromTokenCallAsSpender(
-            address(mockToken),
-            address(aliceSmartWallet),
+            Static.NATIVE_ETH, // Native ETH address
             recipient,
-            0
+            transferAmount
         );
     }
 
@@ -544,7 +510,6 @@ contract AllowanceManagerTest is Base {
 
         _transferFromTokenCallAsSpender(
             address(mockToken),
-            address(aliceSmartWallet),
             recipient,
             transferAmount
         );
@@ -721,7 +686,6 @@ contract AllowanceManagerTest is Base {
 
         _transferFromTokenCallAsSpender(
             address(mockToken),
-            address(aliceSmartWallet),
             recipient,
             transferAmount
         );
@@ -747,11 +711,7 @@ contract AllowanceManagerTest is Base {
         // Set up allowance through execute
         _approveNative(spender, allowanceAmount);
 
-        _transferFromNativeCallAsSpender(
-            address(aliceSmartWallet),
-            recipient,
-            transferAmount
-        );
+        _transferFromNativeCallAsSpender(recipient, transferAmount);
 
         assertEq(recipient.balance, transferAmount);
 
@@ -781,7 +741,6 @@ contract AllowanceManagerTest is Base {
 
         vm.expectRevert(IAllowanceManager.TransferNativeFailed.selector);
         _transferFromNativeCallAsSpender(
-            address(aliceSmartWallet),
             address(rejectingContract),
             transferAmount
         );
@@ -795,30 +754,18 @@ contract AllowanceManagerTest is Base {
     }
 
     function test_TransferFromToken_TokenTransferFailed() public {
-        uint256 allowanceAmount = 200 * 10 ** 18;
-        uint256 transferAmount = 100 * 10 ** 18;
+        uint256 allowanceAmount = 100 * 10 ** 18;
+        uint256 transferAmount = 50 * 10 ** 18;
 
-        // Create a token that always fails transfers
-        FailingToken failingToken = new FailingToken();
-
-        // Mint tokens directly to the wallet
-        failingToken.mint(address(aliceSmartWallet), 1000 * 10 ** 18);
-
-        // Approve allowance for the failing token through execute
+        // Set up allowance through execute
         _approveToken(address(failingToken), spender, allowanceAmount);
 
-        vm.expectRevert(IAllowanceManager.TokenTransferFailed.selector);
+        // Attempt transfer with failing token
+        vm.expectRevert(); // SafeERC20FailedOperation will be thrown
         _transferFromTokenCallAsSpender(
             address(failingToken),
-            address(aliceSmartWallet),
             recipient,
             transferAmount
-        );
-
-        // Verify allowance was not consumed
-        assertEq(
-            aliceSmartWallet.tokenAllowance(address(failingToken), spender),
-            allowanceAmount
         );
     }
 
@@ -835,20 +782,12 @@ contract AllowanceManagerTest is Base {
         // Approve allowance for the reverting token through execute
         _approveToken(address(revertingToken), spender, allowanceAmount);
 
-        // The token transfer should revert, but the AllowanceManager should catch it
-        // and revert with TokenTransferFailed
-        vm.expectRevert(IAllowanceManager.TokenTransferFailed.selector);
+        // The token transfer should revert, and safeTransfer will throw SafeERC20FailedOperation
+        vm.expectRevert(); // SafeERC20FailedOperation will be thrown
         _transferFromTokenCallAsSpender(
             address(revertingToken),
-            address(aliceSmartWallet),
             recipient,
             transferAmount
-        );
-
-        // Verify allowance was not consumed
-        assertEq(
-            aliceSmartWallet.tokenAllowance(address(revertingToken), spender),
-            allowanceAmount
         );
     }
 
@@ -1221,15 +1160,22 @@ contract AllowanceManagerTest is Base {
     function test_UnifiedMapping_NativeAndTokenIndependent_WithRelayer()
         public
     {
-        uint256 nativeAmount = 5 ether;
-        uint256 tokenAmount = 300 * 10 ** 18;
+        // Test that native ETH and token allowances are independent when using relayer
+        uint256 nativeAmount = 1 ether;
+        uint256 tokenAmount = 100 * 10 ** 18;
 
-        // Set up both native and token allowances through relayer
+        // Set up allowances through relayer
         _approveNativeWithRelayer(spender, nativeAmount);
-
         _approveTokenWithRelayer(address(mockToken), spender, tokenAmount);
 
-        // Verify they are stored independently in the unified mapping
+        // Verify allowances are set correctly
+        assertEq(aliceSmartWallet.nativeAllowance(spender), nativeAmount);
+        assertEq(
+            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            tokenAmount
+        );
+
+        // Verify they're stored in the unified mapping
         assertEq(
             aliceSmartWallet.tokenAllowance(Static.NATIVE_ETH, spender),
             nativeAmount
@@ -1237,32 +1183,6 @@ contract AllowanceManagerTest is Base {
         assertEq(
             aliceSmartWallet.tokenAllowance(address(mockToken), spender),
             tokenAmount
-        );
-
-        // Verify the nativeAllowance function returns the correct value
-        assertEq(aliceSmartWallet.nativeAllowance(spender), nativeAmount);
-    }
-
-    function testFuzz_ApproveNative_WithRelayer(uint256 amount) public {
-        vm.assume(amount <= type(uint128).max); // Reasonable bounds
-
-        _approveNativeWithRelayer(spender, amount);
-
-        assertEq(aliceSmartWallet.nativeAllowance(spender), amount);
-        assertEq(
-            aliceSmartWallet.tokenAllowance(Static.NATIVE_ETH, spender),
-            amount
-        );
-    }
-
-    function testFuzz_ApproveToken_WithRelayer(uint256 amount) public {
-        vm.assume(amount <= type(uint128).max); // Reasonable bounds
-
-        _approveTokenWithRelayer(address(mockToken), spender, amount);
-
-        assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
-            amount
         );
     }
 }

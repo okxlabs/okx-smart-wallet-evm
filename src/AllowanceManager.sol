@@ -5,12 +5,17 @@ import {IAllowanceManager} from "./interfaces/IAllowanceManager.sol";
 import {OwnersManager} from "./OwnersManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Static} from "./libraries/Static.sol";
 
 /// @title AllowanceManager
 /// @notice Abstract contract providing allowance management for both native ETH and ERC20 tokens
 /// @dev Provides persistent allowance management for both native ETH and ERC20 tokens using a unified mapping
-abstract contract AllowanceManager is IAllowanceManager, OwnersManager {
+abstract contract AllowanceManager is
+    IAllowanceManager,
+    OwnersManager,
+    ReentrancyGuard
+{
     using SafeERC20 for IERC20;
 
     /// @notice Unified mapping of token => spender => allowance for both native ETH and ERC20 tokens
@@ -49,13 +54,12 @@ abstract contract AllowanceManager is IAllowanceManager, OwnersManager {
     /// @notice Transfer native ETH from this contract using persistent allowance
     /// @dev This function is meant to be called by the spender after his allowance is approved
     function transferFromNative(
-        address from,
         address recipient,
         uint256 amount
-    ) external returns (bool) {
+    ) external nonReentrant returns (bool) {
         if (amount == 0) return true;
-        _transferFromNative(from, recipient, amount);
-        emit TransferFromNative(address(this), recipient, amount);
+        _transferFromNative(recipient, amount);
+        emit TransferFromNative(address(this), msg.sender, recipient, amount);
         return true;
     }
 
@@ -63,28 +67,25 @@ abstract contract AllowanceManager is IAllowanceManager, OwnersManager {
     /// @dev This function is meant to be called by the spender after his allowance is approved
     function transferFromToken(
         address token,
-        address from,
         address recipient,
         uint256 amount
-    ) external returns (bool) {
+    ) external nonReentrant returns (bool) {
         if (amount == 0) return true;
-        _transferFromToken(token, from, recipient, amount);
-        emit TransferFromToken(address(this), token, recipient, amount);
+        _transferFromToken(token, recipient, amount);
+        emit TransferFromToken(
+            address(this),
+            msg.sender,
+            token,
+            recipient,
+            amount
+        );
         return true;
     }
 
     /// @dev Internal function to validate and execute native ETH transfers
-    /// @param from The address to transfer from
     /// @param recipient The address to receive the funds
     /// @param amount The amount to transfer
-    function _transferFromNative(
-        address from,
-        address recipient,
-        uint256 amount
-    ) internal {
-        // Validate inputs
-        if (from != address(this)) revert IncorrectSender();
-
+    function _transferFromNative(address recipient, uint256 amount) internal {
         // Check allowance
         uint256 currentAllowance = tokenAllowance[Static.NATIVE_ETH][
             msg.sender
@@ -110,17 +111,15 @@ abstract contract AllowanceManager is IAllowanceManager, OwnersManager {
 
     /// @dev Internal function to validate and execute token transfers
     /// @param token The ERC20 token address
-    /// @param from The address to transfer from
     /// @param recipient The address to receive the tokens
     /// @param amount The amount to transfer
     function _transferFromToken(
         address token,
-        address from,
         address recipient,
         uint256 amount
     ) internal {
         // Validate inputs
-        if (from != address(this)) revert IncorrectSender();
+        if (token == Static.NATIVE_ETH) revert InvalidTokenForTransfer();
 
         // Check allowance
         uint256 currentAllowance = tokenAllowance[token][msg.sender];
@@ -136,14 +135,8 @@ abstract contract AllowanceManager is IAllowanceManager, OwnersManager {
             emit TokenAllowanceUpdated(token, msg.sender, newAllowance);
         }
 
-        // Execute transfer
-        try IERC20(token).transfer(recipient, amount) returns (bool success) {
-            if (!success) revert TokenTransferFailed();
-        } catch {
-            revert TokenTransferFailed();
-        }
-
-        emit TransferFromToken(address(this), token, recipient, amount);
+        // Execute transfer using SafeERC20
+        IERC20(token).safeTransfer(recipient, amount);
     }
 
     /// @notice Get the current persistent native ETH allowance

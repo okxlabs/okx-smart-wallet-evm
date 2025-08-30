@@ -16,6 +16,7 @@ interface IAllowanceManager {
     /// @notice Emitted when native ETH is transferred using allowance
     event TransferFromNative(
         address indexed owner,
+        address indexed spender,
         address indexed recipient,
         uint256 amount
     );
@@ -23,8 +24,9 @@ interface IAllowanceManager {
     /// @notice Emitted when tokens are transferred using allowance
     event TransferFromToken(
         address indexed owner,
+        address indexed spender,
         address indexed token,
-        address indexed recipient,
+        address recipient,
         uint256 amount
     );
 
@@ -56,6 +58,9 @@ interface IAllowanceManager {
     /// @notice Error thrown when batch operation arrays have mismatched lengths
     error BatchLengthMismatch();
 
+    /// @notice Error thrown when attempting to use native ETH in token transfer function
+    error InvalidTokenForTransfer();
+
     /// @notice Struct for encapsulating approval data
     struct ApprovalInfo {
         address token;
@@ -71,25 +76,21 @@ interface IAllowanceManager {
     ) external returns (bool success);
 
     /// @notice Transfer native ETH from this contract using persistent allowance
-    /// @param from The address to transfer from (must be this contract)
     /// @param recipient The address to receive ETH
     /// @param amount The amount to transfer
     /// @return success True if transfer succeeded
     function transferFromNative(
-        address from,
         address recipient,
         uint256 amount
     ) external returns (bool success);
 
     /// @notice Transfer tokens from this contract using persistent allowance
     /// @param token The ERC20 token address
-    /// @param from The address to transfer from (must be this contract)
     /// @param recipient The address to receive tokens
     /// @param amount The amount to transfer
     /// @return success True if transfer succeeded
     function transferFromToken(
         address token,
-        address from,
         address recipient,
         uint256 amount
     ) external returns (bool success);
