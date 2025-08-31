@@ -34,7 +34,7 @@ library ChainlessLib {
     /// @dev This is used when CHAIN_LESS_NONCE_KEY is used to ensure only allowed operations are performed
     ///      All chainless calls must be self-calls (target == address(this))
     function validateChainlessNonceCallData(
-        Call[] memory calls,
+        Call[] calldata calls,
         address selfAddress
     ) internal pure returns (bool) {
         for (uint256 i; i < calls.length; i++) {
@@ -43,16 +43,12 @@ library ChainlessLib {
                 return false;
             }
 
-            bytes memory callData = calls[i].data;
+            bytes calldata callData = calls[i].data;
             if (callData.length < 4) {
                 return false;
             }
 
-            bytes4 selector;
-            assembly {
-                /// @dev truncate to only take the first 4 bytes
-                selector := mload(add(callData, 32))
-            }
+            bytes4 selector = bytes4(callData[0:4]);
 
             if (!canSkipChainIdValidation(selector)) {
                 return false;
