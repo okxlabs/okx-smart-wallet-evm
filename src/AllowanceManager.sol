@@ -5,17 +5,12 @@ import {IAllowanceManager} from "./interfaces/IAllowanceManager.sol";
 import {OwnersManager} from "./OwnersManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Static} from "./libraries/Static.sol";
 
 /// @title AllowanceManager
 /// @notice Abstract contract providing allowance management for both native ETH and ERC20 tokens
 /// @dev Provides persistent allowance management for both native ETH and ERC20 tokens using a unified mapping
-abstract contract AllowanceManager is
-    IAllowanceManager,
-    OwnersManager,
-    ReentrancyGuard
-{
+abstract contract AllowanceManager is IAllowanceManager, OwnersManager {
     using SafeERC20 for IERC20;
 
     /// @notice Unified mapping of token => spender => allowance for both native ETH and ERC20 tokens
@@ -56,7 +51,7 @@ abstract contract AllowanceManager is
     function transferFromNative(
         address recipient,
         uint256 amount
-    ) external nonReentrant returns (bool) {
+    ) external returns (bool) {
         if (amount == 0) return true;
         _transferFromNative(recipient, amount);
         emit TransferFromNative(address(this), msg.sender, recipient, amount);
@@ -69,7 +64,7 @@ abstract contract AllowanceManager is
         address token,
         address recipient,
         uint256 amount
-    ) external nonReentrant returns (bool) {
+    ) external returns (bool) {
         if (amount == 0) return true;
         _transferFromToken(token, recipient, amount);
         emit TransferFromToken(
