@@ -95,7 +95,7 @@ contract SmartWallet is
 
     /// @dev This function is executeable only by the EntryPoint contract, and is the main pathway for UserOperations to be executed.
     /// UserOperations can be executed through the execute function, but another method of authorization (ie through a passed in signature) is required.
-    /// userOp.callData is abi.encodeCall(IAccountExecute.executeUserOp.selector, (abi.encode(Call[]), bool))
+    /// userOp.callData is abi.encodePacked(IAccountExecute.executeUserOp.selector, (abi.encode(Call[]))
     /// Note that this contract is only compatible with Entrypoint versions v0.7.0 and v0.8.0. It is not compatible with v0.6.0, as that version does not support the "executeUserOp" selector.
     function executeUserOp(
         PackedUserOperation calldata userOp,
@@ -295,7 +295,7 @@ contract SmartWallet is
 
         if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
             // Decode calls from userOp.callData
-            Call[] memory calls = abi.decode(userOp.callData[4:], (Call[]));
+            Call[] calldata calls = DecodeLib.decodeCalls(userOp.callData[4:]);
 
             // Validate all calls are allowed to skip chain ID validation
             if (

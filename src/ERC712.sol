@@ -37,6 +37,6 @@ contract ERC712 is EIP712 {
         override
         returns (bool result)
     {
-        return true;    
+        return true;
     }
 }
