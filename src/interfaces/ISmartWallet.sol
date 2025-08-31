@@ -24,4 +24,6 @@ interface ISmartWallet is IERC165 {
         bytes32 hash,
         bytes calldata signature
     ) external view returns (bytes4);
+
+    function IMPLEMENTATION() external view returns (address);
 }

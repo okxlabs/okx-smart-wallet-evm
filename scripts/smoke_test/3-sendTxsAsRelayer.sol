@@ -62,15 +62,18 @@ contract SendTxsAsRelayer is Script {
         // Create BatchedCall for executeWithRelayer
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: 0,
-            expiry: uint48(block.timestamp + 1 hours)
+            nonce: 0
         });
 
-        // Get typed hash for signing
+        // Prepare validation data (validUntil = 1 hour from now)
+        uint48 validUntil = uint48(block.timestamp + 1 hours);
+        
+        // Get typed hash for signing - use implementation address since that's what the contract uses
         address implementation = vm.envAddress("SMART_WALLET");
         console.log("Using SmartWallet implementation from env:", implementation);
         
-        bytes32 hash = BatchedCallLib.hash(batchedCall, implementation);
+        // The third parameter should match what executeWithRelayer uses: IMPLEMENTATION constant
+        bytes32 hash = BatchedCallLib.hash(batchedCall, validUntil, implementation);
         console.log("BatchedCall hash:", vm.toString(hash));
         
         // Check if the sender has SmartWallet code
@@ -81,7 +84,8 @@ contract SendTxsAsRelayer is Script {
         // Sign and prepare validator data
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(senderPk, typedHash);
         bytes memory validatorData = abi.encodePacked(
-            keccak256(abi.encodePacked(sender)),
+            keccak256(abi.encodePacked(sender)), // pubKeyHash
+            validUntil,                            // validUntil (6 bytes)
             r,
             s,
             v

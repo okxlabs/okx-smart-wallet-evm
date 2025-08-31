@@ -8,9 +8,7 @@ import {console} from "forge-std/console.sol";
 import {OwnersManager} from "src/OwnersManager.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {Call, BatchedCall} from "src/Types.sol";
-import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
-import {ERC712} from "src/ERC712.sol";
 
 contract ExecutionTest is Base {
     MockERC20 mockToken;
@@ -141,19 +139,16 @@ contract ExecutionTest is Base {
         Call[] memory emptyCalls = new Call[](0);
         BatchedCall memory batchedCall = BatchedCall({
             calls: emptyCalls,
-            nonce: 0,
-            expiry: 0
+            nonce: 0
         });
 
-        // Sign the BatchedCall
-        bytes32 hash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
-        );
-        bytes memory validatorData = constructValidatorData(
+        // Use the new helper that correctly includes validUntil in hash
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            hash
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_aliceWallet);
@@ -201,12 +196,13 @@ contract ExecutionTest is Base {
 
     function test_executeFromRelayer_succeeds_as_relayer() public {
         Call[] memory calls = constructCallsData();
-        bytes32 hash = _getValidationTypedHash(_aliceWallet, calls);
-        bytes memory validatorData = constructValidatorData(
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            hash
+            batchedCall,
+            uint48(0)
         );
 
         uint256 gasStart = gasleft();
@@ -215,7 +211,7 @@ contract ExecutionTest is Base {
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
         ISmartWallet(_aliceWallet).executeWithRelayer(
-            BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+            batchedCall,
             validatorData
         );
 
@@ -235,20 +231,21 @@ contract ExecutionTest is Base {
         vm.deal(charlieWallet, 1 ether);
 
         Call[] memory calls = constructCallsData();
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
 
-        bytes32 hash = _getValidationTypedHash(charlieWallet, calls);
-        bytes memory validatorData = constructValidatorData(
+        bytes memory validatorData = _constructRelayerSignature(
             charlieWallet, // wallet address
             _charlie, // signer address
             _charliePk,
-            hash
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _alice, 0);
         ISmartWallet(charlieWallet).executeWithRelayer(
-            BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+            batchedCall,
             validatorData
         );
 
@@ -267,18 +264,19 @@ contract ExecutionTest is Base {
         );
         calls[1] = Call({target: _bob, value: 1 ether, data: ""});
 
-        bytes32 hash = _getValidationTypedHash(_aliceWallet, calls);
-        bytes memory validatorData = constructValidatorData(
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            hash
+            batchedCall,
+            uint48(0)
         );
 
         // Expect revert due to insufficient balance for ERC20 transfer
         vm.expectRevert();
         ISmartWallet(_aliceWallet).executeWithRelayer(
-            BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+            batchedCall,
             validatorData
         );
     }
@@ -293,18 +291,19 @@ contract ExecutionTest is Base {
         );
         calls[1] = Call({target: _bob, value: 1 ether, data: ""});
 
-        bytes32 hash = _getValidationTypedHash(_aliceWallet, calls);
-        bytes memory validatorData = constructValidatorData(
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            hash
+            batchedCall,
+            uint48(0)
         );
         vm.prank(_bob);
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
         ISmartWallet(_aliceWallet).executeWithRelayer(
-            BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+            batchedCall,
             validatorData
         );
 
@@ -320,18 +319,19 @@ contract ExecutionTest is Base {
         calls[0] = Call({target: _bob, value: 1 ether, data: ""});
         calls[1] = Call({target: _bob, value: 1000 ether, data: ""}); // This will fail due to insufficient balance
 
-        bytes32 hash = _getValidationTypedHash(_aliceWallet, calls);
-        bytes memory validatorData = constructValidatorData(
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            hash
+            batchedCall,
+            uint48(0)
         );
 
         // Expect the entire batch to revert when one call fails
         vm.expectRevert();
         ISmartWallet(_aliceWallet).executeWithRelayer(
-            BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+            batchedCall,
             validatorData
         );
 
@@ -348,19 +348,20 @@ contract ExecutionTest is Base {
             10
         );
 
-        bytes32 hash = _getValidationTypedHash(_aliceWallet, calls);
-        bytes memory validatorData = constructValidatorData(
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            hash
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_bob);
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
         ISmartWallet(_aliceWallet).executeWithRelayer(
-            BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+            batchedCall,
             validatorData
         );
 
@@ -371,8 +372,6 @@ contract ExecutionTest is Base {
     // ============ Complex Execution Tests ============
 
     function test_mixed_eth_erc20_contract_calls() public {
-        bytes32 userKeyHash = keccak256(abi.encodePacked(user));
-
         // Complex mixed scenario:
         // 1. Transfer ETH to bob
         // 2. Transfer ERC20 tokens to charlie
@@ -427,16 +426,15 @@ contract ExecutionTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: mixedCalls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: uint48(block.timestamp + 1 hours)
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
-        );
-        bytes memory validatorData = abi.encodePacked(
-            userKeyHash,
-            _signHash(userPk, typedDataHash)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            user, // Use user as signer (who was added as owner in setup)
+            userPk,
+            batchedCall,
+            uint48(0)
         );
 
         uint256 initialGas = gasleft();
@@ -460,8 +458,6 @@ contract ExecutionTest is Base {
     }
 
     function test_large_batch_operation_gas_limits() public {
-        bytes32 userKeyHash = keccak256(abi.encodePacked(user));
-
         // Create 150 calls (>100 limit mentioned in requirements)
         uint256 callCount = 150;
         Call[] memory largeBatch = new Call[](callCount);
@@ -478,16 +474,15 @@ contract ExecutionTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: largeBatch,
-            nonce: _getNonce(_aliceWallet),
-            expiry: uint48(block.timestamp + 1 hours)
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
-        );
-        bytes memory validatorData = abi.encodePacked(
-            userKeyHash,
-            _signHash(userPk, typedDataHash)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            user, // Use user as signer (who was added as owner in setup)
+            userPk,
+            batchedCall,
+            uint48(0)
         );
 
         uint256 initialGas = gasleft();
@@ -514,8 +509,6 @@ contract ExecutionTest is Base {
     }
 
     function test_call_to_nonexistent_contract() public {
-        bytes32 userKeyHash = keccak256(abi.encodePacked(user));
-
         // Use an address that has no code (simulating a destroyed or non-existent contract)
         address nonExistentContract = address(0xdead);
 
@@ -529,16 +522,15 @@ contract ExecutionTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: deadContractCalls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: uint48(block.timestamp + 1 hours)
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
-        );
-        bytes memory validatorData = abi.encodePacked(
-            userKeyHash,
-            _signHash(userPk, typedDataHash)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            user, // Use user as signer (who was added as owner in setup)
+            userPk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_bob);
@@ -550,8 +542,6 @@ contract ExecutionTest is Base {
     }
 
     function test_gas_efficiency_comparison() public {
-        bytes32 userKeyHash = keccak256(abi.encodePacked(user));
-
         // Ensure wallet has enough balance for both tests
         vm.deal(_aliceWallet, 30 ether);
 
@@ -571,16 +561,15 @@ contract ExecutionTest is Base {
         // Test single large call
         BatchedCall memory singleCallBatch = BatchedCall({
             calls: singleLargeCall,
-            nonce: _getNonce(_aliceWallet),
-            expiry: uint48(block.timestamp + 1 hours)
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes32 singleTypedDataHash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(singleCallBatch, address(_smartWallet))
-        );
-        bytes memory singleValidatorData = abi.encodePacked(
-            userKeyHash,
-            _signHash(userPk, singleTypedDataHash)
+        bytes memory singleValidatorData = _constructRelayerSignature(
+            _aliceWallet,
+            user, // Use user as signer (who was added as owner in setup)
+            userPk,
+            singleCallBatch,
+            uint48(0)
         );
 
         uint256 gasBefore = gasleft();
@@ -597,16 +586,15 @@ contract ExecutionTest is Base {
         // Test multiple small calls
         BatchedCall memory multipleCallsBatch = BatchedCall({
             calls: multipleSmallCalls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: uint48(block.timestamp + 1 hours)
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes32 multipleTypedDataHash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(multipleCallsBatch, address(_smartWallet))
-        );
-        bytes memory multipleValidatorData = abi.encodePacked(
-            userKeyHash,
-            _signHash(userPk, multipleTypedDataHash)
+        bytes memory multipleValidatorData = _constructRelayerSignature(
+            _aliceWallet,
+            user, // Use user as signer (who was added as owner in setup)
+            userPk,
+            multipleCallsBatch,
+            uint48(0)
         );
 
         gasBefore = gasleft();
@@ -658,19 +646,16 @@ contract ExecutionTest is Base {
         // Create the batched call for executeWithRelayer
         BatchedCall memory batchedCall = BatchedCall({
             calls: outerCalls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: uint48(block.timestamp + 1 hours)
+            nonce: _getNonce(_aliceWallet)
         });
 
-        // Sign the batched call
-        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
-        );
-        bytes memory validatorData = constructValidatorData(
+        // Sign the batched call using the helper function
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            typedDataHash
+            batchedCall,
+            uint48(0)
         );
 
         // Execute through relayer
@@ -713,19 +698,16 @@ contract ExecutionTest is Base {
         // Create batched call for the inner executeWithRelayer
         BatchedCall memory batchedCall = BatchedCall({
             calls: innerCalls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: uint48(block.timestamp + 1 hours)
+            nonce: _getNonce(_aliceWallet)
         });
 
-        // Sign the batched call
-        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
-        );
-        bytes memory validatorData = constructValidatorData(
+        // Sign the batched call using the helper function
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            typedDataHash
+            batchedCall,
+            uint48(0)
         );
 
         // Create outer call that calls executeWithRelayer
@@ -801,19 +783,16 @@ contract ExecutionTest is Base {
         // Create the batched call for executeWithRelayer
         BatchedCall memory batchedCall = BatchedCall({
             calls: outerCalls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: uint48(block.timestamp + 1 hours)
+            nonce: _getNonce(_aliceWallet)
         });
 
-        // Sign the batched call with Bob's key (non-admin owner)
-        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
-        );
-        bytes memory validatorData = constructValidatorData(
+        // Sign the batched call with Bob's key (non-admin owner) using helper
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _bob, // Bob is the signer
             _bobPk,
-            typedDataHash
+            batchedCall,
+            uint48(0)
         );
 
         // Attempt to execute through relayer should revert with NonAdminSelfCall

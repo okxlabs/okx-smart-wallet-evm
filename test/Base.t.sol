@@ -16,10 +16,15 @@ import {EIP2470} from "scripts/deploy/EIP2470.sol";
 import {IERC20, ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {ERC712} from "src/ERC712.sol";
+import {SmartWallet} from "src/SmartWallet.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
 import {EntryPoint} from "account-abstraction/core/EntryPoint.sol";
+import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 import {IAccount} from "account-abstraction/interfaces/IAccount.sol";
+import {Static} from "src/libraries/Static.sol";
+import {ERC4337Account} from "src/ERC4337Account.sol";
+import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 // ============ Mock Contracts for Testing ============
 
@@ -74,6 +79,7 @@ contract Base is Test {
         0x0000000071727De22E5E9d8BAf0edAc6f37da032;
 
     address payable internal _aliceWallet; // Alice's smart wallet address
+    bytes32 internal _aliceWalletKeyHash; // Alice's key hash for wallet operations
     address internal _alice; // Alice's EOA address
     uint256 internal _alicePk;
     address internal _bob;
@@ -86,7 +92,6 @@ contract Base is Test {
     OKXSmartWalletEntry internal _smartWallet;
     SmartWalletFactory internal _factory;
     IDeployFactory public deployFactory;
-    EntryPoint internal _entryPoint; // EntryPoint instance
     address internal relayer;
     uint256 internal relayerPk;
     Call[] internal relayerCalls;
@@ -101,10 +106,11 @@ contract Base is Test {
     function setUp() public virtual {
         (_alice, _alicePk) = makeAddrAndKey("alice");
         (_bob, _bobPk) = makeAddrAndKey("bob");
+        _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
 
         // Deploy EntryPoint and place it at the standard address
-        _entryPoint = new EntryPoint();
-        vm.etch(ENTRYPOINT_ADDRESS, address(_entryPoint).code);
+        EntryPoint entryPoint = new EntryPoint();
+        vm.etch(ENTRYPOINT_ADDRESS, address(entryPoint).code);
         vm.deal(ENTRYPOINT_ADDRESS, 100 ether); // Fund EntryPoint for gas payments
 
         // Generated real P256 signature using SmartAccount method (crypto.createSign compatibility)
@@ -326,16 +332,71 @@ contract Base is Test {
         return uint256(INonceManager(account).getNonce(uint192(0)));
     }
 
+    /// @notice Helper function to calculate hash for executeWithRelayer validation
+    /// @dev Mimics the exact hash calculation in SmartWallet.executeWithRelayer
+    /// @param batchedCall The batched call data
+    /// @param validUntil The expiry timestamp (6 bytes)
+    /// @param wallet The wallet address for ERC712 domain
+    /// @return The final hash ready for signing
+    function _getExecuteWithRelayerHash(
+        BatchedCall memory batchedCall,
+        uint48 validUntil,
+        address wallet
+    ) internal view returns (bytes32) {
+        // 1. Get base hash using BatchedCallLib
+        // Use the wallet's implementation address for hash calculation
+        bytes32 dataHash = BatchedCallLib.hash(
+            batchedCall,
+            validUntil,
+            SmartWallet(payable(wallet)).IMPLEMENTATION()
+        );
+
+        // 3. Apply ERC712 domain separator
+        uint256 nonceKey = batchedCall.nonce >> 64;
+        if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
+            // For chainless nonce, use hashTypedDataSansChainId
+            return ERC712(wallet).hashTypedDataSansChainId(dataHash);
+        } else {
+            // For regular nonce, use standard hashTypedData
+            return ERC712(wallet).hashTypedData(dataHash);
+        }
+    }
+
+    /// @notice Helper function to calculate the hash for isValidSignature
+    /// @param hash The base hash to be signed
+    /// @param wallet The wallet address
+    /// @param validUntil The expiration timestamp (0 for no expiry)
+    /// @return The final digest ready to be signed
+    function _getIsValidSignatureHash(
+        bytes32 hash,
+        address wallet,
+        uint48 validUntil
+    ) internal view returns (bytes32) {
+        // Create bound hash matching SmartWallet.isValidSignature logic
+        // Get the IMPLEMENTATION address from the wallet
+        address implementation = SmartWallet(payable(wallet)).IMPLEMENTATION();
+        bytes32 boundHash = keccak256(
+            abi.encode(
+                bytes32(block.chainid),
+                wallet,
+                hash,
+                validUntil,
+                implementation
+            )
+        );
+        // Apply EIP-191 prefix
+        return keccak256(abi.encodePacked("\x19\x01", boundHash));
+    }
+
     function _getValidationTypedHash(
         uint256 nonce,
         Call[] memory calls
     ) internal view returns (bytes32) {
         return
-            ERC712(_aliceWallet).hashTypedData(
-                BatchedCallLib.hash(
-                    BatchedCall({calls: calls, nonce: nonce, expiry: 0}),
-                    address(_smartWallet)
-                )
+            _getExecuteWithRelayerHash(
+                BatchedCall({calls: calls, nonce: nonce}),
+                0, // validUntil = 0 (no expiry)
+                _aliceWallet
             );
     }
 
@@ -345,11 +406,10 @@ contract Base is Test {
     ) internal view returns (bytes32) {
         uint256 nonce = _getNonce(account);
         return
-            ERC712(account).hashTypedData(
-                BatchedCallLib.hash(
-                    BatchedCall({calls: calls, nonce: nonce, expiry: 0}),
-                    address(_smartWallet)
-                )
+            _getExecuteWithRelayerHash(
+                BatchedCall({calls: calls, nonce: nonce}),
+                0, // validUntil = 0 (no expiry)
+                account
             );
     }
 
@@ -359,11 +419,10 @@ contract Base is Test {
         Call[] memory calls
     ) internal view returns (bytes32) {
         return
-            ERC712(account).hashTypedData(
-                BatchedCallLib.hash(
-                    BatchedCall({calls: calls, nonce: nonce, expiry: 0}),
-                    address(_smartWallet)
-                )
+            _getExecuteWithRelayerHash(
+                BatchedCall({calls: calls, nonce: nonce}),
+                0, // validUntil = 0 (no expiry)
+                account
             );
     }
 
@@ -375,7 +434,7 @@ contract Base is Test {
         return abi.encodePacked(r, s, v);
     }
 
-    function constructRelayerCall(
+    function _constructRelayerCall(
         uint256 len,
         IERC20 token
     ) internal view returns (Call[] memory calls) {
@@ -385,11 +444,13 @@ contract Base is Test {
         }
     }
 
-    function getExecutionGas(uint256 callSize) internal pure returns (uint256) {
+    function _getExecutionGas(
+        uint256 callSize
+    ) internal pure returns (uint256) {
         return 31532 + 2210 * callSize + 25160 * callSize;
     }
 
-    function constructSignature(
+    function _constructSignature(
         uint256 privateKey,
         bytes32 hash
     ) internal pure returns (bytes memory) {
@@ -397,52 +458,222 @@ contract Base is Test {
         return abi.encodePacked(r, s, v);
     }
 
-    function constructValidatorData(
-        address, // wallet (unused)
+    /// @notice Construct signature for executeWithRelayer/simulateExecuteWithRelayer
+    /// @dev Creates the complete signature in format: keyHash + validUntil + signature
+    /// @param wallet The wallet address for domain separator
+    /// @param signer The signer address
+    /// @param privateKey The private key for signing
+    /// @param batchedCall The batched call to sign
+    /// @param validUntil The expiry timestamp (0 for no expiry)
+    /// @return The complete signature for relayer execution
+    function _constructRelayerSignature(
+        address wallet,
         address signer,
         uint256 privateKey,
-        bytes32 hash
-    ) internal pure returns (bytes memory) {
-        bytes32 keyHash = keccak256(abi.encodePacked(signer));
-        bytes memory signature = constructSignature(privateKey, hash);
-        return abi.encodePacked(keyHash, signature);
-    }
-
-    function constructValidatorData(
-        address signer,
-        uint256 privateKey,
-        bytes32 hash
-    ) internal pure returns (bytes memory) {
-        return constructValidatorData(signer, signer, privateKey, hash);
-    }
-
-    function constructValidatorData(
-        address signer,
-        uint256 privateKey,
-        bytes32 hash,
-        uint64 /* nonce */
-    ) internal pure returns (bytes memory) {
-        bytes32 keyHash = keccak256(abi.encodePacked(signer));
-        bytes memory signature = constructSignature(privateKey, hash);
-        return abi.encodePacked(keyHash, signature);
-    }
-
-    function constructSignature(
         BatchedCall memory batchedCall,
-        address account,
-        uint256 signerPk
-    ) public view returns (bytes memory) {
-        bytes32 hash = ERC712(account).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
-        );
-        address signer = vm.addr(signerPk);
+        uint48 validUntil
+    ) internal view returns (bytes memory) {
         bytes32 keyHash = keccak256(abi.encodePacked(signer));
-        bytes memory signature = _signHash(signerPk, hash);
-        return abi.encodePacked(keyHash, signature);
+
+        // Calculate hash using the helper that matches SmartWallet logic
+        bytes32 hash = _getExecuteWithRelayerHash(
+            batchedCall,
+            validUntil,
+            wallet
+        );
+
+        // Sign the hash
+        bytes memory signature = _constructSignature(privateKey, hash);
+
+        // Return in format: pubKeyHash (32) + validUntil (6) + signature
+        return abi.encodePacked(keyHash, validUntil, signature);
+    }
+
+    /// @notice Construct validator data with Merkle proof support for batch operations
+    /// @dev Creates validator data with Merkle proofs for batch transaction authorization
+    /// @param wallet The wallet address for hash calculation
+    /// @param signer The signer address
+    /// @param privateKey The private key for signing
+    /// @param batchedCall The batched call to sign
+    /// @param validUntil The expiry timestamp
+    /// @param merkleProofs Array of Merkle proof elements
+    /// @return Validator data with format: keyHash + validUntil + signature + abi.encode(proofs)
+    function _constructValidatorDataWithMerkleProof(
+        address wallet,
+        address signer,
+        uint256 privateKey,
+        BatchedCall memory batchedCall,
+        uint48 validUntil,
+        bytes32[] memory merkleProofs
+    ) internal view returns (bytes memory) {
+        bytes32 keyHash = keccak256(abi.encodePacked(signer));
+
+        // Calculate hash using the helper that matches SmartWallet logic
+        bytes32 messageHash = _getExecuteWithRelayerHash(
+            batchedCall,
+            validUntil,
+            wallet
+        );
+
+        // If there are Merkle proofs, we need to sign the root hash instead
+        bytes32 hashToSign = messageHash;
+        if (merkleProofs.length > 0) {
+            // Process Merkle proof to get root hash (mimicking MerkleProofProcessor)
+            hashToSign = MerkleProof.processProof(merkleProofs, messageHash);
+        }
+
+        // Sign the appropriate hash
+        bytes memory signature = _constructSignature(privateKey, hashToSign);
+
+        // Return in format: pubKeyHash (32) + validUntil (6) + signature + abi.encode(proofs)
+        return
+            abi.encodePacked(
+                keyHash,
+                validUntil,
+                signature,
+                abi.encode(merkleProofs)
+            );
+    }
+
+    /// @notice Unified helper to prepare and sign UserOp with automatic hash calculation
+    /// @dev Handles all the complexity of getting baseHash from EntryPoint and calculating final hash
+    /// @param userOp The user operation to sign
+    /// @param signer The signer address
+    /// @param privateKey The private key for signing
+    /// @param wallet The wallet address
+    /// @param validUntil The expiry timestamp (0 for no expiry)
+    /// @return signature The complete signature with keyHash and validUntil
+    /// @return finalHash The final hash that will be used for validation
+    function _prepareAndSignUserOp(
+        PackedUserOperation memory userOp,
+        address signer,
+        uint256 privateKey,
+        address wallet,
+        uint48 validUntil
+    ) internal view returns (bytes memory signature, bytes32 finalHash) {
+        // Get the base hash from EntryPoint
+        bytes32 baseHash = IEntryPoint(ENTRYPOINT_ADDRESS).getUserOpHash(
+            userOp
+        );
+
+        // Calculate the final hash with validUntil and chainless logic
+        finalHash = _getValidateUserOpHash(
+            userOp,
+            baseHash,
+            validUntil,
+            wallet
+        );
+
+        // Create the signature
+        bytes32 keyHash = keccak256(abi.encodePacked(signer));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, finalHash);
+        signature = abi.encodePacked(keyHash, validUntil, r, s, v);
+    }
+
+    /// @notice Overload with default validUntil = 0
+    function _prepareAndSignUserOp(
+        PackedUserOperation memory userOp,
+        address signer,
+        uint256 privateKey,
+        address wallet
+    ) internal view returns (bytes memory signature, bytes32 finalHash) {
+        return
+            _prepareAndSignUserOp(
+                userOp,
+                signer,
+                privateKey,
+                wallet,
+                uint48(0)
+            );
+    }
+
+    // ============ ValidateUserOp Helper Functions ============
+
+    /// @notice Calculate the final hash for validateUserOp validation
+    /// @dev Mimics the exact hash calculation in SmartWallet.validateUserOp
+    /// @param userOp The user operation (needed for chainless mode)
+    /// @param userOpHash The initial user operation hash from EntryPoint
+    /// @param validUntil The expiry timestamp (6 bytes)
+    /// @param wallet The wallet address for chainless hash calculation
+    /// @return The final hash ready for signing
+    function _getValidateUserOpHash(
+        PackedUserOperation memory userOp,
+        bytes32 userOpHash,
+        uint48 validUntil,
+        address wallet
+    ) internal view returns (bytes32) {
+        // 1. If chainless nonce, apply getUserOpHashWithoutChainId
+        uint256 nonceKey = userOp.nonce >> 64;
+        if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
+            // For chainless, get hash without chainId
+            userOpHash = ERC4337Account(wallet).getUserOpHashWithoutChainId(
+                userOp
+            );
+        }
+
+        // 2. Add validUntil and IMPLEMENTATION to hash after chainless processing
+        // The IMPLEMENTATION is the deployed SmartWallet implementation address
+        return
+            keccak256(
+                abi.encode(userOpHash, validUntil, address(_smartWallet))
+            );
+    }
+
+    /// @notice Construct signature for validateUserOp
+    /// @dev Creates the complete signature in the format: pubKeyHash + validUntil + signature
+    /// @param userOp The user operation (needed for chainless mode)
+    /// @param signer The signer address
+    /// @param privateKey The private key for signing
+    /// @param userOpHash The user operation hash from EntryPoint
+    /// @param validUntil The expiry timestamp (use 0 for no expiry)
+    /// @param wallet The wallet address
+    /// @return The complete signature for userOp
+    function _constructUserOpSignature(
+        PackedUserOperation memory userOp,
+        address signer,
+        uint256 privateKey,
+        bytes32 userOpHash,
+        uint48 validUntil,
+        address wallet
+    ) internal view returns (bytes memory) {
+        bytes32 keyHash = keccak256(abi.encodePacked(signer));
+
+        // Calculate the correct hash with validUntil and chainless logic
+        bytes32 finalHash = _getValidateUserOpHash(
+            userOp,
+            userOpHash,
+            validUntil,
+            wallet
+        );
+
+        // Sign the hash
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, finalHash);
+
+        // Return in format: pubKeyHash (32) + validUntil (6) + signature
+        return abi.encodePacked(keyHash, validUntil, r, s, v);
+    }
+
+    /// @notice Overload for convenience with default validUntil = 0
+    function _constructUserOpSignature(
+        PackedUserOperation memory userOp,
+        address signer,
+        uint256 privateKey,
+        bytes32 userOpHash,
+        address wallet
+    ) internal view returns (bytes memory) {
+        return
+            _constructUserOpSignature(
+                userOp,
+                signer,
+                privateKey,
+                userOpHash,
+                uint48(0),
+                wallet
+            );
     }
 
     // Helper function for tests to check if a signer is admin
-    function isSignerAdmin(
+    function _isSignerAdmin(
         address wallet,
         bytes32 keyHash
     ) internal view returns (bool) {
@@ -466,8 +697,29 @@ contract Base is Test {
             );
     }
 
+    /// @notice Simplified version that auto-calculates the hash
+    /// @dev Automatically handles EntryPoint hash calculation
+    function _testValidateUserOp(
+        address account,
+        PackedUserOperation memory userOp,
+        uint256 missingAccountFunds
+    ) internal returns (uint256) {
+        // Get the hash that EntryPoint would calculate
+        bytes32 userOpHash = IEntryPoint(ENTRYPOINT_ADDRESS).getUserOpHash(
+            userOp
+        );
+
+        vm.prank(ENTRYPOINT_ADDRESS);
+        return
+            IAccount(account).validateUserOp(
+                userOp,
+                userOpHash,
+                missingAccountFunds
+            );
+    }
+
     // Helper function for tests to check if a signer is expired
-    function isSignerExpired(
+    function _isSignerExpired(
         address wallet,
         bytes32 keyHash
     ) internal view returns (bool) {
@@ -477,7 +729,7 @@ contract Base is Test {
     }
 
     // Helper function for tests to get signer expiration
-    function getSignerExpiration(
+    function _getSignerExpiration(
         address wallet,
         bytes32 keyHash
     ) internal view returns (uint40) {

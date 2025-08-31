@@ -259,8 +259,17 @@ contract IsValidSignatureTest is Base {
     function test_isValidSignature_fails_with_zero_hash() public view {
         bytes32 zeroHash = bytes32(0);
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
-        bytes memory sig = _signDigest(zeroHash, _alicePk);
-        bytes memory signature = abi.encodePacked(aliceKeyHash, sig);
+        uint48 validUntil = 0; // No expiry
+        bytes memory sig = _signDigestWithValidation(
+            zeroHash,
+            _alicePk,
+            validUntil
+        );
+        bytes memory signature = abi.encodePacked(
+            aliceKeyHash,
+            validUntil,
+            sig
+        );
 
         bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
             zeroHash,
@@ -276,8 +285,17 @@ contract IsValidSignatureTest is Base {
     function test_isValidSignature_fails_with_max_hash() public view {
         bytes32 maxHash = bytes32(type(uint256).max);
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
-        bytes memory sig = _signDigest(maxHash, _alicePk);
-        bytes memory signature = abi.encodePacked(aliceKeyHash, sig);
+        uint48 validUntil = 0; // No expiry
+        bytes memory sig = _signDigestWithValidation(
+            maxHash,
+            _alicePk,
+            validUntil
+        );
+        bytes memory signature = abi.encodePacked(
+            aliceKeyHash,
+            validUntil,
+            sig
+        );
 
         bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
             maxHash,
@@ -363,14 +381,13 @@ contract IsValidSignatureTest is Base {
     {
         bytes32 hash = keccak256("test_wrong_signer");
 
-        // Create bound hash for EIP-1271 validation
+        // Use helper function to get the digest for isValidSignature
         bytes32 boundHash = keccak256(
-            abi.encode(bytes32(block.chainid), _alice, hash)
+            abi.encode(bytes32(block.chainid), _aliceWallet, hash)
         );
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", boundHash));
 
         // Sign with Bob's private key instead of Alice's
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_bobPk, digest);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_bobPk, boundHash);
         bytes memory signature = abi.encodePacked(r, s, v);
 
         bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
@@ -432,13 +449,12 @@ contract IsValidSignatureTest is Base {
     function test_isValidSignature_fails_with_builtin_ecdsa_validator_expired()
         public
     {
-        // Add validator using _bob with expiry to avoid EIP-7702 fallback collision
+        // Add validator using _bob to avoid EIP-7702 fallback collision
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
-        uint40 expiry = uint40(block.timestamp + 1 days);
 
         uint256 settings = OwnersManager(_aliceWallet).packSettings(
             false,
-            expiry,
+            0, // No expiry in storage
             address(0)
         );
         _addOwnerToAccount(
@@ -449,10 +465,13 @@ contract IsValidSignatureTest is Base {
             settings
         );
 
+        // Create validation data with expiry in 1 day
+        uint48 validUntil = uint48(block.timestamp + 1 days);
+
         // Verify validator is initially valid
         bytes32 hash = keccak256("test");
-        bytes memory sig = _signDigest(hash, _bobPk);
-        bytes memory signature = abi.encodePacked(bobKeyHash, sig);
+        bytes memory sig = _signDigestWithValidation(hash, _bobPk, validUntil);
+        bytes memory signature = abi.encodePacked(bobKeyHash, validUntil, sig);
 
         bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
             hash,
@@ -467,7 +486,7 @@ contract IsValidSignatureTest is Base {
         // Fast forward past expiration
         vm.warp(block.timestamp + 2 days);
 
-        // Call isValidSignature after expiration
+        // Call isValidSignature after expiration - same signature should now be invalid
         result = ISmartWallet(_aliceWallet).isValidSignature(hash, signature);
         assertEq(
             result,
@@ -486,12 +505,29 @@ contract IsValidSignatureTest is Base {
 
         // Use validator-based signatures to test signature replay attack protection
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        uint48 validUntil = 0; // No expiry
 
         // Create signatures for both hashes using standard pattern
-        bytes memory sig1 = _signDigest(hash1, _alicePk);
-        bytes memory sig2 = _signDigest(hash2, _alicePk);
-        bytes memory signature1 = abi.encodePacked(aliceKeyHash, sig1);
-        bytes memory signature2 = abi.encodePacked(aliceKeyHash, sig2);
+        bytes memory sig1 = _signDigestWithValidation(
+            hash1,
+            _alicePk,
+            validUntil
+        );
+        bytes memory sig2 = _signDigestWithValidation(
+            hash2,
+            _alicePk,
+            validUntil
+        );
+        bytes memory signature1 = abi.encodePacked(
+            aliceKeyHash,
+            validUntil,
+            sig1
+        );
+        bytes memory signature2 = abi.encodePacked(
+            aliceKeyHash,
+            validUntil,
+            sig2
+        );
 
         // Correct signature for hash1
         bytes4 result1 = ISmartWallet(_aliceWallet).isValidSignature(
@@ -556,6 +592,7 @@ contract IsValidSignatureTest is Base {
                     pubKeyY: testPubY
                 })
             ),
+            uint48(0), // validUntil (0 means no expiry)
             sig
         );
 
@@ -603,6 +640,7 @@ contract IsValidSignatureTest is Base {
                     pubKeyY: _passkeyPubY
                 })
             ),
+            uint48(0), // validUntil (0 means no expiry)
             sig
         );
 
@@ -656,6 +694,7 @@ contract IsValidSignatureTest is Base {
                     pubKeyY: testPubY
                 })
             ),
+            uint48(0), // validUntil (0 means no expiry)
             sig
         );
 
@@ -695,8 +734,23 @@ contract IsValidSignatureTest is Base {
     {
         bytes32 hash = keccak256("test");
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
-        bytes memory sig = _signDigest(hash, _alicePk);
-        bytes memory signature = abi.encodePacked(aliceKeyHash, sig);
+        uint48 validUntil = 0; // No expiry
+
+        // Use helper function to get the digest for isValidSignature
+        bytes32 digest = _getIsValidSignatureHash(
+            hash,
+            _aliceWallet,
+            validUntil
+        );
+
+        // Sign the digest
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, digest);
+        bytes memory sig = abi.encodePacked(r, s, v);
+        bytes memory signature = abi.encodePacked(
+            aliceKeyHash,
+            validUntil,
+            sig
+        );
 
         // Call isValidSignature - this uses the custom ECDSA validator deployed in setUp
         bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
@@ -729,6 +783,7 @@ contract IsValidSignatureTest is Base {
                     pubKeyY: _passkeyPubY
                 })
             ),
+            uint48(0), // validUntil (0 means no expiry)
             sig
         );
 
@@ -771,6 +826,7 @@ contract IsValidSignatureTest is Base {
                     pubKeyY: _passkeyPubY
                 })
             ),
+            uint48(0), // validUntil (0 means no expiry)
             sig
         );
 
@@ -813,6 +869,7 @@ contract IsValidSignatureTest is Base {
                     pubKeyY: _passkeyPubY
                 })
             ),
+            uint48(0), // validUntil (0 means no expiry)
             sig
         );
 
@@ -894,6 +951,7 @@ contract IsValidSignatureTest is Base {
                     pubKeyY: _passkeyPubY
                 })
             ),
+            uint48(0), // validUntil (0 means no expiry)
             sig1
         );
 
@@ -906,6 +964,7 @@ contract IsValidSignatureTest is Base {
                     pubKeyY: _passkeyPubY
                 })
             ),
+            uint48(0), // validUntil (0 means no expiry)
             sig2
         );
 
@@ -944,14 +1003,27 @@ contract IsValidSignatureTest is Base {
         bytes32 hash,
         uint256 signerPk
     ) internal view returns (bytes memory) {
-        bytes32 boundHash = keccak256(
-            abi.encode(bytes32(block.chainid), address(_aliceWallet), hash)
-        );
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", boundHash));
+        // Use helper function to get the digest for isValidSignature
+        bytes32 digest = _getIsValidSignatureHash(hash, _aliceWallet, 0);
 
         // Sign the digest
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
+        return abi.encodePacked(r, s, v);
+    }
 
+    function _signDigestWithValidation(
+        bytes32 hash,
+        uint256 signerPk,
+        uint48 validUntil
+    ) internal view returns (bytes memory) {
+        bytes32 digest = _getIsValidSignatureHash(
+            hash,
+            _aliceWallet,
+            validUntil
+        );
+
+        // Sign the digest
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
         return abi.encodePacked(r, s, v);
     }
 }

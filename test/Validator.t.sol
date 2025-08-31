@@ -156,6 +156,36 @@ contract ValidatorTest is Base {
         ISmartWallet(_aliceWallet).execute(calls);
     }
 
+    function test_addValidator_reverts_on_invalid_validator_address() public {
+        // Test that adding address(0) as validator should revert
+        bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
+
+        // Pack settings
+        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+            false,
+            0,
+            address(0)
+        );
+
+        // Build calls to add address(0) as validator
+        Call[] memory calls = _buildAddOwnerCalls(
+            _aliceWallet,
+            keyHash,
+            address(0), // Invalid validator address
+            settings
+        );
+
+        // Should revert with InvalidValidatorImpl error
+        vm.prank(_alice);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Errors.InvalidValidatorImpl.selector,
+                address(0)
+            )
+        );
+        ISmartWallet(_aliceWallet).execute(calls);
+    }
+
     function test_validator_can_be_added() public {
         // Use the shared validator
         address charlieValidator = address(_ecdsaValidator);
@@ -189,19 +219,20 @@ contract ValidatorTest is Base {
         Call[] memory calls = constructCallsData();
 
         // Relayer executes with Charlie signature
-        bytes32 hash = _getValidationTypedHash(_aliceWallet, calls);
-        bytes memory validatorData = constructValidatorData(
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _charlie,
             _charliePk,
-            hash
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_bob);
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
         ISmartWallet(_aliceWallet).executeWithRelayer(
-            BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+            batchedCall,
             validatorData
         );
 
@@ -293,7 +324,7 @@ contract ValidatorTest is Base {
         address retrievedValidator = IOwnersManager(_aliceWallet)
             .ownerValidators(keyHash);
         assertEq(retrievedValidator, validatorAddress);
-        assertFalse(isSignerExpired(_aliceWallet, keyHash));
+        assertFalse(_isSignerExpired(_aliceWallet, keyHash));
 
         // Advance time past expiration
         vm.warp(block.timestamp + 2);
@@ -304,7 +335,7 @@ contract ValidatorTest is Base {
             keyHash
         );
         assertEq(retrievedValidator, validatorAddress); // Still returns the address
-        assertTrue(isSignerExpired(_aliceWallet, keyHash));
+        assertTrue(_isSignerExpired(_aliceWallet, keyHash));
     }
 
     function test_getVerifiedValidator_returns_zero_for_expired_owner() public {
@@ -368,7 +399,7 @@ contract ValidatorTest is Base {
 
         // Verify the owner is indeed expired
         assertTrue(
-            isSignerExpired(_aliceWallet, keyHash),
+            _isSignerExpired(_aliceWallet, keyHash),
             "Owner should be expired"
         );
     }
@@ -436,7 +467,7 @@ contract ValidatorTest is Base {
 
         // Verify the owner is indeed expired
         assertTrue(
-            isSignerExpired(_aliceWallet, keyHash),
+            _isSignerExpired(_aliceWallet, keyHash),
             "Owner should be expired"
         );
     }
@@ -464,8 +495,8 @@ contract ValidatorTest is Base {
         address retrievedValidator = IOwnersManager(_aliceWallet)
             .ownerValidators(keyHash);
         assertEq(retrievedValidator, validatorAddress);
-        assertFalse(isSignerExpired(_aliceWallet, keyHash));
-        assertEq(getSignerExpiration(_aliceWallet, keyHash), 0);
+        assertFalse(_isSignerExpired(_aliceWallet, keyHash));
+        assertEq(_getSignerExpiration(_aliceWallet, keyHash), 0);
     }
 
     function test_admin_signer_functionality() public {
@@ -487,7 +518,7 @@ contract ValidatorTest is Base {
         );
 
         // Verify admin status
-        assertTrue(isSignerAdmin(_aliceWallet, keyHash));
+        assertTrue(_isSignerAdmin(_aliceWallet, keyHash));
 
         // Add non-admin validator
         bytes32 nonAdminKeyHash = keccak256(abi.encodePacked(_bob));
@@ -507,7 +538,7 @@ contract ValidatorTest is Base {
         );
 
         // Verify non-admin status
-        assertFalse(isSignerAdmin(_aliceWallet, nonAdminKeyHash));
+        assertFalse(_isSignerAdmin(_aliceWallet, nonAdminKeyHash));
     }
 
     function test_backward_compatibility_with_old_addValidator() public {
@@ -573,8 +604,8 @@ contract ValidatorTest is Base {
         ISmartWallet(newWallet).initialize(initialOwners);
 
         // Verify both initial owners have admin privileges
-        assertTrue(isSignerAdmin(newWallet, charlieKeyHash));
-        assertTrue(isSignerAdmin(newWallet, bobKeyHash));
+        assertTrue(_isSignerAdmin(newWallet, charlieKeyHash));
+        assertTrue(_isSignerAdmin(newWallet, bobKeyHash));
 
         // Verify their settings
         (
@@ -626,7 +657,7 @@ contract ValidatorTest is Base {
             IOwnersManager(newWallet).ownerValidators(testKeyHash),
             address(0)
         );
-        assertFalse(isSignerAdmin(newWallet, testKeyHash));
+        assertFalse(_isSignerAdmin(newWallet, testKeyHash));
     }
 
     function test_removeValidator_reverts_for_non_owner() public {
@@ -699,15 +730,16 @@ contract ValidatorTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
         // Sign with non-admin signer (_bob)
-        bytes memory signature = constructSignature(
-            batchedCall,
+        bytes memory signature = _constructRelayerSignature(
             _aliceWallet,
-            _bobPk
+            _bob,
+            _bobPk,
+            batchedCall,
+            uint48(0)
         );
 
         // Should revert with NonAdminSelfCall
@@ -754,15 +786,16 @@ contract ValidatorTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
         // Sign with non-admin signer (_bob)
-        bytes memory signature = constructSignature(
-            batchedCall,
+        bytes memory signature = _constructRelayerSignature(
             _aliceWallet,
-            _bobPk
+            _bob,
+            _bobPk,
+            batchedCall,
+            uint48(0)
         );
 
         // Should revert with NonAdminSelfCall
@@ -807,15 +840,16 @@ contract ValidatorTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
         // Sign with admin signer (default initial owner is admin)
-        bytes memory signature = constructSignature(
-            batchedCall,
+        bytes memory signature = _constructRelayerSignature(
             _aliceWallet,
-            _alicePk
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         // Should succeed
@@ -828,6 +862,56 @@ contract ValidatorTest is Base {
             IOwnersManager(_aliceWallet).ownerValidators(keyHash),
             address(0)
         );
+    }
+
+    function test_removeValidator_succeeds_on_nonexistent_validator() public {
+        // Test that removing a validator that was never added succeeds (idempotent operation)
+        // This is the actual contract behavior - it doesn't revert for non-existent validators
+        bytes32 nonExistentKeyHash = keccak256(abi.encodePacked(_dave));
+
+        // Verify the validator doesn't exist
+        assertEq(
+            IOwnersManager(_aliceWallet).ownerValidators(nonExistentKeyHash),
+            address(0)
+        );
+        assertFalse(IOwnersManager(_aliceWallet).hasOwner(nonExistentKeyHash));
+
+        // Create a BatchedCall to remove non-existent validator
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: _aliceWallet,
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnersManager.removeOwner.selector,
+                nonExistentKeyHash
+            )
+        });
+
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: _getNonce(_aliceWallet)
+        });
+
+        // Sign with admin signer
+        bytes memory signature = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
+        );
+
+        // Should succeed even though validator doesn't exist (idempotent behavior)
+        vm.expectEmit(true, true, true, true);
+        emit OwnerRemoved(nonExistentKeyHash);
+        ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, signature);
+
+        // Verify the validator still doesn't exist (no-op)
+        assertEq(
+            IOwnersManager(_aliceWallet).ownerValidators(nonExistentKeyHash),
+            address(0)
+        );
+        assertFalse(IOwnersManager(_aliceWallet).hasOwner(nonExistentKeyHash));
     }
 
     function test_updateValidator_succeeds() public {
@@ -874,15 +958,16 @@ contract ValidatorTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
         // Sign with admin signer
-        bytes memory signature = constructSignature(
-            batchedCall,
+        bytes memory signature = _constructRelayerSignature(
             _aliceWallet,
-            _alicePk
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         // Should succeed and emit event
@@ -924,14 +1009,15 @@ contract ValidatorTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory signature = constructSignature(
-            batchedCall,
+        bytes memory signature = _constructRelayerSignature(
             _aliceWallet,
-            _alicePk
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         // Should revert
@@ -978,14 +1064,15 @@ contract ValidatorTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory signature = constructSignature(
-            batchedCall,
+        bytes memory signature = _constructRelayerSignature(
             _aliceWallet,
-            _alicePk
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         // Should revert
@@ -1069,14 +1156,15 @@ contract ValidatorTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(freshWallet),
-            expiry: 0
+            nonce: _getNonce(freshWallet)
         });
 
-        bytes memory signature = constructSignature(
-            batchedCall,
+        bytes memory signature = _constructRelayerSignature(
             freshWallet,
-            _alicePk
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         ISmartWallet(freshWallet).executeWithRelayer(batchedCall, signature);
@@ -1122,18 +1210,15 @@ contract ValidatorTest is Base {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: uint48(block.timestamp + 1 hours)
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
-        );
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_charliePk, typedDataHash);
-
-        bytes memory validatorData = abi.encodePacked(
-            charlieKeyHash,
-            abi.encodePacked(r, s, v)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _charlie,
+            _charliePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_bob);
@@ -1167,12 +1252,12 @@ contract ValidatorTest is Base {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: uint48(block.timestamp + 1 hours)
+            nonce: _getNonce(_aliceWallet)
         });
 
         bytes memory validatorData = abi.encodePacked(
             charlieKeyHash,
+            uint48(0), // validUntil (0 means no expiry)
             "mock signature data"
         );
 
@@ -1207,12 +1292,12 @@ contract ValidatorTest is Base {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: uint48(block.timestamp + 1 hours)
+            nonce: _getNonce(_aliceWallet)
         });
 
         bytes memory validatorData = abi.encodePacked(
             charlieKeyHash,
+            uint48(0), // validUntil (0 means no expiry)
             "mock signature data"
         );
 
@@ -1246,13 +1331,13 @@ contract ValidatorTest is Base {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: uint48(block.timestamp + 1 hours)
+            nonce: _getNonce(_aliceWallet)
         });
 
         // Test 1: Empty signature should fail
         bytes memory emptyValidatorData = abi.encodePacked(
             charlieKeyHash,
+            uint48(0), // validUntil data
             bytes("")
         );
         vm.prank(_bob);
@@ -1271,6 +1356,7 @@ contract ValidatorTest is Base {
         }
         bytes memory oversizedValidatorData = abi.encodePacked(
             charlieKeyHash,
+            uint48(0), // validUntil data
             oversizedSignature
         );
         vm.prank(_bob);
@@ -1285,6 +1371,7 @@ contract ValidatorTest is Base {
         // Test 3: Insufficient signature data should fail
         bytes memory insufficientValidatorData = abi.encodePacked(
             charlieKeyHash,
+            uint48(0), // validUntil data
             bytes32(
                 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
             )
@@ -1306,17 +1393,17 @@ contract ValidatorTest is Base {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: uint48(block.timestamp + 1 hours)
+            nonce: _getNonce(_aliceWallet)
         });
 
         bytes32 typedDataHash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+            BatchedCallLib.hash(batchedCall, 0, address(_smartWallet))
         );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_charliePk, typedDataHash);
 
         bytes memory validatorData = abi.encodePacked(
             invalidKeyHash, // Invalid keyHash
+            uint48(0), // validUntil (0 means no expiry)
             abi.encodePacked(r, s, v)
         );
 
@@ -1451,18 +1538,20 @@ contract ValidatorTest is Base {
 
         // Create a BatchedCall and try to execute with the reverting validator
         Call[] memory calls = constructCallsData();
-        BatchedCall memory batchedCall = BatchedCall({
-            calls: calls,
-            nonce: 0,
-            expiry: 0
-        });
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
 
         // Create signature data - the actual signature doesn't matter since validator will revert
         bytes32 hash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+            BatchedCallLib.hash(batchedCall, 0, address(_smartWallet))
         );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_charliePk, hash);
-        bytes memory validatorData = abi.encodePacked(keyHash, r, s, v);
+        bytes memory validatorData = abi.encodePacked(
+            keyHash,
+            uint48(0), // validUntil (0 means no expiry)
+            r,
+            s,
+            v
+        );
 
         // The transaction should revert with InvalidSignature because the validator reverts
         // and _validateSignature returns false when external validator reverts
@@ -1496,18 +1585,20 @@ contract ValidatorTest is Base {
 
         // Create a BatchedCall and try to execute with the failing validator
         Call[] memory calls = constructCallsData();
-        BatchedCall memory batchedCall = BatchedCall({
-            calls: calls,
-            nonce: 0,
-            expiry: 0
-        });
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
 
         // Create signature data
         bytes32 hash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+            BatchedCallLib.hash(batchedCall, 0, address(_smartWallet))
         );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_charliePk, hash);
-        bytes memory validatorData = abi.encodePacked(keyHash, r, s, v);
+        bytes memory validatorData = abi.encodePacked(
+            keyHash,
+            uint48(0), // validUntil (0 means no expiry)
+            r,
+            s,
+            v
+        );
 
         // The transaction should revert with InvalidSignature because validator returns false
         vm.expectRevert(Errors.InvalidSignature.selector);

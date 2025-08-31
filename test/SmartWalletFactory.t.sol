@@ -274,19 +274,20 @@ contract FactoryTest is Base {
         vm.deal(prediction, 2 ether);
 
         Call[] memory calls = constructCallsData();
-        bytes32 hash = _getValidationTypedHash(_aliceWallet, calls);
-        bytes memory validatorData = constructValidatorData(
-            _aliceWallet,
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
+        bytes memory validatorData = _constructRelayerSignature(
+            prediction,
             _alice,
             _alicePk,
-            hash
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
         address wallet = _factory.createAccountWithCall(
             initialOwners,
             salt,
-            BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+            batchedCall,
             validatorData
         );
 

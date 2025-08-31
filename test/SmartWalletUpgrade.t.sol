@@ -10,8 +10,6 @@ import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 import {Errors} from "src/libraries/Errors.sol";
 import {Call, BatchedCall} from "src/Types.sol";
-import {ERC712} from "src/ERC712.sol";
-import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 
 // OKXSmartWalletEntryV2 - Upgraded version for testing
 // Cannot inherit from OKXSmartWalletEntry directly due to custom storage layout
@@ -60,20 +58,12 @@ contract SmartWalletUpgradeTest is Base {
         // 2. Wrap in BatchedCall
         BatchedCall memory batchedCall = BatchedCall({
             calls: upgradeCalls,
-            nonce: 0,
-            expiry: 0
+            nonce: 0
         });
         
         // 3. Generate signature (using ECDSA to simulate Passkey)
-        bytes32 hash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
-        );
-        bytes memory validatorData = constructValidatorData(
-            _aliceWallet,
-            _alice,
-            _alicePk,
-            hash
-        );
+        bytes memory validatorData = _constructRelayerSignature(_aliceWallet, _alice, _alicePk, batchedCall
+        , uint48(0));
         
         // 4. Execute upgrade through relayer
         vm.prank(_alice); // Anyone can be relayer, using alice for simplicity
@@ -105,19 +95,11 @@ contract SmartWalletUpgradeTest is Base {
         
         BatchedCall memory batchedCall = BatchedCall({
             calls: upgradeCalls,
-            nonce: 0,
-            expiry: 0
+            nonce: 0
         });
         
-        bytes32 hash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
-        );
-        bytes memory validatorData = constructValidatorData(
-            _aliceWallet,
-            _alice,
-            _alicePk,
-            hash
-        );
+        bytes memory validatorData = _constructRelayerSignature(_aliceWallet, _alice, _alicePk, batchedCall
+        , uint48(0));
         
         // Execute upgrade
         vm.prank(_alice);
@@ -137,19 +119,11 @@ contract SmartWalletUpgradeTest is Base {
             Call[] memory calls = constructCallsData();
             BatchedCall memory txCall = BatchedCall({
                 calls: calls,
-                nonce: i,  // Using sequential nonce with key 0
-                expiry: 0
+                nonce: i  // Using sequential nonce with key 0
             });
             
-            bytes32 txHash = ERC712(_aliceWallet).hashTypedData(
-                BatchedCallLib.hash(txCall, address(_smartWallet))
-            );
-            bytes memory txValidatorData = constructValidatorData(
-                _aliceWallet,
-                _alice,
-                _alicePk,
-                txHash
-            );
+            bytes memory txValidatorData = _constructRelayerSignature(_aliceWallet, _alice, _alicePk, txCall
+            , uint48(0));
             
             vm.prank(_alice);
             ISmartWallet(_aliceWallet).executeWithRelayer(txCall, txValidatorData);
@@ -173,19 +147,11 @@ contract SmartWalletUpgradeTest is Base {
         
         BatchedCall memory batchedCall = BatchedCall({
             calls: upgradeCalls,
-            nonce: 3,
-            expiry: 0
+            nonce: 3
         });
         
-        bytes32 hash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
-        );
-        bytes memory validatorData = constructValidatorData(
-            _aliceWallet,
-            _alice,
-            _alicePk,
-            hash
-        );
+        bytes memory validatorData = _constructRelayerSignature(_aliceWallet, _alice, _alicePk, batchedCall
+        , uint48(0));
         
         vm.prank(_alice);
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, validatorData);
@@ -214,19 +180,11 @@ contract SmartWalletUpgradeTest is Base {
         
         BatchedCall memory batchedCall = BatchedCall({
             calls: upgradeCalls,
-            nonce: 0,
-            expiry: 0
+            nonce: 0
         });
         
-        bytes32 hash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
-        );
-        bytes memory validatorData = constructValidatorData(
-            _aliceWallet,
-            _alice,
-            _alicePk,
-            hash
-        );
+        bytes memory validatorData = _constructRelayerSignature(_aliceWallet, _alice, _alicePk, batchedCall
+        , uint48(0));
         
         vm.prank(_alice);
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, validatorData);
@@ -260,17 +218,11 @@ contract SmartWalletUpgradeTest is Base {
         
         BatchedCall memory batchedCall = BatchedCall({
             calls: upgradeCalls,
-            nonce: bobNonce,
-            expiry: 0
+            nonce: bobNonce
         });
         
-        bytes32 hash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
-        );
-        
-        // Sign with bob's key
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_bobPk, hash);
-        bytes memory validatorData = abi.encodePacked(bobKeyHash, r, s, v);
+        bytes memory validatorData = _constructRelayerSignature(_aliceWallet, _bob, _bobPk, batchedCall
+        , uint48(0));
         
         // Should fail because non-admin cannot make self-calls
         vm.prank(makeAddr("relayer"));
@@ -292,18 +244,15 @@ contract SmartWalletUpgradeTest is Base {
         
         BatchedCall memory batchedCall = BatchedCall({
             calls: upgradeCalls,
-            nonce: 0,
-            expiry: 0
+            nonce: 0
         });
         
-        bytes32 hash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
-        );
-        
-        // Use wrong key to sign (bob's key for alice's wallet)
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_bobPk, hash);
+        // Use wrong key to sign (bob's key but claim it's alice's)
+        // This creates a signature with alice's keyHash but signed with bob's key
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
-        bytes memory invalidValidatorData = abi.encodePacked(aliceKeyHash, r, s, v);
+        bytes32 hash = _getExecuteWithRelayerHash(batchedCall, uint48(0), _aliceWallet);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_bobPk, hash);
+        bytes memory invalidValidatorData = abi.encodePacked(aliceKeyHash, uint48(0), r, s, v);
         
         // Should revert with InvalidSignature
         vm.prank(_alice);

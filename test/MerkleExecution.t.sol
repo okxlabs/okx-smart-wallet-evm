@@ -5,8 +5,6 @@ import {Base} from "./Base.t.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 import {Errors} from "src/libraries/Errors.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
-import {ERC712} from "src/ERC712.sol";
-import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 
 contract MerkleExecutionTest is Base {
     // Test data for Merkle tree construction
@@ -47,8 +45,10 @@ contract MerkleExecutionTest is Base {
         BatchedCall memory batchedCall
     ) internal view returns (bytes32) {
         return
-            ERC712(account).hashTypedData(
-                BatchedCallLib.hash(batchedCall, address(_smartWallet))
+            _getExecuteWithRelayerHash(
+                batchedCall,
+                0, // validUntil = 0 (no expiry)
+                account
             );
     }
 
@@ -209,12 +209,7 @@ contract MerkleExecutionTest is Base {
         Call[] memory calls,
         address account
     ) internal view returns (BatchedCall memory) {
-        return
-            BatchedCall({
-                calls: calls,
-                nonce: _getNonce(account),
-                expiry: uint48(block.timestamp + 1 hours)
-            });
+        return BatchedCall({calls: calls, nonce: _getNonce(account)});
     }
 
     function _constructSimpleValidatorData(
@@ -223,11 +218,12 @@ contract MerkleExecutionTest is Base {
         bytes32 messageHash
     ) internal pure returns (bytes memory) {
         bytes32 keyHash = keccak256(abi.encodePacked(signer));
-        bytes memory signature = constructSignature(privateKey, messageHash);
+        bytes memory signature = _constructSignature(privateKey, messageHash);
 
-        // For simple ECDSA validation: keyHash + signature (65 bytes)
-        // ECDSAValidator will see validatorData.length <= 65 and do simple validation
-        return abi.encodePacked(keyHash, signature);
+        // For simple ECDSA validation: keyHash + validUntil + signature
+        // ECDSAValidator will see validatorData.length <= 103 and do simple validation
+        uint48 validUntil = 0; // 0 means no expiration
+        return abi.encodePacked(keyHash, validUntil, signature);
     }
 
     function _constructMerkleValidatorData(
@@ -238,9 +234,15 @@ contract MerkleExecutionTest is Base {
     ) internal pure returns (bytes memory) {
         bytes32 keyHash = keccak256(abi.encodePacked(signer));
 
-        bytes memory signature = constructSignature(privateKey, hashToSign);
+        bytes memory signature = _constructSignature(privateKey, hashToSign);
 
-        return abi.encodePacked(keyHash, signature, abi.encode(proofs));
+        return
+            abi.encodePacked(
+                keyHash,
+                uint48(0), // validUntil (0 means no expiry)
+                signature,
+                abi.encode(proofs)
+            );
     }
 
     // ============ POSITIVE TEST CASES ============
@@ -254,11 +256,12 @@ contract MerkleExecutionTest is Base {
         );
 
         // Use merkle validation with proofs
+        // The signer signs the merkleRoot, not the individual transaction
         bytes memory validatorData = _constructMerkleValidatorData(
             charlie,
             charliePk,
-            merkleRoot,
-            merkleProof
+            merkleRoot, // Sign the Merkle root
+            merkleProof // Provide proof that this BatchedCall is in the tree
         );
 
         // Execute with merkle validation
@@ -363,8 +366,7 @@ contract MerkleExecutionTest is Base {
 
         BatchedCall memory invalidNonceBatchedCall = BatchedCall({
             calls: calls,
-            nonce: nonce,
-            expiry: uint48(block.timestamp + 1 hours)
+            nonce: nonce
         });
 
         bytes memory validatorData = _constructMerkleValidatorData(
@@ -391,6 +393,7 @@ contract MerkleExecutionTest is Base {
             _aliceWallet
         );
 
+        // Use Merkle validation for batch authorization
         bytes memory validatorData = _constructMerkleValidatorData(
             charlie,
             charliePk,
@@ -407,7 +410,7 @@ contract MerkleExecutionTest is Base {
             validatorData
         );
 
-        // Second execution with same nonce should fail
+        // Second execution with same nonce should fail (replay protection)
         vm.prank(_bob);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -436,8 +439,7 @@ contract MerkleExecutionTest is Base {
 
         BatchedCall memory manipulatedBatchedCall = BatchedCall({
             calls: manipulatedCalls,
-            nonce: batchedCall.nonce,
-            expiry: batchedCall.expiry
+            nonce: batchedCall.nonce
         });
 
         bytes memory validatorData = _constructMerkleValidatorData(
@@ -468,8 +470,9 @@ contract MerkleExecutionTest is Base {
 
         // Create signature that's too short (missing signature part)
         bytes memory shortValidatorData = abi.encodePacked(
-            keccak256(abi.encodePacked(charlie)),
-            uint256(0)
+            keccak256(abi.encodePacked(charlie)), // pubKeyHash (32 bytes)
+            uint48(0) // validUntil (6 bytes)
+            // Missing actual signature part - total only 38 bytes
         );
 
         vm.prank(_bob);
@@ -485,31 +488,27 @@ contract MerkleExecutionTest is Base {
     // ============ EDGE CASES ============
 
     function test_executeWithMerkle_handles_large_proof_arrays() public {
-        // Create a larger Merkle tree for testing
-        uint256 numLeaves = 16;
-        bytes32[] memory largeLeaves = new bytes32[](numLeaves);
-
+        // Create a simple valid BatchedCall for testing
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _constructBatchedCall(
             calls,
             _aliceWallet
         );
 
-        for (uint256 i = 0; i < numLeaves; i++) {
-            largeLeaves[i] = _getValidationTypedHash(_aliceWallet, batchedCall);
+        // Create a large Merkle proof array to test edge case
+        bytes32[] memory largeProofs = new bytes32[](10);
+        for (uint256 i = 0; i < 10; i++) {
+            largeProofs[i] = keccak256(abi.encodePacked("proof", i));
         }
 
-        bytes32 largeMerkleRoot = _computeMerkleRootOpenZeppelin(largeLeaves);
-        bytes32[] memory largeMerkleProof = _generateMerkleProof(
-            largeLeaves,
-            0
-        );
-
-        bytes memory validatorData = _constructMerkleValidatorData(
+        // Use the helper function with Merkle proof support
+        bytes memory validatorData = _constructValidatorDataWithMerkleProof(
+            _aliceWallet,
             charlie,
             charliePk,
-            largeMerkleRoot,
-            largeMerkleProof
+            batchedCall,
+            uint48(0), // no expiry
+            largeProofs
         );
 
         vm.prank(_bob);

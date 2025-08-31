@@ -199,9 +199,9 @@ abstract contract OwnersManager is IOwnersManager {
         address hook
     ) public pure returns (uint256) {
         return
-            uint256(uint160(hook)) |
+            (uint256(adminFlag ? 1 : 0) << 200) |
             (uint256(expiration) << 160) |
-            (uint256(adminFlag ? 1 : 0) << 200);
+            uint256(uint160(hook));
     }
 
     /// @notice Extract hook address from packed settings (bits 0-159)

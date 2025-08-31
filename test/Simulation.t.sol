@@ -590,7 +590,7 @@ contract SimulationTest is Base {
         );
         deal(address(maliciousToken), _aliceWallet, maxDeal);
 
-        Call[] memory tempCalls = constructRelayerCall(1, usdc);
+        Call[] memory tempCalls = _constructRelayerCall(1, usdc);
         // Clear existing storage array
         delete relayerCalls;
         // Push elements individually
@@ -648,19 +648,19 @@ contract SimulationTest is Base {
     function test_simulate_executeFromRelayer() public {
         Call[] memory calls = constructCallsData();
 
-        bytes32 hash = _getValidationTypedHash(_aliceWallet, calls);
-        bytes memory validatorData = constructValidatorData(
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            hash
+            BatchedCall({calls: calls, nonce: 0}),
+            uint48(0)
         );
 
         vm.prank(relayer);
         uint256 gasStart = gasleft();
         try
             ISmartWallet(_aliceWallet).simulateExecuteWithRelayer(
-                BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+                BatchedCall({calls: calls, nonce: 0}),
                 address(_ecdsaValidator),
                 validatorData
             )
@@ -690,18 +690,14 @@ contract SimulationTest is Base {
     function test_compareGas_simulateVsActual_executeFromRelayer() public {
         // Setup common data for both tests
         Call[] memory calls = constructCallsData();
-        bytes32 hash = _getValidationTypedHash(_aliceWallet, calls);
-        bytes memory validatorData = constructValidatorData(
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            hash
+            batchedCall,
+            uint48(0)
         );
-        BatchedCall memory batchedCall = BatchedCall({
-            calls: calls,
-            nonce: 0,
-            expiry: 0
-        });
 
         // Test 1: Measure gas for simulateExecuteWithRelayer
         uint256 simulateGasUsed;
@@ -824,13 +820,13 @@ contract SimulationTest is Base {
         // Create batched call with CHAIN_LESS_NONCE_KEY
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: Static.CHAIN_LESS_NONCE_KEY << 64, // This triggers the chainless validation
-            expiry: uint48(block.timestamp + 1 hours)
+            nonce: Static.CHAIN_LESS_NONCE_KEY << 64 // This triggers the chainless validation
         });
 
         // Create validator data with a non-existent validator
         bytes memory validatorData = abi.encodePacked(
             keccak256(abi.encodePacked(_alice)), // keyHash
+            uint48(0), // validUntil (0 means no expiry)
             abi.encodePacked(bytes32(0), bytes32(0), uint8(27)) // dummy signature
         );
 
@@ -882,17 +878,16 @@ contract SimulationTest is Base {
         // Create batched call with CHAIN_LESS_NONCE_KEY
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: Static.CHAIN_LESS_NONCE_KEY << 64, // This triggers the chainless validation
-            expiry: uint48(block.timestamp + 1 hours)
+            nonce: Static.CHAIN_LESS_NONCE_KEY << 64 // This triggers the chainless validation
         });
 
         // Create validator data
-        bytes32 hash = _getValidationTypedHash(_aliceWallet, calls);
-        bytes memory validatorData = constructValidatorData(
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            hash
+            BatchedCall({calls: calls, nonce: 0}),
+            uint48(0)
         );
 
         vm.prank(relayer);
@@ -926,11 +921,7 @@ contract SimulationTest is Base {
         calls[0] = Call({target: _bob, value: 0, data: ""});
 
         // Create batched call with simple nonce (like other working tests)
-        BatchedCall memory batchedCall = BatchedCall({
-            calls: calls,
-            nonce: 0,
-            expiry: 0
-        });
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
 
         // Create validator data with an unknown public key hash
         bytes32 unknownPubKeyHash = keccak256(
@@ -939,7 +930,7 @@ contract SimulationTest is Base {
 
         // Sign the batched call with Alice's key (valid signature)
         bytes32 hash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+            BatchedCallLib.hash(batchedCall, 0, address(_smartWallet))
         );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, hash);
         bytes memory signature = abi.encodePacked(r, s, v);
@@ -947,6 +938,7 @@ contract SimulationTest is Base {
         // Create validator data with unknown pubKeyHash but valid signature
         bytes memory validatorData = abi.encodePacked(
             unknownPubKeyHash,
+            uint48(0), // validUntil (0 means no expiry)
             signature
         );
 
@@ -1018,8 +1010,7 @@ contract SimulationTest is Base {
 
         BatchedCall memory mixedBatchedCall = BatchedCall({
             calls: mixedCalls,
-            nonce: Static.CHAIN_LESS_NONCE_KEY << 64,
-            expiry: uint48(block.timestamp + 1 hours)
+            nonce: Static.CHAIN_LESS_NONCE_KEY << 64
         });
 
         bytes memory mixedValidatorData = abi.encodePacked(

@@ -2,11 +2,12 @@
 pragma solidity ^0.8.29;
 
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
+import {UserOperationLib} from "account-abstraction/core/UserOperationLib.sol";
 import {IERC4337Account} from "./interfaces/IERC4337Account.sol";
 import {Errors} from "./libraries/Errors.sol";
-import {UserOperationLib} from "account-abstraction/core/UserOperationLib.sol";
 
 abstract contract ERC4337Account is IERC4337Account {
+    using UserOperationLib for PackedUserOperation;
     /// @notice Modifier to ensure the caller is the EntryPoint
     modifier onlyEntryPoint() {
         if (msg.sender != entryPoint()) revert Errors.NotEntryPoint();
@@ -37,12 +38,11 @@ abstract contract ERC4337Account is IERC4337Account {
     }
 
     /// @notice Returns the hash of the user operation without the chain id
-    /// @param userOp The user operation to hash
+    /// @param userOp The user operation
     /// @return The hash of the user operation without the chain id
     function getUserOpHashWithoutChainId(
         PackedUserOperation calldata userOp
     ) public view virtual returns (bytes32) {
-        return
-            keccak256(abi.encode(UserOperationLib.hash(userOp), entryPoint()));
+        return keccak256(abi.encode(userOp.hash(), entryPoint()));
     }
 }

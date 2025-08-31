@@ -150,9 +150,14 @@ contract ValidateUserOpTest is Base {
             userOp
         );
 
-        // Sign the userOp hash
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
-        userOp.signature = abi.encodePacked(aliceKeyHash, r, s, v);
+        // Use helper function to construct signature
+        userOp.signature = _constructUserOpSignature(
+            userOp,
+            _alice,
+            _alicePk,
+            userOpHash,
+            account
+        );
 
         // Record bob's initial balance
         uint256 bobInitialBalance = _bob.balance;
@@ -242,13 +247,17 @@ contract ValidateUserOpTest is Base {
             signature: bytes("")
         });
 
-        // Get userOp hash without chain ID for chainless operations
-        bytes32 userOpHash = ERC4337Account(account)
-            .getUserOpHashWithoutChainId(userOp);
-
-        // Sign the userOp
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
-        userOp.signature = abi.encodePacked(aliceKeyHash, r, s, v);
+        // Use helper function to construct signature for chainless nonce
+        bytes32 baseUserOpHash = IEntryPoint(ENTRYPOINT_ADDRESS).getUserOpHash(
+            userOp
+        );
+        userOp.signature = _constructUserOpSignature(
+            userOp,
+            _alice,
+            _alicePk,
+            baseUserOpHash,
+            account
+        );
 
         // Verify bob is not an owner yet
         assertFalse(
@@ -269,10 +278,147 @@ contract ValidateUserOpTest is Base {
         );
     }
 
+    function test_handleOps_with_expired_validUntil_fails() external {
+        // Test that EntryPoint rejects UserOperation when validUntil has expired
+
+        // Setup account with initial balance
+        address account = _aliceWallet;
+        vm.deal(account, 1 ether);
+
+        // Create UserOp with transfer call
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _bob, value: 0.1 ether, data: ""});
+
+        PackedUserOperation memory userOp;
+        userOp.sender = account;
+        userOp.nonce = 0;
+        userOp.callData = abi.encodeCall(ISmartWallet.execute, (calls));
+        userOp.accountGasLimits = bytes32(
+            abi.encodePacked(uint128(100000), uint128(100000))
+        );
+        userOp.preVerificationGas = 21000;
+        userOp.gasFees = bytes32(
+            abi.encodePacked(uint128(1 gwei), uint128(1 gwei))
+        );
+
+        bytes32 userOpHash = IEntryPoint(ENTRYPOINT_ADDRESS).getUserOpHash(
+            userOp
+        );
+
+        // Set expired validUntil (1 second ago to avoid underflow)
+        vm.warp(2 hours); // Set block.timestamp to 2 hours
+        uint48 expiredValidUntil = uint48(block.timestamp - 1);
+
+        // Create signature with expired validUntil
+        bytes32 keyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 finalHash = _getValidateUserOpHash(
+            userOp,
+            userOpHash,
+            expiredValidUntil,
+            account
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, finalHash);
+        userOp.signature = abi.encodePacked(
+            keyHash,
+            expiredValidUntil,
+            r,
+            s,
+            v
+        );
+
+        // Prepare for handleOps call
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+        ops[0] = userOp;
+
+        // Record initial balance
+        uint256 bobInitialBalance = _bob.balance;
+
+        // Fund the EntryPoint for gas
+        vm.deal(ENTRYPOINT_ADDRESS, 10 ether);
+
+        // Call handleOps - should fail due to expired validUntil
+        // EntryPoint checks the validUntil in the returned validation data
+        vm.expectRevert();
+        IEntryPoint(ENTRYPOINT_ADDRESS).handleOps(ops, payable(address(this)));
+
+        // Verify transfer didn't happen
+        assertEq(
+            _bob.balance,
+            bobInitialBalance,
+            "Transfer should not have occurred"
+        );
+    }
+
+    function test_handleOps_with_future_validUntil_succeeds() external {
+        // Test that EntryPoint accepts UserOperation when validUntil is in the future
+
+        // Setup account with initial balance
+        address account = _aliceWallet;
+        vm.deal(account, 1 ether);
+
+        // Create UserOp with transfer call
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _bob, value: 0.1 ether, data: ""});
+
+        PackedUserOperation memory userOp;
+        userOp.sender = account;
+        userOp.nonce = 0;
+        // executeUserOp expects: selector + abi.encode(calls)
+        userOp.callData = abi.encodeWithSelector(
+            IERC4337Account.executeUserOp.selector,
+            calls
+        );
+        userOp.accountGasLimits = bytes32(
+            abi.encodePacked(uint128(200000), uint128(200000))
+        );
+        userOp.preVerificationGas = 21000;
+        userOp.gasFees = bytes32(
+            abi.encodePacked(uint128(1 gwei), uint128(1 gwei))
+        );
+
+        bytes32 userOpHash = IEntryPoint(ENTRYPOINT_ADDRESS).getUserOpHash(
+            userOp
+        );
+
+        // Set future validUntil (1 hour from now)
+        vm.warp(1 hours); // Set block.timestamp
+        uint48 futureValidUntil = uint48(block.timestamp + 1 hours);
+
+        // Create signature with future validUntil
+        bytes32 keyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 finalHash = _getValidateUserOpHash(
+            userOp,
+            userOpHash,
+            futureValidUntil,
+            account
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, finalHash);
+        userOp.signature = abi.encodePacked(keyHash, futureValidUntil, r, s, v);
+
+        // Prepare for handleOps call
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+        ops[0] = userOp;
+
+        // Record initial balance
+        uint256 bobInitialBalance = _bob.balance;
+
+        // Fund the EntryPoint for gas
+        vm.deal(ENTRYPOINT_ADDRESS, 10 ether);
+
+        // Call handleOps - should succeed with future validUntil
+        IEntryPoint(ENTRYPOINT_ADDRESS).handleOps(ops, payable(address(this)));
+
+        // Verify transfer happened
+        assertEq(
+            _bob.balance,
+            bobInitialBalance + 0.1 ether,
+            "Transfer should have occurred"
+        );
+    }
+
     function test_validateUserOp_with_eoa_signer() external {
         vm.prank(_alice);
 
-        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
         address account = _deployAccountSingleOwner(
             _aliceWalletKeyHash,
             address(1),
@@ -283,16 +429,18 @@ contract ValidateUserOpTest is Base {
         t.userOpHash = keccak256("123");
         t.signer = _aliceWallet;
         t.privateKey = _alicePk;
-        (t.v, t.r, t.s) = vm.sign(t.privateKey, t.userOpHash);
         t.missingAccountFunds = 123;
         vm.deal(address(account), 1 ether);
         assertEq(address(account).balance, 1 ether);
 
         PackedUserOperation memory userOp;
-        // Success returns 0.
-        userOp.signature = abi.encodePacked(
-            _aliceWalletKeyHash,
-            abi.encodePacked(t.r, t.s, t.v)
+        // Use helper function to construct signature
+        userOp.signature = _constructUserOpSignature(
+            userOp,
+            _alice,
+            t.privateKey,
+            t.userOpHash,
+            account
         );
         assertEq(
             _testValidateUserOp(
@@ -308,11 +456,19 @@ contract ValidateUserOpTest is Base {
             100 ether + t.missingAccountFunds
         );
 
-        // Failure returns 1.
-        userOp.signature = abi.encodePacked(
-            _aliceWalletKeyHash,
-            abi.encodePacked(t.r, bytes32(uint256(t.s) ^ 1), t.v)
+        // Create invalid signature for failure test
+        // First get valid signature, then corrupt it
+        bytes memory validSignature = _constructUserOpSignature(
+            userOp,
+            _alice,
+            t.privateKey,
+            t.userOpHash,
+            account
         );
+        // Corrupt the signature by flipping one bit in the 's' component (at position 70)
+        bytes memory invalidSignature = validSignature;
+        invalidSignature[70] = bytes1(uint8(validSignature[70]) ^ 1);
+        userOp.signature = invalidSignature;
 
         assertEq(
             _testValidateUserOp(
@@ -339,7 +495,6 @@ contract ValidateUserOpTest is Base {
     function test_validateUserOp_with_eoa_signer_and_chain_less_nonce()
         external
     {
-        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
         bytes32 _bobKeyHash = keccak256(abi.encodePacked(_bob));
 
         TestTemps memory t;
@@ -363,27 +518,29 @@ contract ValidateUserOpTest is Base {
             calls
         );
 
-        t.userOpHash = IERC4337Account(_aliceWallet)
-            .getUserOpHashWithoutChainId(userOp);
-        t.signer = _alice; // 签名者是 EOA
+        t.signer = _alice; // signer is EOA
         t.privateKey = _alicePk;
-        (t.v, t.r, t.s) = vm.sign(t.privateKey, t.userOpHash);
         t.missingAccountFunds = 123;
         vm.deal(_aliceWallet, 1 ether);
         assertEq(_aliceWallet.balance, 1 ether);
 
-        // Success returns 0.
-        userOp.signature = abi.encodePacked(
-            _aliceWalletKeyHash,
-            abi.encodePacked(t.r, t.s, t.v)
+        // Get the base userOp hash for chainless signature
+        bytes32 baseHash = IEntryPoint(ENTRYPOINT_ADDRESS).getUserOpHash(
+            userOp
         );
+
+        // Use helper function to construct chainless signature
+        userOp.signature = _constructUserOpSignature(
+            userOp,
+            _alice,
+            _alicePk,
+            baseHash,
+            _aliceWallet
+        );
+
+        // Use the simplified version that auto-calculates hash
         assertEq(
-            _testValidateUserOp(
-                _aliceWallet,
-                userOp,
-                t.userOpHash,
-                t.missingAccountFunds
-            ),
+            _testValidateUserOp(_aliceWallet, userOp, t.missingAccountFunds),
             0
         );
         assertEq(
@@ -395,7 +552,6 @@ contract ValidateUserOpTest is Base {
     function test_uopHash_error_validateUserOp_with_eoa_signer_and_chain_less_nonce()
         external
     {
-        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
         bytes32 _bobKeyHash = keccak256(abi.encodePacked(_bob));
 
         TestTemps memory t;
@@ -420,21 +576,24 @@ contract ValidateUserOpTest is Base {
         );
 
         t.userOpHash = keccak256("123");
-        t.signer = _alice; // 修正：签名者是 EOA，不是账户
+        t.signer = _alice; // fixed: signer is EOA, not account
         t.privateKey = _alicePk;
-        (t.v, t.r, t.s) = vm.sign(t.privateKey, t.userOpHash);
         t.missingAccountFunds = 123;
-        vm.deal(_aliceWallet, 1 ether); // 给账户充值
+        vm.deal(_aliceWallet, 1 ether); // fund the account
         assertEq(_aliceWallet.balance, 1 ether);
 
-        // Success returns 0.
+        // This test uses a fixed userOpHash that doesn't match proper chainless calculation
+        // For this specific error test, manually create signature to match test expectations
+        uint48 validUntil = 0;
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(t.privateKey, t.userOpHash);
         userOp.signature = abi.encodePacked(
             _aliceWalletKeyHash,
-            abi.encodePacked(t.r, t.s, t.v)
+            validUntil,
+            abi.encodePacked(r, s, v)
         );
         assertEq(
             _testValidateUserOp(
-                _aliceWallet, // 验证的是账户
+                _aliceWallet, // validating the account
                 userOp,
                 t.userOpHash,
                 t.missingAccountFunds
@@ -446,8 +605,6 @@ contract ValidateUserOpTest is Base {
     function test_calldata_error_validateUserOp_with_eoa_signer_and_chain_less_nonce()
         external
     {
-        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
-
         TestTemps memory t;
         PackedUserOperation memory userOp;
         userOp.nonce = Static.CHAIN_LESS_NONCE_KEY << 64;
@@ -465,17 +622,20 @@ contract ValidateUserOpTest is Base {
         );
 
         t.userOpHash = keccak256("123");
-        t.signer = _alice; // 签名者是 EOA
+        t.signer = _alice; // signer is EOA
         t.privateKey = _alicePk;
-        (t.v, t.r, t.s) = vm.sign(t.privateKey, t.userOpHash);
         t.missingAccountFunds = 123;
         vm.deal(_aliceWallet, 1 ether);
         assertEq(_aliceWallet.balance, 1 ether);
 
-        // Success returns 0.
+        // This test uses a fixed userOpHash that doesn't match proper chainless calculation
+        // For this specific error test, manually create signature to match test expectations
+        uint48 validUntil = 0;
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(t.privateKey, t.userOpHash);
         userOp.signature = abi.encodePacked(
             _aliceWalletKeyHash,
-            abi.encodePacked(t.r, t.s, t.v)
+            validUntil,
+            abi.encodePacked(r, s, v)
         );
         assertEq(
             _testValidateUserOp(
@@ -490,7 +650,6 @@ contract ValidateUserOpTest is Base {
 
     function test_validateUserOp_with_ecdsa_validator() external {
         // Create account with ECDSA validator
-        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
         address account = _deployAccountSingleOwner(
             _aliceWalletKeyHash,
             address(ecdsaValidator),
@@ -503,15 +662,15 @@ contract ValidateUserOpTest is Base {
         t.missingAccountFunds = 1000;
         vm.deal(address(account), 2 ether);
 
-        // Create ECDSA signature - ECDSAValidator expects direct hash, not eth signed message hash
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(t.privateKey, t.userOpHash);
-        bytes memory ecdsaSignature = abi.encodePacked(r, s, v);
-
         PackedUserOperation memory userOp;
-        // Test valid ECDSA signature
-        userOp.signature = abi.encodePacked(
-            _aliceWalletKeyHash,
-            ecdsaSignature
+
+        // Use helper function to construct signature
+        userOp.signature = _constructUserOpSignature(
+            userOp,
+            _alice,
+            t.privateKey,
+            t.userOpHash,
+            address(account)
         );
 
         assertEq(
@@ -525,16 +684,18 @@ contract ValidateUserOpTest is Base {
             "Valid ECDSA signature should return 0"
         );
 
-        // Test invalid ECDSA signature
-        bytes memory invalidSignature = abi.encodePacked(
-            r,
-            bytes32(uint256(s) ^ 1),
-            v
+        // Create invalid signature for failure test
+        bytes memory validSignature = _constructUserOpSignature(
+            userOp,
+            _alice,
+            t.privateKey,
+            t.userOpHash,
+            address(account)
         );
-        userOp.signature = abi.encodePacked(
-            _aliceWalletKeyHash,
-            invalidSignature
-        );
+        // Corrupt the signature by flipping one bit in the 's' component
+        bytes memory invalidSignature = validSignature;
+        invalidSignature[70] = bytes1(uint8(validSignature[70]) ^ 1);
+        userOp.signature = invalidSignature;
 
         assertEq(
             _testValidateUserOp(
@@ -566,20 +727,28 @@ contract ValidateUserOpTest is Base {
         t.missingAccountFunds = 1000;
         vm.deal(address(account), 2 ether);
 
+        bytes32 passkeyHashWithValidUntil = keccak256(
+            abi.encode(
+                t.userOpHash,
+                uint48(0),
+                ISmartWallet(account).IMPLEMENTATION()
+            )
+        );
         (, , bytes32 messageHash) = HelperLib.getPasskeyMessageHash(
-            t.userOpHash
+            passkeyHashWithValidUntil
         );
         (bytes32 r, bytes32 s) = vm.signP256(_passkeyPrivateKey, messageHash);
 
         // Create Passkey signature with WebAuthn auth
         WebAuthn.WebAuthnAuth memory auth = HelperLib.getWebAuthnAuth(
-            t.userOpHash,
+            passkeyHashWithValidUntil,
             uint256(r),
             uint256(s)
         );
 
         bytes memory sig = abi.encode(auth, new bytes32[](0)); // No merkle proofs
         bytes memory validatorData = abi.encodePacked(
+            uint48(0), // validUntil (0 means no expiry)
             abi.encode(
                 PasskeyValidatorLib.PasskeyPubKey({
                     pubKeyX: _passkeyPubX,
@@ -590,6 +759,8 @@ contract ValidateUserOpTest is Base {
         );
 
         PackedUserOperation memory userOp;
+        // Note: Passkey validator uses different format - keyHash + validatorData
+        // The validatorData already contains validUntil (6 bytes at offset after pubkey)
         userOp.signature = abi.encodePacked(passkeyHash, validatorData);
 
         // Test valid Passkey signature
@@ -612,8 +783,10 @@ contract ValidateUserOpTest is Base {
                     pubKeyY: 0x2222222222222222222222222222222222222222222222222222222222222222
                 })
             ),
+            uint48(0), // validUntil (0 means no expiry)
             sig
         );
+        // Note: Invalid passkey test with different format
         userOp.signature = abi.encodePacked(passkeyHash, invalidValidatorData);
 
         assertEq(
@@ -630,7 +803,6 @@ contract ValidateUserOpTest is Base {
 
     function test_validateUserOp_onlyEntryPoint_modifier() external {
         // Create account
-        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
         address account = _deployAccountSingleOwner(
             _aliceWalletKeyHash,
             address(ecdsaValidator),
@@ -668,11 +840,13 @@ contract ValidateUserOpTest is Base {
         );
 
         // Test 4: Only the actual EntryPoint can call
-        // Create valid signature - use raw hash directly for ECDSA validator
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
-        userOp.signature = abi.encodePacked(
-            _aliceWalletKeyHash,
-            abi.encodePacked(r, s, v)
+        // Use helper function to construct valid signature
+        userOp.signature = _constructUserOpSignature(
+            userOp,
+            _alice,
+            _alicePk,
+            userOpHash,
+            account
         );
 
         vm.deal(account, 1 ether);
@@ -689,7 +863,6 @@ contract ValidateUserOpTest is Base {
     }
 
     function test_validateUserOp_signature_validation_edge_cases() external {
-        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
         address account = _deployAccountSingleOwner(
             _aliceWalletKeyHash,
             address(ecdsaValidator),
@@ -702,8 +875,8 @@ contract ValidateUserOpTest is Base {
         bytes32 userOpHash = keccak256("edge_case_test");
         uint256 missingAccountFunds = 100;
 
-        // Test 1: Empty signature - needs at least 32 bytes for keyHash
-        userOp.signature = new bytes(32); // 32 bytes of zeros
+        // Test 1: Empty signature - needs at least 38 bytes for keyHash + validUntil
+        userOp.signature = new bytes(38); // 38 bytes of zeros (keyHash + validUntil)
         assertEq(
             _testValidateUserOp(
                 account,
@@ -715,8 +888,9 @@ contract ValidateUserOpTest is Base {
             "Empty signature should fail"
         );
 
-        // Test 2: Only keyHash, no actual signature
-        userOp.signature = abi.encodePacked(_aliceWalletKeyHash);
+        // Test 2: Only keyHash + validUntil, no actual signature
+        uint48 validUntil = 0;
+        userOp.signature = abi.encodePacked(_aliceWalletKeyHash, validUntil);
         assertEq(
             _testValidateUserOp(
                 account,
@@ -729,13 +903,20 @@ contract ValidateUserOpTest is Base {
         );
 
         // Test 3: Wrong keyHash with valid signature format
-        bytes32 wrongKeyHash = keccak256(abi.encodePacked(_bob));
-        // Use raw hash directly for ECDSA validator
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
-        userOp.signature = abi.encodePacked(
-            wrongKeyHash,
-            abi.encodePacked(r, s, v)
+        // Use helper to create signature, then corrupt the keyHash portion
+        bytes memory validSignature = _constructUserOpSignature(
+            userOp,
+            _alice,
+            _alicePk,
+            userOpHash,
+            account
         );
+        bytes32 wrongKeyHash = keccak256(abi.encodePacked(_bob));
+        // Replace the keyHash in the signature (first 32 bytes)
+        assembly {
+            mstore(add(validSignature, 32), wrongKeyHash)
+        }
+        userOp.signature = validSignature;
 
         assertEq(
             _testValidateUserOp(
@@ -751,6 +932,7 @@ contract ValidateUserOpTest is Base {
         // Test 4: Malformed signature (wrong length)
         userOp.signature = abi.encodePacked(
             _aliceWalletKeyHash,
+            validUntil,
             bytes32(0),
             bytes32(0)
         );
@@ -770,13 +952,11 @@ contract ValidateUserOpTest is Base {
     function test_validateUserOp_allows_chainless_nonce_for_addOwner()
         external
     {
-        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
-
         // Create addOwner call
         bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(_bob));
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
-            target: _aliceWallet, // 使用已有的 _aliceWallet 账户
+            target: _aliceWallet, // use existing _aliceWallet account
             value: 0,
             data: abi.encodeWithSelector(
                 OwnersManager.addOwner.selector,
@@ -793,27 +973,19 @@ contract ValidateUserOpTest is Base {
             calls
         );
 
-        // Get hash without chain ID for chainless nonce
-        bytes32 userOpHash = IERC4337Account(_aliceWallet)
-            .getUserOpHashWithoutChainId(userOp);
-
-        // Sign the hash
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
-        userOp.signature = abi.encodePacked(
-            _aliceWalletKeyHash,
-            abi.encodePacked(r, s, v)
+        // Use new unified helper to prepare and sign
+        (userOp.signature, ) = _prepareAndSignUserOp(
+            userOp,
+            _alice,
+            _alicePk,
+            _aliceWallet
         );
 
         uint256 missingAccountFunds = 100;
 
         // Should succeed for addOwner with chainless nonce
         assertEq(
-            _testValidateUserOp(
-                _aliceWallet,
-                userOp,
-                userOpHash,
-                missingAccountFunds
-            ),
+            _testValidateUserOp(_aliceWallet, userOp, missingAccountFunds),
             0,
             "addOwner should succeed with chainless nonce"
         );
@@ -823,7 +995,6 @@ contract ValidateUserOpTest is Base {
         external
     {
         // Create account with ECDSA validator
-        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
         address account = _deployAccountSingleOwner(
             _aliceWalletKeyHash,
             address(ecdsaValidator),
@@ -857,24 +1028,19 @@ contract ValidateUserOpTest is Base {
             calls
         );
 
-        bytes32 userOpHash = IERC4337Account(account)
-            .getUserOpHashWithoutChainId(userOp);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
-        userOp.signature = abi.encodePacked(
-            _aliceWalletKeyHash,
-            abi.encodePacked(r, s, v)
+        // Use new unified helper to prepare and sign
+        (userOp.signature, ) = _prepareAndSignUserOp(
+            userOp,
+            _alice,
+            _alicePk,
+            account
         );
 
         uint256 missingAccountFunds = 100;
 
-        // Should succeed for updateOwner with chainless nonce
+        // Should fail for updateOwner with chainless nonce
         assertEq(
-            _testValidateUserOp(
-                account,
-                userOp,
-                userOpHash,
-                missingAccountFunds
-            ),
+            _testValidateUserOp(account, userOp, missingAccountFunds),
             Static.SIG_VALIDATION_FAILED,
             "updateOwner should not succeed with chainless nonce"
         );
@@ -884,7 +1050,6 @@ contract ValidateUserOpTest is Base {
         external
     {
         // Create account with ECDSA validator
-        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
         bytes32 _bobKeyHash = keccak256(abi.encodePacked(_bob));
         bytes32[] memory keyHashes = new bytes32[](2);
         keyHashes[0] = _aliceWalletKeyHash;
@@ -914,24 +1079,19 @@ contract ValidateUserOpTest is Base {
             calls
         );
 
-        bytes32 userOpHash = IERC4337Account(account)
-            .getUserOpHashWithoutChainId(userOp);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
-        userOp.signature = abi.encodePacked(
-            _aliceWalletKeyHash,
-            abi.encodePacked(r, s, v)
+        // Use new unified helper to prepare and sign
+        (userOp.signature, ) = _prepareAndSignUserOp(
+            userOp,
+            _alice,
+            _alicePk,
+            account
         );
 
         uint256 missingAccountFunds = 100;
 
-        // Should succeed for removeOwner with chainless nonce
+        // Should fail for removeOwner with chainless nonce
         assertEq(
-            _testValidateUserOp(
-                account,
-                userOp,
-                userOpHash,
-                missingAccountFunds
-            ),
+            _testValidateUserOp(account, userOp, missingAccountFunds),
             Static.SIG_VALIDATION_FAILED,
             "removeOwner should not succeed with chainless nonce"
         );
@@ -941,7 +1101,6 @@ contract ValidateUserOpTest is Base {
         external
     {
         // Create account with ECDSA validator
-        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
         address account = _deployAccountSingleOwner(
             _aliceWalletKeyHash,
             address(ecdsaValidator),
@@ -961,24 +1120,19 @@ contract ValidateUserOpTest is Base {
             calls
         );
 
-        bytes32 userOpHash = IERC4337Account(account)
-            .getUserOpHashWithoutChainId(userOp);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
-        userOp.signature = abi.encodePacked(
-            _aliceWalletKeyHash,
-            abi.encodePacked(r, s, v)
+        // Use new unified helper to prepare and sign
+        (userOp.signature, ) = _prepareAndSignUserOp(
+            userOp,
+            _alice,
+            _alicePk,
+            account
         );
 
         uint256 missingAccountFunds = 100;
 
         // Should return SIG_VALIDATION_FAILED for unsupported selector
         assertEq(
-            _testValidateUserOp(
-                account,
-                userOp,
-                userOpHash,
-                missingAccountFunds
-            ),
+            _testValidateUserOp(account, userOp, missingAccountFunds),
             Static.SIG_VALIDATION_FAILED,
             "Should return validation failed for unsupported selector with chainless nonce"
         );
@@ -988,7 +1142,6 @@ contract ValidateUserOpTest is Base {
         external
     {
         // Create account with ECDSA validator
-        bytes32 _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
         address account = _deployAccountSingleOwner(
             _aliceWalletKeyHash,
             address(ecdsaValidator),
@@ -1019,26 +1172,173 @@ contract ValidateUserOpTest is Base {
             calls
         );
 
-        bytes32 userOpHash = IERC4337Account(account)
-            .getUserOpHashWithoutChainId(userOp);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, userOpHash);
-        userOp.signature = abi.encodePacked(
-            _aliceWalletKeyHash,
-            abi.encodePacked(r, s, v)
+        // Use new unified helper to prepare and sign
+        (userOp.signature, ) = _prepareAndSignUserOp(
+            userOp,
+            _alice,
+            _alicePk,
+            account
         );
 
         uint256 missingAccountFunds = 100;
 
         // Should succeed with all supported selectors
         assertEq(
-            _testValidateUserOp(
-                account,
-                userOp,
-                userOpHash,
-                missingAccountFunds
-            ),
+            _testValidateUserOp(account, userOp, missingAccountFunds),
             0,
             "Multiple supported selectors should succeed with chainless nonce"
+        );
+    }
+
+    // ============ ChainId Replay Protection Tests ============
+
+    function test_validateUserOp_with_chainId_prevents_replay_across_chains()
+        external
+    {
+        // Test that normal mode (with chainId) prevents replay attacks across chains
+        address account = _aliceWallet;
+        uint256 missingAccountFunds = 0;
+
+        // Create a normal UserOp (not chainless)
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _bob, value: 0.1 ether, data: ""});
+
+        PackedUserOperation memory userOp;
+        userOp.sender = account;
+        userOp.nonce = 0; // Normal nonce (not chainless)
+        userOp.callData = abi.encodeCall(ISmartWallet.execute, (calls));
+
+        // Get hash on chain 1
+        vm.chainId(1);
+        bytes32 userOpHashChain1 = IEntryPoint(ENTRYPOINT_ADDRESS)
+            .getUserOpHash(userOp);
+
+        // Create signature for chain 1
+        userOp.signature = _constructUserOpSignature(
+            userOp,
+            _alice,
+            _alicePk,
+            userOpHashChain1,
+            account
+        );
+
+        vm.deal(account, 1 ether);
+
+        // Validate on chain 1 - should succeed
+        uint256 result1 = _testValidateUserOp(
+            address(account),
+            userOp,
+            userOpHashChain1,
+            missingAccountFunds
+        );
+        assertEq(result1, 0, "Should succeed on chain 1");
+
+        // Switch to chain 2
+        vm.chainId(2);
+
+        // Get hash on chain 2 (should be different due to chainId)
+        bytes32 userOpHashChain2 = IEntryPoint(ENTRYPOINT_ADDRESS)
+            .getUserOpHash(userOp);
+
+        // The hashes should be different
+        assertTrue(
+            userOpHashChain1 != userOpHashChain2,
+            "Hashes should differ across chains"
+        );
+
+        // Try to use the same signature on chain 2 - should fail
+        uint256 result2 = _testValidateUserOp(
+            address(account),
+            userOp,
+            userOpHashChain2,
+            missingAccountFunds
+        );
+
+        assertEq(
+            result2,
+            Static.SIG_VALIDATION_FAILED,
+            "Should fail on chain 2 with chain 1 signature"
+        );
+    }
+
+    function test_validateUserOp_chainless_mode_allows_replay_across_chains()
+        external
+    {
+        // Test that chainless mode allows the same signature across different chains
+        address account = _aliceWallet;
+        uint256 missingAccountFunds = 0;
+
+        // Create a chainless UserOp
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: account,
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnersManager.addOwner.selector,
+                keccak256("crossChainOwner"),
+                address(ecdsaValidator),
+                0
+            )
+        });
+
+        PackedUserOperation memory userOp;
+        userOp.sender = account;
+        userOp.nonce = Static.CHAIN_LESS_NONCE_KEY << 64; // Chainless nonce
+        userOp.callData = abi.encodeCall(ISmartWallet.execute, (calls));
+
+        // Get hash on chain 1
+        vm.chainId(1);
+        bytes32 userOpHashChain1 = IEntryPoint(ENTRYPOINT_ADDRESS)
+            .getUserOpHash(userOp);
+
+        // Create signature for chainless operation
+        userOp.signature = _constructUserOpSignature(
+            userOp,
+            _alice,
+            _alicePk,
+            userOpHashChain1,
+            account
+        );
+
+        vm.deal(account, 1 ether);
+
+        // Validate on chain 1 - should succeed
+        uint256 result1 = _testValidateUserOp(
+            address(account),
+            userOp,
+            userOpHashChain1,
+            missingAccountFunds
+        );
+        assertEq(result1, 0, "Should succeed on chain 1");
+
+        // Switch to chain 2
+        vm.chainId(2);
+
+        // Get hash on chain 2
+        bytes32 userOpHashChain2 = IEntryPoint(ENTRYPOINT_ADDRESS)
+            .getUserOpHash(userOp);
+
+        // The raw hashes should be different due to chainId
+        assertTrue(
+            userOpHashChain1 != userOpHashChain2,
+            "Raw hashes should still differ across chains"
+        );
+
+        // But chainless mode should process them to be the same
+        // This test may fail if the implementation is incorrect
+        // The same signature should work on chain 2 in chainless mode
+        uint256 result2 = _testValidateUserOp(
+            address(account),
+            userOp,
+            userOpHashChain2,
+            missingAccountFunds
+        );
+
+        // This assertion may fail if getUserOpHashWithoutChainId doesn't work correctly
+        assertEq(
+            result2,
+            0,
+            "Should succeed on chain 2 with the same signature in chainless mode"
         );
     }
 }

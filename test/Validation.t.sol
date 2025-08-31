@@ -28,15 +28,24 @@ contract ValidationTest is Base {
         bytes32 hash = _getValidationTypedHash(_aliceWallet, calls);
         // Use alice's keyHash but bob's signature to create invalid signature
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_bobPk, hash);
-        bytes memory validatorData = abi.encodePacked(aliceKeyHash, r, s, v);
+        uint48 validUntil = 0; // 0 means no expiry
+        // Add validUntil to hash before signing (matching SmartWallet.sol line 141 & 213)
+        bytes32 hashWithValidUntil = keccak256(abi.encode(hash, validUntil));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_bobPk, hashWithValidUntil);
+        bytes memory validatorData = abi.encodePacked(
+            aliceKeyHash,
+            validUntil,
+            r,
+            s,
+            v
+        );
 
         vm.prank(_alice);
         vm.expectRevert(
             abi.encodeWithSelector(Errors.InvalidSignature.selector)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
-            BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+            BatchedCall({calls: calls, nonce: 0}),
             validatorData
         );
 
@@ -48,11 +57,13 @@ contract ValidationTest is Base {
 
         // Use a keyHash that doesn't exist (bob's keyHash, but bob is not a validator)
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
-        bytes32 hash = _getValidationTypedHash(_aliceWallet, calls);
-        bytes memory validatorData = constructValidatorData(
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
             _bob, // Use bob's address for keyHash
             _bobPk, // Use bob's private key for signing
-            hash
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_bob);
@@ -60,7 +71,7 @@ contract ValidationTest is Base {
             abi.encodeWithSelector(Errors.InvalidKeyHash.selector, bobKeyHash)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
-            BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+            BatchedCall({calls: calls, nonce: 0}),
             validatorData
         );
 
@@ -82,12 +93,13 @@ contract ValidationTest is Base {
         );
         _executeRemoveValidator(_aliceWallet, bobKeyHash);
 
-        bytes32 hash = _getValidationTypedHash(_aliceWallet, calls);
-        bytes memory validatorData = constructValidatorData(
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _bob, // Using _bob's address
             _bobPk, // Using _bob's private key
-            hash
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -95,7 +107,7 @@ contract ValidationTest is Base {
             abi.encodeWithSelector(Errors.InvalidKeyHash.selector, bobKeyHash)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
-            BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+            BatchedCall({calls: calls, nonce: 0}),
             validatorData
         );
 
@@ -110,19 +122,20 @@ contract ValidationTest is Base {
         vm.expectEmit();
         emit NonceConsumed(uint192(0), uint64(nonce));
 
-        bytes32 hash = _getValidationTypedHash(_aliceWallet, calls);
-        bytes memory validatorData = constructValidatorData(
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            hash
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _alice, 0);
         ISmartWallet(_aliceWallet).executeWithRelayer(
-            BatchedCall({calls: calls, nonce: 0, expiry: 0}),
+            BatchedCall({calls: calls, nonce: 0}),
             validatorData
         );
 
@@ -140,8 +153,7 @@ contract ValidationTest is Base {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: (uint256(nonceKey) << 64) | uint256(initialNonce),
-            expiry: 0
+            nonce: (uint256(nonceKey) << 64) | uint256(initialNonce)
         });
 
         // Create validatorData with invalid signature
@@ -149,6 +161,7 @@ contract ValidationTest is Base {
         bytes memory invalidSignature = new bytes(65); // All zeros - invalid signature
         bytes memory validatorData = abi.encodePacked(
             aliceKeyHash,
+            uint48(0), // validUntil (0 means no expiry)
             invalidSignature
         );
 
@@ -273,23 +286,28 @@ contract ValidationTest is Base {
     }
 
     function test_executeWithRelayer_reverts_for_expired_batchedCall() public {
-        // Create a BatchedCall that will expire in 1 second
+        // Create a BatchedCall with expiry validation
         Call[] memory calls = constructCallsData();
-        BatchedCall memory batchedCall = BatchedCall({
-            calls: calls,
-            nonce: 0,
-            expiry: uint48(block.timestamp + 1)
-        });
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
 
-        // Sign the BatchedCall
-        bytes32 hash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
+        uint48 validUntil = uint48(block.timestamp + 1);
+
+        // Sign the BatchedCall with validUntil in the hash
+        bytes32 dataHash = BatchedCallLib.hash(
+            batchedCall,
+            validUntil,
+            address(_smartWallet)
         );
-        bytes memory validatorData = constructValidatorData(
-            _aliceWallet,
-            _alice,
-            _alicePk,
-            hash
+        bytes32 hash = ERC712(_aliceWallet).hashTypedData(dataHash);
+
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, hash);
+        bytes memory validatorData = abi.encodePacked(
+            aliceKeyHash,
+            validUntil,
+            r,
+            s,
+            v
         );
 
         // Fast forward time by 2 seconds to make the BatchedCall expired
@@ -297,10 +315,7 @@ contract ValidationTest is Base {
 
         // Should revert with ExpiryPassed error
         vm.expectRevert(
-            abi.encodeWithSelector(
-                Errors.ExpiryPassed.selector,
-                batchedCall.expiry
-            )
+            abi.encodeWithSelector(Errors.ExpiryPassed.selector, validUntil)
         );
         vm.prank(_alice);
         ISmartWallet(_aliceWallet).executeWithRelayer(
@@ -312,21 +327,15 @@ contract ValidationTest is Base {
     function test_executeWithRelayer_allows_zero_expiry_batchedCall() public {
         // Create a BatchedCall with expiry = 0 (never expires)
         Call[] memory calls = constructCallsData();
-        BatchedCall memory batchedCall = BatchedCall({
-            calls: calls,
-            nonce: 0,
-            expiry: 0
-        });
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
 
         // Sign the BatchedCall
-        bytes32 hash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
-        );
-        bytes memory validatorData = constructValidatorData(
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            hash
+            batchedCall,
+            uint48(0)
         );
 
         // Fast forward time by 365 days
@@ -375,21 +384,15 @@ contract ValidationTest is Base {
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _bob, value: 1 ether, data: ""});
 
-        BatchedCall memory batchedCall = BatchedCall({
-            calls: calls,
-            nonce: 0,
-            expiry: 0
-        });
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
 
         // Sign for the ORIGINAL alice wallet (from Base.t.sol)
-        bytes32 hashForAlice = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
-        );
-        bytes memory validatorDataForAlice = constructValidatorData(
+        bytes memory validatorDataForAlice = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            hashForAlice
+            batchedCall,
+            uint48(0)
         );
 
         // Execute on alice's original wallet - should succeed
@@ -420,14 +423,12 @@ contract ValidationTest is Base {
         assertEq(_bob.balance, 1 ether);
 
         // Now create proper signature for the independent wallet
-        bytes32 hashForIndependent = ERC712(independentWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(independentImplementation))
-        );
-        bytes memory validatorDataForIndependent = constructValidatorData(
+        bytes memory validatorDataForIndependent = _constructRelayerSignature(
             independentWallet,
             _alice,
             _alicePk,
-            hashForIndependent
+            batchedCall,
+            uint48(0)
         );
 
         // This should succeed with proper signature
@@ -458,22 +459,16 @@ contract ValidationTest is Base {
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _bob, value: 1 ether, data: ""});
 
-        BatchedCall memory batchedCall = BatchedCall({
-            calls: calls,
-            nonce: 0,
-            expiry: 0
-        });
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
 
         // Sign the BatchedCall for the FIRST wallet (_aliceWallet)
         // Note: The hash includes the wallet address via domain separator
-        bytes32 hash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
-        );
-        bytes memory validatorData = constructValidatorData(
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            hash
+            batchedCall,
+            uint48(0)
         );
 
         // Create a relayer address
@@ -503,14 +498,12 @@ contract ValidationTest is Base {
         assertEq(_bob.balance, 1 ether);
 
         // Now create a proper signature for the second wallet
-        bytes32 hashForSecondWallet = ERC712(secondWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, address(_smartWallet))
-        );
-        bytes memory validatorDataForSecondWallet = constructValidatorData(
+        bytes memory validatorDataForSecondWallet = _constructRelayerSignature(
             secondWallet,
             _alice,
             _alicePk,
-            hashForSecondWallet
+            batchedCall,
+            uint48(0)
         );
 
         // This should succeed because it's properly signed for the second wallet
@@ -539,7 +532,7 @@ contract ValidationTest is Base {
 
         bytes32 hash = keccak256("test");
         bytes memory sig = _signDigest(hash, _bobPk); // Use _bob's private key
-        bytes memory signature = abi.encodePacked(bobKeyHash, sig);
+        bytes memory signature = abi.encodePacked(bobKeyHash, uint48(0), sig);
 
         // Call isValidSignature
         bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
@@ -586,8 +579,17 @@ contract ValidationTest is Base {
     {
         bytes32 hash = keccak256("test");
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
-        bytes memory sig = _signDigest(hash, _alicePk);
-        bytes memory signature = abi.encodePacked(aliceKeyHash, sig);
+        uint48 validUntil = 0; // No expiry
+        bytes memory sig = _signDigestWithValidation(
+            hash,
+            _alicePk,
+            validUntil
+        );
+        bytes memory signature = abi.encodePacked(
+            aliceKeyHash,
+            validUntil,
+            sig
+        );
 
         // Call isValidSignature
         bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
@@ -603,8 +605,13 @@ contract ValidationTest is Base {
     {
         bytes32 hash = keccak256("test");
         bytes32 keyHash = keccak256(abi.encodePacked(_alice));
-        bytes memory sig = _signDigest(hash, _alicePk);
-        bytes memory signature = abi.encodePacked(keyHash, sig);
+        uint48 validUntil = 0; // No expiry
+        bytes memory sig = _signDigestWithValidation(
+            hash,
+            _alicePk,
+            validUntil
+        );
+        bytes memory signature = abi.encodePacked(keyHash, validUntil, sig);
 
         // Call isValidSignature
         bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
@@ -616,19 +623,27 @@ contract ValidationTest is Base {
 
     function test_isValidSignature_for_premit() public view {
         bytes32 hash = keccak256("721 struct data");
+        uint48 validUntil = 0; // No expiry
 
-        // Create bound hash like isValidSignature does
-        bytes32 boundHash = keccak256(
-            abi.encode(bytes32(block.chainid), address(_aliceWallet), hash)
+        // Create bound hash like isValidSignature does with validUntil
+        bytes32 digest = _getIsValidSignatureHash(
+            hash,
+            _aliceWallet,
+            validUntil
         );
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", boundHash));
 
         // Sign the bound digest
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, digest);
 
-        // Signature with keyHash prefix
+        // Signature with keyHash and validUntil prefix
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
-        bytes memory validatorData = abi.encodePacked(aliceKeyHash, r, s, v);
+        bytes memory validatorData = abi.encodePacked(
+            aliceKeyHash,
+            validUntil,
+            r,
+            s,
+            v
+        );
 
         // Call isValidSignature
         bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
@@ -642,10 +657,25 @@ contract ValidationTest is Base {
         bytes32 hash,
         uint256 signerPk
     ) internal view returns (bytes memory) {
-        bytes32 boundHash = keccak256(
-            abi.encode(bytes32(block.chainid), address(_aliceWallet), hash)
+        // Note: Using validUntil = 0 for backwards compatibility
+        bytes32 digest = _getIsValidSignatureHash(hash, _aliceWallet, 0);
+
+        // Sign the digest
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
+
+        return abi.encodePacked(r, s, v);
+    }
+
+    function _signDigestWithValidation(
+        bytes32 hash,
+        uint256 signerPk,
+        uint48 validUntil
+    ) internal view returns (bytes memory) {
+        bytes32 digest = _getIsValidSignatureHash(
+            hash,
+            _aliceWallet,
+            validUntil
         );
-        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", boundHash));
 
         // Sign the digest
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
@@ -657,9 +687,13 @@ contract ValidationTest is Base {
         address account,
         BatchedCall memory batchedCall
     ) internal view returns (bytes32) {
+        // _getExecuteWithRelayerHash will automatically use hashTypedDataSansChainId
+        // when the nonce has CHAIN_LESS_NONCE_KEY
         return
-            ERC712(account).hashTypedDataSansChainId(
-                BatchedCallLib.hash(batchedCall, address(_smartWallet))
+            _getExecuteWithRelayerHash(
+                batchedCall,
+                0, // validUntil = 0 (no expiry)
+                account
             );
     }
 
@@ -690,19 +724,15 @@ contract ValidationTest is Base {
         uint256 chainlessNonce = Static.CHAIN_LESS_NONCE_KEY << 64; // nonce key = 196, sequence = 0
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: chainlessNonce,
-            expiry: 0
+            nonce: chainlessNonce
         });
 
-        bytes32 hash = _getValidationTypedHashSansChainId(
-            _aliceWallet,
-            batchedCall
-        );
-        bytes memory validatorData = constructValidatorData(
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            hash
+            batchedCall,
+            uint48(0)
         );
 
         // Should succeed with chainless nonce for addOwner
@@ -758,19 +788,15 @@ contract ValidationTest is Base {
         uint256 chainlessNonce = Static.CHAIN_LESS_NONCE_KEY << 64;
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: chainlessNonce,
-            expiry: 0
+            nonce: chainlessNonce
         });
 
-        bytes32 hash = _getValidationTypedHashSansChainId(
-            _aliceWallet,
-            batchedCall
-        );
-        bytes memory validatorData = constructValidatorData(
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            hash
+            batchedCall,
+            uint48(0)
         );
 
         // Should not succeed with chainless nonce for updateOwner
@@ -819,19 +845,15 @@ contract ValidationTest is Base {
         uint256 chainlessNonce = Static.CHAIN_LESS_NONCE_KEY << 64;
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: chainlessNonce,
-            expiry: 0
+            nonce: chainlessNonce
         });
 
-        bytes32 hash = _getValidationTypedHashSansChainId(
-            _aliceWallet,
-            batchedCall
-        );
-        bytes memory validatorData = constructValidatorData(
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            hash
+            batchedCall,
+            uint48(0)
         );
 
         // Should NOT succeed with chainless nonce for removeOwner
@@ -858,19 +880,15 @@ contract ValidationTest is Base {
         uint256 chainlessNonce = Static.CHAIN_LESS_NONCE_KEY << 64;
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: chainlessNonce,
-            expiry: 0
+            nonce: chainlessNonce
         });
 
-        bytes32 hash = _getValidationTypedHashSansChainId(
-            _aliceWallet,
-            batchedCall
-        );
-        bytes memory validatorData = constructValidatorData(
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            hash
+            batchedCall,
+            uint48(0)
         );
 
         // Should revert with InvalidNonceKey for unsupported selector
@@ -927,19 +945,15 @@ contract ValidationTest is Base {
         uint256 chainlessNonce = Static.CHAIN_LESS_NONCE_KEY << 64;
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: chainlessNonce,
-            expiry: 0
+            nonce: chainlessNonce
         });
 
-        bytes32 hash = _getValidationTypedHashSansChainId(
-            _aliceWallet,
-            batchedCall
-        );
-        bytes memory validatorData = constructValidatorData(
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            hash
+            batchedCall,
+            uint48(0)
         );
 
         // Should fail because it mixes supported and unsupported selectors
@@ -975,19 +989,15 @@ contract ValidationTest is Base {
         uint256 chainlessNonce = Static.CHAIN_LESS_NONCE_KEY << 64;
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: chainlessNonce,
-            expiry: 0
+            nonce: chainlessNonce
         });
 
-        bytes32 hash = _getValidationTypedHashSansChainId(
-            _aliceWallet,
-            batchedCall
-        );
-        bytes memory validatorData = constructValidatorData(
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            hash
+            batchedCall,
+            uint48(0)
         );
 
         // Should succeed with chainless nonce for upgradeToAndCall
@@ -1079,19 +1089,15 @@ contract ValidationTest is Base {
         uint256 chainlessNonce = Static.CHAIN_LESS_NONCE_KEY << 64;
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: chainlessNonce,
-            expiry: 0
+            nonce: chainlessNonce
         });
 
-        bytes32 hash = _getValidationTypedHashSansChainId(
-            _aliceWallet,
-            batchedCall
-        );
-        bytes memory validatorData = constructValidatorData(
+        bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
             _alicePk,
-            hash
+            batchedCall,
+            uint48(0)
         );
 
         // Should fail because updateOwner and removeOwner are not supported for chainless nonce

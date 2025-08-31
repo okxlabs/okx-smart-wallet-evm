@@ -16,7 +16,8 @@ import {Errors} from "./libraries/Errors.sol";
 import {Static} from "./libraries/Static.sol";
 import {IHook} from "./interfaces/IHook.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import {ERC4337Account, PackedUserOperation} from "./ERC4337Account.sol";
+import {ERC4337Account} from "./ERC4337Account.sol";
+import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 import {BatchedCallLib} from "./libraries/BatchedCallLib.sol";
 import {AllowanceManager} from "./AllowanceManager.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
@@ -42,7 +43,7 @@ contract SmartWallet is
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
     using BatchedCallLib for BatchedCall;
 
-    address public immutable IMPLEMENTATION;
+    address public immutable override IMPLEMENTATION;
 
     constructor() {
         IMPLEMENTATION = address(this);
@@ -103,7 +104,8 @@ contract SmartWallet is
     ) external onlyEntryPoint {
         // Parse the keyHash from the signature. This is the keyHash that has been pre-validated as the correct signer over the UserOp data
         // and must be used to check further on-chain permissions over the call execution.
-        bytes32 keyHash = bytes32(userOp.signature[0:32]);
+        // Signature format: pubKeyHash (32) + validUntil (6) + signatures
+        bytes32 keyHash = bytes32(userOp.signature[:32]);
 
         Call[] calldata calls = DecodeLib.decodeCalls(userOp.callData[4:]);
 
@@ -114,22 +116,26 @@ contract SmartWallet is
     /// @dev
     /// 1) The validator must be previously registered and the validation data must be valid
     /// 2) Validator is looked up from keyHash in validatorData
-    /// @param batchedCall BatchedCall struct containing calls, nonce, and expiry
-    /// @param validatorData Encoded data containing keyHash and signature: pubkeyHash + signatures
+    /// @param batchedCall BatchedCall struct containing calls and nonce
+    /// @param validatorData Encoded data containing keyHash and signature: pubkeyHash + validUntil (6 bytes) + signatures
     function executeWithRelayer(
         BatchedCall calldata batchedCall,
         bytes calldata validatorData
     ) external {
+        // Extract validation components from new format
+        // Format: pubkeyHash (32) + validUntil (6) + signatures
+        bytes32 pubKeyHash = bytes32(validatorData[:32]);
+        uint48 validUntil = uint48(bytes6(validatorData[32:38]));
+
         // Check transaction expiry
-        if (_isExpired(batchedCall.expiry))
-            revert Errors.ExpiryPassed(batchedCall.expiry);
+        if (_isExpired(validUntil)) revert Errors.ExpiryPassed(validUntil);
 
         // Validate and update nonce
         if (!validateAndUpdateNonce(batchedCall.nonce))
             revert Errors.InvalidNonce(batchedCall.nonce);
 
         uint256 nonceKey = batchedCall.nonce >> 64;
-        bytes32 dataHash = batchedCall.hash(IMPLEMENTATION);
+        bytes32 dataHash = batchedCall.hash(validUntil, IMPLEMENTATION);
 
         if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
             // Validate all calls are allowed to skip chain ID validation
@@ -146,8 +152,7 @@ contract SmartWallet is
             dataHash = hashTypedData(dataHash);
         }
 
-        // Extract pubKeyHash and validate validator
-        bytes32 pubKeyHash = bytes32(validatorData[:32]);
+        // Validate validator
         address validator = getVerifiedValidator(pubKeyHash);
         if (validator == address(0)) revert Errors.InvalidKeyHash(pubKeyHash);
 
@@ -157,7 +162,7 @@ contract SmartWallet is
                 validator,
                 pubKeyHash,
                 dataHash,
-                validatorData[32:]
+                validatorData[38:]
             )
         ) revert Errors.InvalidSignature();
 
@@ -175,17 +180,22 @@ contract SmartWallet is
     /// 1) If the simulation fails during validation or the sponsor call, those other errors bubble up directly instead.
     /// 2) "Successful simulation" means both validation and the sponsorship call passed.
     ///    Any failure in the user's batch calls is then captured in `errorData` and surfaced inside the `SimulateExecution` revert.
-    /// @param batchedCall BatchedCall struct containing calls, nonce, and expiry
+    /// @param batchedCall BatchedCall struct containing calls and nonce
     /// @param validator Validator address intended to be used for validation during execution
-    /// @param validatorData Encoded data containing keyHash and signature: abi.encodePacked(keyHash, signature)
+    /// @param validatorData Encoded data containing keyHash and signature: pubkeyHash + validUntil (6 bytes) + signatures
     function simulateExecuteWithRelayer(
         BatchedCall calldata batchedCall,
         address validator,
         bytes calldata validatorData
     ) external {
+        // Extract validation components from new format
+        // Format: pubkeyHash (32) + validUntil (6) + signatures
+        bytes32 pubKeyHash = bytes32(validatorData[:32]);
+        uint48 validUntil = uint48(bytes6(validatorData[32:38]));
+
         // Check transaction expiry
-        if (_isExpired(batchedCall.expiry)) {
-            // revert Errors.ExpiryPassed(batchedCall.expiry);
+        if (_isExpired(validUntil)) {
+            // revert Errors.ExpiryPassed(validUntil);
         }
 
         // Validate and update nonce
@@ -194,7 +204,7 @@ contract SmartWallet is
         }
 
         uint256 nonceKey = batchedCall.nonce >> 64;
-        bytes32 dataHash = batchedCall.hash(IMPLEMENTATION);
+        bytes32 dataHash = batchedCall.hash(validUntil, IMPLEMENTATION);
 
         if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
             // Validate all calls are allowed to skip chain ID validation
@@ -211,9 +221,6 @@ contract SmartWallet is
             dataHash = hashTypedData(dataHash);
         }
 
-        // Extract pubKeyHash and validate validator
-        bytes32 pubKeyHash = bytes32(validatorData[:32]);
-
         address mockValidator = getVerifiedValidator(pubKeyHash);
         // Use mockValidator to avoid unused variable warning since it is only used for gas measurement
         mockValidator;
@@ -228,7 +235,7 @@ contract SmartWallet is
                 validator,
                 pubKeyHash,
                 dataHash,
-                validatorData[32:]
+                validatorData[38:]
             )
         ) {
             // revert Errors.InvalidSignature();
@@ -287,12 +294,15 @@ contract SmartWallet is
     ) external onlyEntryPoint returns (uint256 validationData) {
         _payPrefund(missingAccountFunds);
 
-        bytes32 pubKeyHash = bytes32(userOp.signature[0:32]);
+        // Extract validation components from signature
+        // Signature format: pubKeyHash (32) + validUntil (6) + signatures
+        bytes32 pubKeyHash = bytes32(userOp.signature[:32]);
+        uint48 validUntil = uint48(bytes6(userOp.signature[32:38]));
+
         address validator = getVerifiedValidator(pubKeyHash);
         if (validator == address(0)) return Static.SIG_VALIDATION_FAILED;
 
         uint256 nonceKey = userOp.nonce >> 64;
-
         if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
             // Decode calls from userOp.callData
             Call[] calldata calls = DecodeLib.decodeCalls(userOp.callData[4:]);
@@ -310,15 +320,22 @@ contract SmartWallet is
             userOpHash = getUserOpHashWithoutChainId(userOp);
         }
 
+        // Add validUntil and IMPLEMENTATION to hash after chainless processing
+        userOpHash = keccak256(
+            abi.encode(userOpHash, validUntil, IMPLEMENTATION)
+        );
+
         if (
             !_validateSignature(
                 validator,
                 pubKeyHash,
                 userOpHash,
-                userOp.signature[32:]
+                userOp.signature[38:]
             )
         ) return Static.SIG_VALIDATION_FAILED;
-        return validationData;
+
+        // Return the validation data in EntryPoint-compatible format
+        return uint256(validUntil) << 160;
     }
 
     /// @notice Implements EIP-1271 signature validation standard
@@ -347,26 +364,37 @@ contract SmartWallet is
             if (recovered == address(this)) return Static.MAGIC_VALUE;
         }
 
-        // Extract pubKeyHash and signature from the input
-        if (signature.length > 32) {
+        // Extract pubKeyHash, validUntil and signature from the input
+        // Format: pubKeyHash (32) + validUntil (6) + signatures[64/65 bytes]
+        if (signature.length > 65) {
             bytes32 pubKeyHash = bytes32(signature[:32]);
+            uint48 validUntil = uint48(bytes6(signature[32:38]));
 
-            // Create bound hash for EIP-1271 validation
-            bytes32 boundHash = keccak256(
-                abi.encode(bytes32(block.chainid), address(this), _hash)
-            );
-            bytes32 digest = keccak256(abi.encodePacked("\x19\x01", boundHash));
+            // Check expiry
+            if (_isExpired(validUntil)) return Static.INVALID_VALUE;
 
             // Use _validateSignature with calldata signature directly
             address validator = getVerifiedValidator(pubKeyHash);
             if (validator == address(0)) return Static.INVALID_VALUE;
+
+            // Create bound hash for EIP-1271 validation with validUntil
+            bytes32 boundHash = keccak256(
+                abi.encode(
+                    bytes32(block.chainid),
+                    address(this),
+                    _hash,
+                    validUntil,
+                    IMPLEMENTATION
+                )
+            );
+            bytes32 digest = keccak256(abi.encodePacked("\x19\x01", boundHash));
 
             return
                 _validateSignature(
                     validator,
                     pubKeyHash,
                     digest,
-                    signature[32:]
+                    signature[38:]
                 )
                     ? Static.MAGIC_VALUE
                     : Static.INVALID_VALUE;

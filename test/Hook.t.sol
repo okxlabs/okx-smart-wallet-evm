@@ -170,13 +170,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -415,13 +417,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -452,13 +456,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -489,13 +495,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -529,13 +537,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -566,13 +576,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -601,13 +613,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -640,13 +654,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -669,13 +685,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -697,13 +715,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -728,13 +748,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -755,13 +777,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -799,13 +823,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -838,13 +864,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -883,13 +911,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -930,13 +960,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -976,13 +1008,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -1011,13 +1045,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -1037,13 +1073,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -1067,13 +1105,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -1104,13 +1144,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall1 = BatchedCall({
             calls: calls1,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData1 = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls1)
+        bytes memory validatorData1 = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall1,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -1134,13 +1176,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall2 = BatchedCall({
             calls: calls2,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData2 = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls2)
+        bytes memory validatorData2 = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall2,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -1177,13 +1221,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory setupBatchedCall = BatchedCall({
             calls: setupCalls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory setupValidatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, setupCalls)
+        bytes memory setupValidatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            setupBatchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -1214,13 +1260,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);
@@ -1262,13 +1310,15 @@ contract HookTest is Base {
         // Use executeWithRelayer to specify the correct keyHash
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: _getNonce(_aliceWallet),
-            expiry: 0
+            nonce: _getNonce(_aliceWallet)
         });
 
-        bytes memory validatorData = abi.encodePacked(
-            aliceKeyHash,
-            constructSignature(_aliceWallet, _alicePk, calls)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
 
         vm.prank(_alice);

@@ -59,7 +59,7 @@ contract InitializationTest is Base {
         vm.prank(_bob);
         bytes32[] memory keyHashes = new bytes32[](2);
         keyHashes[0] = keccak256(abi.encodePacked(_alice));
-        keyHashes[1] = keccak256(abi.encodePacked(_bob)); // _bob 本身就是 EOA
+        keyHashes[1] = keccak256(abi.encodePacked(_bob)); // _bob is an EOA
         address[] memory validators = new address[](2);
         validators[0] = address(_ecdsaValidator);
         validators[1] = address(_ecdsaValidator);
