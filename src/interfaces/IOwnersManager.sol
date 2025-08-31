@@ -3,8 +3,8 @@ pragma solidity ^0.8.29;
 
 interface IOwnersManager {
     // EVENTS
-    event OwnerAdded(address validator);
-    event OwnerRemoved(bytes32 keyHash);
+    event OwnerAdded(bytes32 keyHash, address validator);
+    event OwnerRemoved(bytes32 keyHash, address validator);
     event OwnerUpdated(bytes32 keyHash, address newValidator);
 
     // Public mappings (auto-generated getters)

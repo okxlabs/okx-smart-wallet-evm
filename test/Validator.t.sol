@@ -61,8 +61,8 @@ contract ValidatorTest is Base {
     PasskeyValidator internal externalPasskeyValidator;
     MockValidator internal mockValidator;
 
-    event OwnerAdded(address validator);
-    event OwnerRemoved(bytes32 keyHash);
+    event OwnerAdded(bytes32 keyHash, address validator);
+    event OwnerRemoved(bytes32 keyHash, address validator);
     event OwnerUpdated(bytes32 keyHash, address newValidator);
     error FailedDeployment();
 
@@ -192,10 +192,10 @@ contract ValidatorTest is Base {
 
         // Expect owner added event
         vm.expectEmit();
-        emit OwnerAdded(charlieValidator);
+        bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
+        emit OwnerAdded(charlieKeyHash, charlieValidator);
 
         // Deploy and add validator using the helper
-        bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
         _addOwnerToAccount(
             _alice,
             _aliceWallet,
@@ -854,7 +854,7 @@ contract ValidatorTest is Base {
 
         // Should succeed
         vm.expectEmit(true, true, true, true);
-        emit OwnerRemoved(keyHash);
+        emit OwnerRemoved(keyHash, Static.ECDSA_VALIDATOR_ADDRESS);
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, signature);
 
         // Verify validator is removed
@@ -903,7 +903,7 @@ contract ValidatorTest is Base {
 
         // Should succeed even though validator doesn't exist (idempotent behavior)
         vm.expectEmit(true, true, true, true);
-        emit OwnerRemoved(nonExistentKeyHash);
+        emit OwnerRemoved(nonExistentKeyHash, address(0));
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, signature);
 
         // Verify the validator still doesn't exist (no-op)

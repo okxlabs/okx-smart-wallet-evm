@@ -61,7 +61,7 @@ abstract contract OwnersManager is IOwnersManager {
         // Store validator with settings
         _setValidatorWithSettings(keyHash, validator, settings);
 
-        emit OwnerAdded(validator);
+        emit OwnerAdded(keyHash, validator);
     }
 
     /// @notice Updates an existing validator's address and/or settings
@@ -93,8 +93,9 @@ abstract contract OwnersManager is IOwnersManager {
     /// @dev Only callable by the wallet owner
     /// @param keyHash The public key hash to remove
     function removeOwner(bytes32 keyHash) external onlySelf {
+        emit OwnerRemoved(keyHash, ownerValidators[keyHash]);
+
         _removeValidator(keyHash);
-        emit OwnerRemoved(keyHash);
     }
 
     // ============ External View Functions (Interface Implementation) ============
