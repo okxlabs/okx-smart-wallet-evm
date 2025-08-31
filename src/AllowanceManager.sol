@@ -89,10 +89,7 @@ abstract contract AllowanceManager is IAllowanceManager, OwnersManager {
 
         // Update allowance
         if (currentAllowance < type(uint256).max) {
-            uint256 newAllowance;
-            unchecked {
-                newAllowance = currentAllowance - amount;
-            }
+            uint256 newAllowance = currentAllowance - amount;
             tokenAllowance[Static.NATIVE_ETH][msg.sender] = newAllowance;
             emit NativeAllowanceUpdated(msg.sender, newAllowance);
         }
@@ -122,10 +119,7 @@ abstract contract AllowanceManager is IAllowanceManager, OwnersManager {
 
         // Update allowance
         if (currentAllowance < type(uint256).max) {
-            uint256 newAllowance;
-            unchecked {
-                newAllowance = currentAllowance - amount;
-            }
+            uint256 newAllowance = currentAllowance - amount;
             tokenAllowance[token][msg.sender] = newAllowance;
             emit TokenAllowanceUpdated(token, msg.sender, newAllowance);
         }
