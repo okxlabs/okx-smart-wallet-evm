@@ -5,7 +5,7 @@ import {Call} from "./Types.sol";
 
 abstract contract ExecuteManager {
     event ExecuteSuccessEvent(
-        bytes32 indexed callHash,
+        bytes32 indexed intentHash,
         address sender,
         uint256 nonce
     );

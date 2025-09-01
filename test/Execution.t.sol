@@ -207,13 +207,18 @@ contract ExecutionTest is Base {
 
         uint256 gasStart = gasleft();
 
-        vm.prank(_bob);
+        vm.startPrank(_bob);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
+        emit ExecuteSuccessEvent(
+            _getExecuteWithRelayerHash(batchedCall, 0, _aliceWallet),
+            _bob,
+            0
+        );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
         );
+        vm.stopPrank();
 
         uint256 gasEnd = gasleft();
         console.log("gas used", gasStart - gasEnd);
@@ -241,13 +246,18 @@ contract ExecutionTest is Base {
             uint48(0)
         );
 
-        vm.prank(_alice);
+        vm.startPrank(_alice);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _alice, 0);
+        emit ExecuteSuccessEvent(
+            _getExecuteWithRelayerHash(batchedCall, 0, charlieWallet),
+            _alice,
+            0
+        );
         ISmartWallet(charlieWallet).executeWithRelayer(
             batchedCall,
             validatorData
         );
+        vm.stopPrank();
 
         assertEq(address(_bob).balance, 1 ether);
     }
@@ -299,13 +309,18 @@ contract ExecutionTest is Base {
             batchedCall,
             uint48(0)
         );
-        vm.prank(_bob);
+        vm.startPrank(_bob);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
+        emit ExecuteSuccessEvent(
+            _getExecuteWithRelayerHash(batchedCall, 0, _aliceWallet),
+            _bob,
+            0
+        );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
         );
+        vm.stopPrank();
 
         assertEq(mockToken.balanceOf(_bob), 10);
         assertEq(address(_bob).balance, 1 ether);
@@ -357,13 +372,18 @@ contract ExecutionTest is Base {
             uint48(0)
         );
 
-        vm.prank(_bob);
+        vm.startPrank(_bob);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
+        emit ExecuteSuccessEvent(
+            _getExecuteWithRelayerHash(batchedCall, 0, _aliceWallet),
+            _bob,
+            0
+        );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
         );
+        vm.stopPrank();
 
         assertEq(mockToken.balanceOf(_bob), 10);
         // assertEq(address(_bob).balance, 0 ether);
@@ -438,14 +458,19 @@ contract ExecutionTest is Base {
         );
 
         uint256 initialGas = gasleft();
-        vm.prank(_bob);
+        vm.startPrank(_bob);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(keccak256(abi.encode(mixedCalls)), _bob, 0);
+        emit ExecuteSuccessEvent(
+            _getExecuteWithRelayerHash(batchedCall, 0, _aliceWallet),
+            _bob,
+            0
+        );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
         );
         uint256 gasUsed = initialGas - gasleft();
+        vm.stopPrank();
 
         // Verify all operations succeeded
         assertEq(address(_bob).balance, 0.5 ether);

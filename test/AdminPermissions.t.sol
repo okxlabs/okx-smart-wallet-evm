@@ -151,13 +151,18 @@ contract AdminPermissionsTest is Base {
         );
 
         // Non-admin should be able to make external calls
-        vm.prank(_bob);
+        vm.startPrank(_bob);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(keccak256(abi.encode(externalCalls)), _bob, 0);
+        emit ExecuteSuccessEvent(
+            _getExecuteWithRelayerHash(batchedCall, 0, _aliceWallet),
+            _bob,
+            0
+        );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
         );
+        vm.stopPrank();
 
         // Verify external call succeeded
         assertEq(address(_bob).balance, 1 ether);

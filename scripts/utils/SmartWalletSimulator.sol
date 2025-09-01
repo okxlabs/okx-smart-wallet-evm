@@ -91,8 +91,9 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
         _batchCall(batchedCall.calls, pubKeyHash);
         
         // If we reach here, the call succeeded
+        // Emit success event with the intent hash that the user signed
         emit ExecuteSuccessEvent(
-            keccak256(abi.encode(batchedCall.calls)),
+            dataHash, // This is the intentHash - the hash of the user's execution intent
             msg.sender,
             batchedCall.nonce
         );

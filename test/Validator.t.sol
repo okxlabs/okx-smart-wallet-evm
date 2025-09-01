@@ -228,13 +228,18 @@ contract ValidatorTest is Base {
             uint48(0)
         );
 
-        vm.prank(_bob);
+        vm.startPrank(_bob);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
+        emit ExecuteSuccessEvent(
+            _getExecuteWithRelayerHash(batchedCall, 0, _aliceWallet),
+            _bob,
+            0
+        );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
         );
+        vm.stopPrank();
 
         assertEq(address(_bob).balance, 1 ether);
     }
@@ -1221,13 +1226,18 @@ contract ValidatorTest is Base {
             uint48(0)
         );
 
-        vm.prank(_bob);
+        vm.startPrank(_bob);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
+        emit ExecuteSuccessEvent(
+            _getExecuteWithRelayerHash(batchedCall, 0, _aliceWallet),
+            _bob,
+            0
+        );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
         );
+        vm.stopPrank();
 
         assertEq(address(_bob).balance, 1 ether);
     }
@@ -1261,13 +1271,18 @@ contract ValidatorTest is Base {
             "mock signature data"
         );
 
-        vm.prank(_bob);
+        vm.startPrank(_bob);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _bob, 0);
+        emit ExecuteSuccessEvent(
+            _getExecuteWithRelayerHash(batchedCall, 0, _aliceWallet),
+            _bob,
+            0
+        );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
         );
+        vm.stopPrank();
 
         assertEq(address(_bob).balance, 1 ether);
     }

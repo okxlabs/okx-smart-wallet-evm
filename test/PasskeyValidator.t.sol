@@ -593,10 +593,10 @@ contract PasskeyValidatorTest is Base {
             typedDataHash
         );
 
-        vm.prank(_bob);
+        vm.startPrank(_bob);
         vm.expectEmit(true, true, true, true);
         emit ExecuteSuccessEvent(
-            keccak256(abi.encode(calls)),
+            _getExecuteWithRelayerHash(batchedCall, 0, builtinWallet),
             _bob,
             batchedCall.nonce
         );
@@ -604,6 +604,7 @@ contract PasskeyValidatorTest is Base {
             batchedCall,
             validatorData
         );
+        vm.stopPrank();
 
         assertEq(address(_bob).balance, 1 ether);
     }

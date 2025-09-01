@@ -131,13 +131,22 @@ contract ValidationTest is Base {
             uint48(0)
         );
 
-        vm.prank(_alice);
+        vm.startPrank(_alice);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(keccak256(abi.encode(calls)), _alice, 0);
+        emit ExecuteSuccessEvent(
+            _getExecuteWithRelayerHash(
+                BatchedCall({calls: calls, nonce: 0}),
+                0,
+                _aliceWallet
+            ),
+            _alice,
+            0
+        );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0}),
             validatorData
         );
+        vm.stopPrank();
 
         assertEq(address(_bob).balance, 1 ether);
     }

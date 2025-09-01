@@ -108,7 +108,7 @@ contract Base is Test {
     Call[] internal emptyRelayerCalls;
 
     event ExecuteSuccessEvent(
-        bytes32 indexed callHash,
+        bytes32 indexed intentHash,
         address sender,
         uint256 nonce
     );
