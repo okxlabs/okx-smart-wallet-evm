@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 import {EIP712} from "solady/utils/EIP712.sol";
 
 /// @title EIP712
-contract ERC712 is EIP712 {
+abstract contract ERC712 is EIP712 {
     function hashTypedData(
         bytes32 structHash
     ) public view returns (bytes32 digest) {

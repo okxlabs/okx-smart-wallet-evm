@@ -26,7 +26,7 @@ import {ChainlessLib} from "./libraries/ChainlessLib.sol";
 import {MessageSignLib} from "./libraries/MessageSignLib.sol";
 
 // Do not set any states in this contract
-contract SmartWallet is
+abstract contract SmartWallet is
     ISmartWallet,
     ERC7201,
     ERC4337Account,
@@ -278,9 +278,9 @@ contract SmartWallet is
         // 7702 Post upgrade compatibility: try validate signature for EOA sigs
         // Make sure the _signature can be decoded
         if (signature.length == 65) {
-            bytes32 typedDatahash = hashTypedData(_hash);
+            bytes32 typedDataHash = hashTypedData(_hash);
             (address recovered, , ) = ECDSA.tryRecover(
-                typedDatahash,
+                typedDataHash,
                 signature
             );
             if (recovered == address(this)) return Static.MAGIC_VALUE;
@@ -299,14 +299,14 @@ contract SmartWallet is
             address validator = getVerifiedValidator(pubKeyHash);
             if (validator == address(0)) return Static.INVALID_VALUE;
 
-            bytes32 typedDatahash = hashTypedData(
+            bytes32 typedDataHash = hashTypedData(
                 MessageSignLib.hash(_hash, validUntil, IMPLEMENTATION)
             );
             return
                 _validateSignature(
                     validator,
                     pubKeyHash,
-                    typedDatahash,
+                    typedDataHash,
                     signature[38:]
                 )
                     ? Static.MAGIC_VALUE

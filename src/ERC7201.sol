@@ -4,7 +4,7 @@ pragma solidity ^0.8.29;
 import {IERC7201} from "./interfaces/IERC7201.sol";
 
 /// @title ERC7201
-contract ERC7201 is IERC7201 {
+abstract contract ERC7201 is IERC7201 {
     /// @inheritdoc IERC7201
     function namespaceAndVersion() external pure returns (string memory) {
         return "OKX.SmartWallet.1.0.0";

@@ -28,11 +28,6 @@ contract DeployInit is Script {
         console.log("Deploy factory salt:");
         console.logBytes32(deployFactorySalt);
 
-        string memory smartWalletName = "smart-wallet";
-        string memory smartWalletVersion = "1.0.0";
-        console.log("SmartWallet name: %s", smartWalletName);
-        console.log("SmartWallet version: %s", smartWalletVersion);
-
         // Deploy the contracts using DeployInitHelper
         (
             SmartWallet smartWallet_,
