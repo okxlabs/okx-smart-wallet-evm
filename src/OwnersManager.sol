@@ -5,11 +5,12 @@ import {IOwnersManager} from "./interfaces/IOwnersManager.sol";
 import {Errors} from "./libraries/Errors.sol";
 import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
 import {Static} from "./libraries/Static.sol";
+import {BaseAuthorization} from "./BaseAuthorization.sol";
 
 /// @title OwnersManager
 /// @notice Abstract contract providing owners management functionality for SmartWallet
 /// @dev To be inherited by SmartWallet
-abstract contract OwnersManager is IOwnersManager {
+abstract contract OwnersManager is IOwnersManager, BaseAuthorization {
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
 
     // ============ State Variables ============
@@ -17,14 +18,6 @@ abstract contract OwnersManager is IOwnersManager {
     EnumerableSetLib.Bytes32Set internal _ownerKeys; // Set of all owner keyHashes
     mapping(bytes32 => address) public ownerValidators; // keyHash => validator address for this owner
     mapping(bytes32 => uint256) public ownerSettings; // keyHash => packed settings (isAdmin + expiration + hook)
-    // ============ Modifiers ============
-
-    modifier onlySelf() {
-        if (msg.sender != address(this)) {
-            revert Errors.NotFromSelf();
-        }
-        _;
-    }
 
     // ============ External Functions ============
 
