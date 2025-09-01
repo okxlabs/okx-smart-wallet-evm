@@ -60,7 +60,7 @@ The wallet deployment uses a factory pattern:
 - Compatible with standard AA infrastructure
 
 ## Architecture
-
+ 
 The implementation follows a modular manager-based design:
 
 - `SmartWallet`: Main wallet contract inheriting all managers
