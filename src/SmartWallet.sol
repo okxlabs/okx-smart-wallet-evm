@@ -176,83 +176,6 @@ contract SmartWallet is
         );
     }
 
-    /// @notice Simulate a sponsored transaction, measuring gas costs for validation and execution, then reverts with detailed metrics.
-    /// @dev Always reverts with `Errors.SimulateExecution` once validation and the sponsor call succeed.
-    /// 1) If the simulation fails during validation or the sponsor call, those other errors bubble up directly instead.
-    /// 2) "Successful simulation" means both validation and the sponsorship call passed.
-    ///    Any failure in the user's batch calls is then captured in `errorData` and surfaced inside the `SimulateExecution` revert.
-    /// @param batchedCall BatchedCall struct containing calls and nonce
-    /// @param validator Validator address intended to be used for validation during execution
-    /// @param validatorData Encoded data containing keyHash and signature: pubkeyHash + validUntil (6 bytes) + signatures
-    function simulateExecuteWithRelayer(
-        BatchedCall calldata batchedCall,
-        address validator,
-        bytes calldata validatorData
-    ) external {
-        // Extract validation components from new format
-        // Format: pubkeyHash (32) + validUntil (6) + signatures
-        bytes32 pubKeyHash = bytes32(validatorData[:32]);
-        uint48 validUntil = uint48(bytes6(validatorData[32:38]));
-
-        // Check transaction expiry
-        if (_isExpired(validUntil)) {
-            // revert Errors.ExpiryPassed(validUntil);
-        }
-
-        // Validate and update nonce
-        if (!validateAndUpdateNonce(batchedCall.nonce)) {
-            // revert Errors.InvalidNonce(batchedCall.nonce);
-        }
-
-        uint256 nonceKey = batchedCall.nonce >> 64;
-        bytes32 dataHash = batchedCall.hash(validUntil, IMPLEMENTATION);
-
-        if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
-            // Validate all calls are allowed to skip chain ID validation
-            if (
-                !ChainlessLib.validateChainlessNonceCallData(
-                    batchedCall.calls,
-                    address(this)
-                )
-            ) {
-                // revert Errors.InvalidNonceKey(nonceKey);
-            }
-            dataHash = hashTypedDataSansChainId(dataHash);
-        } else {
-            dataHash = hashTypedData(dataHash);
-        }
-
-        address mockValidator = getVerifiedValidator(pubKeyHash);
-        // Use mockValidator to avoid unused variable warning since it is only used for gas measurement
-        mockValidator;
-
-        if (validator == address(0)) {
-            // revert Errors.InvalidKeyHash(pubKeyHash);
-        }
-
-        // Validate signature
-        if (
-            !_validateSignature(
-                validator,
-                pubKeyHash,
-                dataHash,
-                validatorData[38:]
-            )
-        ) {
-            // revert Errors.InvalidSignature();
-        }
-
-        _batchCall(batchedCall.calls, pubKeyHash);
-
-        emit ExecuteSuccessEvent(
-            keccak256(abi.encode(batchedCall.calls)),
-            msg.sender,
-            batchedCall.nonce
-        );
-
-        revert Errors.SimulateExecution();
-    }
-
     /// @notice Executes multiple contract calls in a single transaction
     /// @dev Reverts if any of the calls fail
     /// @param calls Array of Call structs containing destination address, value, and calldata
@@ -398,4 +321,15 @@ contract SmartWallet is
     function _authorizeUpgrade(
         address
     ) internal view override(UUPSUpgradeable) onlySelf {}
+
+    /// @notice Simulates a transaction by delegating to a simulation contract
+    /// @dev This function delegates the call to a simulation contract that handles the actual simulation logic
+    ///      Useful for dry-run testing of SmartWallet operations
+    /// @dev References EntryPoint's delegateAndRevert function
+    /// @param target The target contract to delegatecall
+    /// @param data The calldata to pass to the target
+    function delegateAndRevert(address target, bytes calldata data) external {
+        (bool success, bytes memory ret) = target.delegatecall(data);
+        revert Errors.DelegateAndRevert(success, ret);
+    }
 }

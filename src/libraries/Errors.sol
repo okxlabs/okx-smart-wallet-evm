@@ -23,7 +23,13 @@ library Errors {
     error InvalidSignature();
 
     // Simulation related
-    error SimulateExecution();
+    error SimulateExecution(
+        uint256 executionGas,
+        uint256 intrinsicGas,
+        uint256 totalGas
+    );
+
+    error DelegateAndRevert(bool success, bytes ret);
 
     error NotEntryPoint();
 

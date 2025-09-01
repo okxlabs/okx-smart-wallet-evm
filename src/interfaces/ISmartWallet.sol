@@ -14,16 +14,12 @@ interface ISmartWallet is IERC165 {
         bytes calldata validatorData
     ) external;
 
-    function simulateExecuteWithRelayer(
-        BatchedCall calldata batchedCall,
-        address validator,
-        bytes calldata validatorData
-    ) external;
-
     function isValidSignature(
         bytes32 hash,
         bytes calldata signature
     ) external view returns (bytes4);
 
     function IMPLEMENTATION() external view returns (address);
+
+    function delegateAndRevert(address target, bytes calldata data) external;
 }
