@@ -4,11 +4,11 @@ pragma solidity ^0.8.23;
 import {Base} from "./Base.t.sol";
 import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
 import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
-import {OwnersManager} from "src/OwnersManager.sol";
+import {OwnerManager} from "src/OwnerManager.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {Errors} from "src/libraries/Errors.sol";
 import {Static} from "src/libraries/Static.sol";
-import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
+import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 import {ERC712} from "src/ERC712.sol";
@@ -83,7 +83,7 @@ contract ValidatorTest is Base {
         address nonOwner = address(0xdead);
 
         // Pack settings
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -109,7 +109,7 @@ contract ValidatorTest is Base {
         address dave = vm.addr(3);
 
         // Pack settings before setting expectRevert
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -135,10 +135,10 @@ contract ValidatorTest is Base {
         bytes32 keyHash = keccak256(abi.encodePacked(_alice));
 
         // Verify Alice has the validator first
-        assertTrue(IOwnersManager(_aliceWallet).hasOwner(keyHash));
+        assertTrue(IOwnerManager(_aliceWallet).hasOwner(keyHash));
 
         // Pack settings before setting expectRevert
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -161,7 +161,7 @@ contract ValidatorTest is Base {
         bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
 
         // Pack settings
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -249,7 +249,7 @@ contract ValidatorTest is Base {
         bytes32 keyHash = keccak256(abi.encodePacked(_alice));
 
         // Pack settings before setting expectRevert
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -278,7 +278,7 @@ contract ValidatorTest is Base {
         uint40 expiration = uint40(block.timestamp + 3600); // 1 hour from now
         bool isAdmin = true;
 
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             isAdmin,
             expiration,
             hookAddress
@@ -298,7 +298,7 @@ contract ValidatorTest is Base {
             uint40 storedExpiration,
             bool storedIsAdmin,
             bool isExpired
-        ) = IOwnersManager(_aliceWallet).getOwnerSettings(keyHash);
+        ) = IOwnerManager(_aliceWallet).getOwnerSettings(keyHash);
 
         assertEq(validator, validatorAddress);
         assertEq(hook, hookAddress);
@@ -312,7 +312,7 @@ contract ValidatorTest is Base {
         address validatorAddress = Static.ECDSA_VALIDATOR_ADDRESS;
         uint40 expiration = uint40(block.timestamp + 1); // Expires in 1 second
 
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             expiration,
             address(0)
@@ -326,7 +326,7 @@ contract ValidatorTest is Base {
         );
 
         // Validator should be valid initially
-        address retrievedValidator = IOwnersManager(_aliceWallet)
+        address retrievedValidator = IOwnerManager(_aliceWallet)
             .ownerValidators(keyHash);
         assertEq(retrievedValidator, validatorAddress);
         assertFalse(_isSignerExpired(_aliceWallet, keyHash));
@@ -336,7 +336,7 @@ contract ValidatorTest is Base {
 
         // Validator should now be expired but ownerValidators still returns the address
         // Only getVerifiedValidator checks expiration
-        retrievedValidator = IOwnersManager(_aliceWallet).ownerValidators(
+        retrievedValidator = IOwnerManager(_aliceWallet).ownerValidators(
             keyHash
         );
         assertEq(retrievedValidator, validatorAddress); // Still returns the address
@@ -349,7 +349,7 @@ contract ValidatorTest is Base {
         address validatorAddress = Static.ECDSA_VALIDATOR_ADDRESS;
         uint40 expiration = uint40(block.timestamp + 100); // Expires in 100 seconds
 
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             expiration,
             address(0)
@@ -363,7 +363,7 @@ contract ValidatorTest is Base {
         );
 
         // Before expiration, getVerifiedValidator should return the validator address
-        address verifiedValidator = IOwnersManager(_aliceWallet)
+        address verifiedValidator = IOwnerManager(_aliceWallet)
             .getVerifiedValidator(keyHash);
         assertEq(
             verifiedValidator,
@@ -372,7 +372,7 @@ contract ValidatorTest is Base {
         );
 
         // Verify the validator exists in ownerValidators mapping
-        address storedValidator = IOwnersManager(_aliceWallet).ownerValidators(
+        address storedValidator = IOwnerManager(_aliceWallet).ownerValidators(
             keyHash
         );
         assertEq(
@@ -385,7 +385,7 @@ contract ValidatorTest is Base {
         vm.warp(block.timestamp + 101);
 
         // After expiration, getVerifiedValidator should return address(0)
-        verifiedValidator = IOwnersManager(_aliceWallet).getVerifiedValidator(
+        verifiedValidator = IOwnerManager(_aliceWallet).getVerifiedValidator(
             keyHash
         );
         assertEq(
@@ -395,7 +395,7 @@ contract ValidatorTest is Base {
         );
 
         // But ownerValidators still returns the validator address (doesn't check expiration)
-        storedValidator = IOwnersManager(_aliceWallet).ownerValidators(keyHash);
+        storedValidator = IOwnerManager(_aliceWallet).ownerValidators(keyHash);
         assertEq(
             storedValidator,
             validatorAddress,
@@ -417,7 +417,7 @@ contract ValidatorTest is Base {
         address validatorAddress = Static.ECDSA_VALIDATOR_ADDRESS;
         uint40 expiration = uint40(block.timestamp + 100); // Expires in 100 seconds
 
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             expiration,
             address(0)
@@ -431,7 +431,7 @@ contract ValidatorTest is Base {
         );
 
         // Before expiration, getVerifiedValidator should return the validator address
-        address verifiedValidator = IOwnersManager(_aliceWallet)
+        address verifiedValidator = IOwnerManager(_aliceWallet)
             .getVerifiedValidator(keyHash);
         assertEq(
             verifiedValidator,
@@ -440,7 +440,7 @@ contract ValidatorTest is Base {
         );
 
         // Verify the validator exists in ownerValidators mapping
-        address storedValidator = IOwnersManager(_aliceWallet).ownerValidators(
+        address storedValidator = IOwnerManager(_aliceWallet).ownerValidators(
             keyHash
         );
         assertEq(
@@ -453,7 +453,7 @@ contract ValidatorTest is Base {
         vm.warp(block.timestamp + 101);
 
         // After expiration, getVerifiedValidator should return address(0)
-        verifiedValidator = IOwnersManager(_aliceWallet).getVerifiedValidator(
+        verifiedValidator = IOwnerManager(_aliceWallet).getVerifiedValidator(
             keyHash
         );
         assertEq(
@@ -463,7 +463,7 @@ contract ValidatorTest is Base {
         );
 
         // But ownerValidators still returns the validator address (doesn't check expiration)
-        storedValidator = IOwnersManager(_aliceWallet).ownerValidators(keyHash);
+        storedValidator = IOwnerManager(_aliceWallet).ownerValidators(keyHash);
         assertEq(
             storedValidator,
             validatorAddress,
@@ -481,7 +481,7 @@ contract ValidatorTest is Base {
         bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
         address validatorAddress = Static.ECDSA_VALIDATOR_ADDRESS;
 
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -497,7 +497,7 @@ contract ValidatorTest is Base {
         // Even after advancing time significantly, validator should remain valid
         vm.warp(block.timestamp + 365 days);
 
-        address retrievedValidator = IOwnersManager(_aliceWallet)
+        address retrievedValidator = IOwnerManager(_aliceWallet)
             .ownerValidators(keyHash);
         assertEq(retrievedValidator, validatorAddress);
         assertFalse(_isSignerExpired(_aliceWallet, keyHash));
@@ -509,7 +509,7 @@ contract ValidatorTest is Base {
         address validatorAddress = Static.ECDSA_VALIDATOR_ADDRESS;
 
         // Add admin validator
-        uint256 adminSettings = OwnersManager(_aliceWallet).packSettings(
+        uint256 adminSettings = OwnerManager(_aliceWallet).packSettings(
             true,
             0,
             address(0)
@@ -529,7 +529,7 @@ contract ValidatorTest is Base {
         bytes32 nonAdminKeyHash = keccak256(abi.encodePacked(_bob));
         address nonAdminValidatorAddress = Static.ECDSA_VALIDATOR_ADDRESS;
 
-        uint256 nonAdminSettings = OwnersManager(_aliceWallet).packSettings(
+        uint256 nonAdminSettings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -551,7 +551,7 @@ contract ValidatorTest is Base {
         bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
         address validatorAddress = Static.ECDSA_VALIDATOR_ADDRESS;
 
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -571,7 +571,7 @@ contract ValidatorTest is Base {
             uint40 expiration,
             bool isAdmin,
             bool isExpired
-        ) = IOwnersManager(_aliceWallet).getOwnerSettings(keyHash);
+        ) = IOwnerManager(_aliceWallet).getOwnerSettings(keyHash);
 
         assertEq(validator, validatorAddress);
         assertEq(hook, address(0)); // Default: no hook
@@ -619,7 +619,7 @@ contract ValidatorTest is Base {
             uint40 charlieExpiration,
             bool charlieIsAdmin,
             bool charlieIsExpired
-        ) = IOwnersManager(newWallet).getOwnerSettings(charlieKeyHash);
+        ) = IOwnerManager(newWallet).getOwnerSettings(charlieKeyHash);
 
         assertEq(charlieValidator, Static.ECDSA_VALIDATOR_ADDRESS);
         assertEq(charlieHook, address(0)); // No hook
@@ -634,7 +634,7 @@ contract ValidatorTest is Base {
             uint40 bobExpiration,
             bool bobIsAdmin,
             bool bobIsExpired
-        ) = IOwnersManager(newWallet).getOwnerSettings(bobKeyHash);
+        ) = IOwnerManager(newWallet).getOwnerSettings(bobKeyHash);
 
         assertEq(bobValidator, Static.ECDSA_VALIDATOR_ADDRESS);
         assertEq(bobHook, address(0)); // No hook
@@ -659,7 +659,7 @@ contract ValidatorTest is Base {
         // No signers should be set
         bytes32 testKeyHash = keccak256(abi.encodePacked(_alice));
         assertEq(
-            IOwnersManager(newWallet).ownerValidators(testKeyHash),
+            IOwnerManager(newWallet).ownerValidators(testKeyHash),
             address(0)
         );
         assertFalse(_isSignerAdmin(newWallet, testKeyHash));
@@ -668,7 +668,7 @@ contract ValidatorTest is Base {
     function test_removeValidator_reverts_for_non_owner() public {
         // First add a validator to remove
         bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -685,7 +685,7 @@ contract ValidatorTest is Base {
         vm.prank(_bob);
         vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
         (bool success, ) = _aliceWallet.call(
-            abi.encodeWithSelector(OwnersManager.removeOwner.selector, keyHash)
+            abi.encodeWithSelector(OwnerManager.removeOwner.selector, keyHash)
         );
         // Note: vm.expectRevert() already validates the call failed with the expected error
         success; // Silence unused variable warning
@@ -694,7 +694,7 @@ contract ValidatorTest is Base {
     function test_removeValidator_reverts_for_non_admin() public {
         // Add a validator first (using admin)
         bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -709,7 +709,7 @@ contract ValidatorTest is Base {
 
         // Add a non-admin signer - use the correct keyHash for _bob's address
         bytes32 nonAdminKeyHash = keccak256(abi.encodePacked(_bob));
-        uint256 nonAdminSettings = OwnersManager(_aliceWallet).packSettings(
+        uint256 nonAdminSettings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -728,7 +728,7 @@ contract ValidatorTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.removeOwner.selector,
+                OwnerManager.removeOwner.selector,
                 keyHash
             )
         });
@@ -757,7 +757,7 @@ contract ValidatorTest is Base {
     function test_addValidator_reverts_for_non_admin() public {
         // Add a non-admin signer - use the correct keyHash for _bob's address
         bytes32 nonAdminKeyHash = keccak256(abi.encodePacked(_bob));
-        uint256 nonAdminSettings = OwnersManager(_aliceWallet).packSettings(
+        uint256 nonAdminSettings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -772,7 +772,7 @@ contract ValidatorTest is Base {
 
         // Create a BatchedCall to add another validator using non-admin signer
         bytes32 newKeyHash = keccak256(abi.encodePacked(_charlie));
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             uint40(0),
             address(0)
@@ -782,7 +782,7 @@ contract ValidatorTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 newKeyHash,
                 Static.ECDSA_VALIDATOR_ADDRESS,
                 settings
@@ -813,7 +813,7 @@ contract ValidatorTest is Base {
     function test_removeValidator_succeeds_for_admin() public {
         // First add a validator to remove
         bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -828,7 +828,7 @@ contract ValidatorTest is Base {
 
         // Verify validator exists
         assertEq(
-            IOwnersManager(_aliceWallet).ownerValidators(keyHash),
+            IOwnerManager(_aliceWallet).ownerValidators(keyHash),
             Static.ECDSA_VALIDATOR_ADDRESS
         );
 
@@ -838,7 +838,7 @@ contract ValidatorTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.removeOwner.selector,
+                OwnerManager.removeOwner.selector,
                 keyHash
             )
         });
@@ -864,7 +864,7 @@ contract ValidatorTest is Base {
 
         // Verify validator is removed
         assertEq(
-            IOwnersManager(_aliceWallet).ownerValidators(keyHash),
+            IOwnerManager(_aliceWallet).ownerValidators(keyHash),
             address(0)
         );
     }
@@ -876,10 +876,10 @@ contract ValidatorTest is Base {
 
         // Verify the validator doesn't exist
         assertEq(
-            IOwnersManager(_aliceWallet).ownerValidators(nonExistentKeyHash),
+            IOwnerManager(_aliceWallet).ownerValidators(nonExistentKeyHash),
             address(0)
         );
-        assertFalse(IOwnersManager(_aliceWallet).hasOwner(nonExistentKeyHash));
+        assertFalse(IOwnerManager(_aliceWallet).hasOwner(nonExistentKeyHash));
 
         // Create a BatchedCall to remove non-existent validator
         Call[] memory calls = new Call[](1);
@@ -887,7 +887,7 @@ contract ValidatorTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.removeOwner.selector,
+                OwnerManager.removeOwner.selector,
                 nonExistentKeyHash
             )
         });
@@ -913,16 +913,16 @@ contract ValidatorTest is Base {
 
         // Verify the validator still doesn't exist (no-op)
         assertEq(
-            IOwnersManager(_aliceWallet).ownerValidators(nonExistentKeyHash),
+            IOwnerManager(_aliceWallet).ownerValidators(nonExistentKeyHash),
             address(0)
         );
-        assertFalse(IOwnersManager(_aliceWallet).hasOwner(nonExistentKeyHash));
+        assertFalse(IOwnerManager(_aliceWallet).hasOwner(nonExistentKeyHash));
     }
 
     function test_updateValidator_succeeds() public {
         // First add a validator to update
         bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -937,12 +937,12 @@ contract ValidatorTest is Base {
 
         // Verify initial validator
         assertEq(
-            IOwnersManager(_aliceWallet).ownerValidators(keyHash),
+            IOwnerManager(_aliceWallet).ownerValidators(keyHash),
             Static.ECDSA_VALIDATOR_ADDRESS
         );
 
         // Create new settings
-        uint256 newSettings = OwnersManager(_aliceWallet).packSettings(
+        uint256 newSettings = OwnerManager(_aliceWallet).packSettings(
             true,
             uint40(block.timestamp + 3600),
             address(0)
@@ -954,7 +954,7 @@ contract ValidatorTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.updateOwner.selector,
+                OwnerManager.updateOwner.selector,
                 keyHash,
                 Static.PASSKEY_VALIDATOR_ADDRESS,
                 newSettings
@@ -982,18 +982,18 @@ contract ValidatorTest is Base {
 
         // Verify validator is updated
         assertEq(
-            IOwnersManager(_aliceWallet).ownerValidators(keyHash),
+            IOwnerManager(_aliceWallet).ownerValidators(keyHash),
             Static.PASSKEY_VALIDATOR_ADDRESS
         );
         assertEq(
-            IOwnersManager(_aliceWallet).ownerSettings(keyHash),
+            IOwnerManager(_aliceWallet).ownerSettings(keyHash),
             newSettings
         );
     }
 
     function test_updateValidator_reverts_for_non_existent_keyHash() public {
         bytes32 nonExistentKeyHash = keccak256(abi.encodePacked("nonexistent"));
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -1005,7 +1005,7 @@ contract ValidatorTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.updateOwner.selector,
+                OwnerManager.updateOwner.selector,
                 nonExistentKeyHash,
                 Static.ECDSA_VALIDATOR_ADDRESS,
                 settings
@@ -1035,7 +1035,7 @@ contract ValidatorTest is Base {
     function test_updateValidator_reverts_for_invalid_validator() public {
         // First add a validator to update
         bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -1048,7 +1048,7 @@ contract ValidatorTest is Base {
             settings
         );
 
-        uint256 updateSettings = OwnersManager(_aliceWallet).packSettings(
+        uint256 updateSettings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -1060,7 +1060,7 @@ contract ValidatorTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.updateOwner.selector,
+                OwnerManager.updateOwner.selector,
                 keyHash,
                 _charlie, // EOA address with no code
                 updateSettings
@@ -1108,10 +1108,10 @@ contract ValidatorTest is Base {
         bytes32 selfKeyHash = keccak256(abi.encodePacked(newWallet));
 
         // This keyHash should NOT be a registered owner
-        assertFalse(IOwnersManager(newWallet).hasOwner(selfKeyHash));
+        assertFalse(IOwnerManager(newWallet).hasOwner(selfKeyHash));
 
         // getVerifiedValidator should return address(0) (no fallback)
-        address validator = IOwnersManager(newWallet).getVerifiedValidator(
+        address validator = IOwnerManager(newWallet).getVerifiedValidator(
             selfKeyHash
         );
         assertEq(validator, address(0));
@@ -1137,10 +1137,10 @@ contract ValidatorTest is Base {
         bytes32 selfKeyHash = keccak256(abi.encodePacked(freshWallet));
 
         // This keyHash should NOT be a registered owner
-        assertFalse(IOwnersManager(freshWallet).hasOwner(selfKeyHash));
+        assertFalse(IOwnerManager(freshWallet).hasOwner(selfKeyHash));
 
         // Without fallback, should return address(0)
-        address validator = IOwnersManager(freshWallet).getVerifiedValidator(
+        address validator = IOwnerManager(freshWallet).getVerifiedValidator(
             selfKeyHash
         );
         assertEq(validator, address(0));
@@ -1152,10 +1152,10 @@ contract ValidatorTest is Base {
             target: freshWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 selfKeyHash,
                 address(_ecdsaValidator),
-                OwnersManager(freshWallet).packSettings(false, 0, address(0))
+                OwnerManager(freshWallet).packSettings(false, 0, address(0))
             )
         });
 
@@ -1175,10 +1175,10 @@ contract ValidatorTest is Base {
         ISmartWallet(freshWallet).executeWithRelayer(batchedCall, signature);
 
         // Now it should be a registered owner
-        assertTrue(IOwnersManager(freshWallet).hasOwner(selfKeyHash));
+        assertTrue(IOwnerManager(freshWallet).hasOwner(selfKeyHash));
 
         // And getVerifiedValidator should return the registered validator
-        address registeredValidator = IOwnersManager(freshWallet)
+        address registeredValidator = IOwnerManager(freshWallet)
             .getVerifiedValidator(selfKeyHash);
         assertEq(registeredValidator, address(_ecdsaValidator));
     }
@@ -1192,7 +1192,7 @@ contract ValidatorTest is Base {
     function test_external_ecdsa_validator_integration() public {
         // Add charlie as validator using external ECDSA validator
         bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -1206,7 +1206,7 @@ contract ValidatorTest is Base {
         );
 
         // Verify validator was added
-        address addedValidator = IOwnersManager(_aliceWallet).ownerValidators(
+        address addedValidator = IOwnerManager(_aliceWallet).ownerValidators(
             charlieKeyHash
         );
         assertEq(addedValidator, address(externalEcdsaValidator));
@@ -1244,7 +1244,7 @@ contract ValidatorTest is Base {
 
     function test_mock_validator_integration_success() public {
         bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -1289,7 +1289,7 @@ contract ValidatorTest is Base {
 
     function test_mock_validator_integration_failure() public {
         bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -1330,7 +1330,7 @@ contract ValidatorTest is Base {
 
     function test_validator_signature_boundaries() public {
         bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -1538,7 +1538,7 @@ contract ValidatorTest is Base {
 
         // Add the reverting validator
         bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -1585,7 +1585,7 @@ contract ValidatorTest is Base {
 
         // Add the mock validator
         bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -1627,7 +1627,7 @@ contract ValidatorTest is Base {
     function test_addOwner_reverts_with_NotFromSelf_for_direct_call() public {
         bytes32 newKeyHash = keccak256(abi.encodePacked(makeAddr("newOwner")));
         address newValidator = Static.ECDSA_VALIDATOR_ADDRESS;
-        uint256 newSettings = OwnersManager(_aliceWallet).packSettings(
+        uint256 newSettings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -1636,7 +1636,7 @@ contract ValidatorTest is Base {
         // Test 1: Direct call from external address should revert with NotFromSelf
         vm.prank(_bob);
         vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
-        OwnersManager(_aliceWallet).addOwner(
+        OwnerManager(_aliceWallet).addOwner(
             newKeyHash,
             newValidator,
             newSettings
@@ -1645,14 +1645,14 @@ contract ValidatorTest is Base {
         // Test 2: Direct call from owner (Alice) should also revert with NotFromSelf
         vm.prank(_alice);
         vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
-        OwnersManager(_aliceWallet).addOwner(
+        OwnerManager(_aliceWallet).addOwner(
             newKeyHash,
             newValidator,
             newSettings
         );
 
         // Verify owner was not added
-        assertFalse(IOwnersManager(_aliceWallet).hasOwner(newKeyHash));
+        assertFalse(IOwnerManager(_aliceWallet).hasOwner(newKeyHash));
     }
 
     function test_updateOwner_reverts_with_NotFromSelf_for_direct_call()
@@ -1660,7 +1660,7 @@ contract ValidatorTest is Base {
     {
         // First add an owner to update (through execute)
         bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -1675,7 +1675,7 @@ contract ValidatorTest is Base {
 
         // Now try to update it directly
         address newValidator = Static.PASSKEY_VALIDATOR_ADDRESS;
-        uint256 newSettings = OwnersManager(_aliceWallet).packSettings(
+        uint256 newSettings = OwnerManager(_aliceWallet).packSettings(
             true,
             0,
             address(0)
@@ -1684,7 +1684,7 @@ contract ValidatorTest is Base {
         // Test 1: Direct call from external address should revert with NotFromSelf
         vm.prank(_bob);
         vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
-        OwnersManager(_aliceWallet).updateOwner(
+        OwnerManager(_aliceWallet).updateOwner(
             keyHash,
             newValidator,
             newSettings
@@ -1693,7 +1693,7 @@ contract ValidatorTest is Base {
         // Test 2: Direct call from owner (Alice) should also revert with NotFromSelf
         vm.prank(_alice);
         vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
-        OwnersManager(_aliceWallet).updateOwner(
+        OwnerManager(_aliceWallet).updateOwner(
             keyHash,
             newValidator,
             newSettings
@@ -1701,7 +1701,7 @@ contract ValidatorTest is Base {
 
         // Verify owner was not updated
         assertEq(
-            IOwnersManager(_aliceWallet).ownerValidators(keyHash),
+            IOwnerManager(_aliceWallet).ownerValidators(keyHash),
             Static.ECDSA_VALIDATOR_ADDRESS
         );
     }

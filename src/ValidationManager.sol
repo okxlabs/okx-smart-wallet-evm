@@ -6,7 +6,7 @@ import {ECDSAValidatorLib} from "./libraries/ECDSAValidatorLib.sol";
 import {PasskeyValidatorLib} from "./libraries/PasskeyValidatorLib.sol";
 import {Static} from "./libraries/Static.sol";
 
-abstract contract ValidateManager {
+abstract contract ValidationManager {
     /// @notice Validates expiry has not passed
     /// @dev Checks if the given expiry timestamp is in the past
     /// @param expiry Unix timestamp expiry

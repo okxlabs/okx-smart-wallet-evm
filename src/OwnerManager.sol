@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.29;
 
-import {IOwnersManager} from "./interfaces/IOwnersManager.sol";
+import {IOwnerManager} from "./interfaces/IOwnerManager.sol";
 import {Errors} from "./libraries/Errors.sol";
 import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
 import {Static} from "./libraries/Static.sol";
 import {BaseAuthorization} from "./BaseAuthorization.sol";
 
-/// @title OwnersManager
+/// @title OwnerManager
 /// @notice Abstract contract providing owners management functionality for SmartWallet
 /// @dev To be inherited by SmartWallet
-abstract contract OwnersManager is IOwnersManager, BaseAuthorization {
+abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
 
     // ============ State Variables ============

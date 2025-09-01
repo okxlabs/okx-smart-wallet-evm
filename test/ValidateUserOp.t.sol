@@ -10,13 +10,13 @@ import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {HelperLib} from "scripts/utils/Helper.sol";
-import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
+import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 import {Static} from "src/libraries/Static.sol";
 import {ERC4337Account} from "src/ERC4337Account.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {Call} from "src/Types.sol";
-import {OwnersManager} from "src/OwnersManager.sol";
+import {OwnerManager} from "src/OwnerManager.sol";
 
 // Mock contract moved from end of file
 contract MockEntryPoint {
@@ -221,10 +221,10 @@ contract ValidateUserOpTest is Base {
             target: account,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 bobKeyHash,
                 address(1),
-                OwnersManager(account).packSettings(false, 0, address(0))
+                OwnerManager(account).packSettings(false, 0, address(0))
             )
         });
 
@@ -261,7 +261,7 @@ contract ValidateUserOpTest is Base {
 
         // Verify bob is not an owner yet
         assertFalse(
-            IOwnersManager(account).hasOwner(bobKeyHash),
+            IOwnerManager(account).hasOwner(bobKeyHash),
             "Bob should not be owner initially"
         );
 
@@ -273,7 +273,7 @@ contract ValidateUserOpTest is Base {
 
         // Verify bob was added as owner
         assertTrue(
-            IOwnersManager(account).hasOwner(bobKeyHash),
+            IOwnerManager(account).hasOwner(bobKeyHash),
             "Bob should be added as owner"
         );
     }
@@ -506,7 +506,7 @@ contract ValidateUserOpTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 _bobKeyHash,
                 address(_ecdsaValidator),
                 0
@@ -563,7 +563,7 @@ contract ValidateUserOpTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 _bobKeyHash,
                 address(_ecdsaValidator),
                 0
@@ -613,7 +613,7 @@ contract ValidateUserOpTest is Base {
         calls[0] = Call({
             target: _aliceWallet,
             value: 0,
-            data: abi.encodeWithSelector(OwnersManager.ownerCount.selector)
+            data: abi.encodeWithSelector(OwnerManager.ownerCount.selector)
         });
 
         userOp.callData = abi.encodeWithSelector(
@@ -959,7 +959,7 @@ contract ValidateUserOpTest is Base {
             target: _aliceWallet, // use existing _aliceWallet account
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 newOwnerKeyHash,
                 address(_ecdsaValidator),
                 0
@@ -1004,7 +1004,7 @@ contract ValidateUserOpTest is Base {
         vm.deal(account, 2 ether);
 
         // Create updateOwner call (make alice admin)
-        uint256 adminSettings = IOwnersManager(account).packSettings(
+        uint256 adminSettings = IOwnerManager(account).packSettings(
             true,
             0,
             address(0)
@@ -1014,7 +1014,7 @@ contract ValidateUserOpTest is Base {
             target: account,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.updateOwner.selector,
+                OwnerManager.updateOwner.selector,
                 _aliceWalletKeyHash,
                 address(ecdsaValidator),
                 adminSettings
@@ -1067,7 +1067,7 @@ contract ValidateUserOpTest is Base {
             target: account,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.removeOwner.selector,
+                OwnerManager.removeOwner.selector,
                 _bobKeyHash
             )
         });
@@ -1159,7 +1159,7 @@ contract ValidateUserOpTest is Base {
             target: account,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 newOwnerKeyHash,
                 address(ecdsaValidator),
                 0
@@ -1274,7 +1274,7 @@ contract ValidateUserOpTest is Base {
             target: account,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 keccak256("crossChainOwner"),
                 address(ecdsaValidator),
                 0

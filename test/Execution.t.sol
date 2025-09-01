@@ -5,10 +5,10 @@ import {Base, MockComplexContract, MockRevertingContract, MockERC20} from "./Bas
 import {Errors} from "src/libraries/Errors.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {console} from "forge-std/console.sol";
-import {OwnersManager} from "src/OwnersManager.sol";
+import {OwnerManager} from "src/OwnerManager.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {Call, BatchedCall} from "src/Types.sol";
-import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
+import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 
 contract ExecutionTest is Base {
     MockERC20 mockToken;
@@ -52,7 +52,7 @@ contract ExecutionTest is Base {
 
         // Add user as validator for complex tests
         bytes32 userKeyHash = keccak256(abi.encodePacked(user));
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false, // adminFlag
             0, // expiration
             address(0) // hook
@@ -168,7 +168,7 @@ contract ExecutionTest is Base {
         bytes32 keyHash = keccak256(abi.encodePacked(testAddress));
 
         // Initially Charlie should not be an owner
-        assertFalse(IOwnersManager(_aliceWallet).hasOwner(keyHash));
+        assertFalse(IOwnerManager(_aliceWallet).hasOwner(keyHash));
 
         // Charlie should not be able to call execute
         vm.prank(_charlie);
@@ -189,7 +189,7 @@ contract ExecutionTest is Base {
         );
 
         // Verify Charlie is now an owner and can execute
-        assertTrue(IOwnersManager(_aliceWallet).hasOwner(keyHash));
+        assertTrue(IOwnerManager(_aliceWallet).hasOwner(keyHash));
         vm.prank(_charlie);
         ISmartWallet(_aliceWallet).execute(calls);
     }
@@ -777,8 +777,8 @@ contract ExecutionTest is Base {
         );
 
         // Verify Bob is now an owner but not admin
-        assertTrue(IOwnersManager(_aliceWallet).hasOwner(bobKeyHash));
-        assertFalse(OwnersManager(_aliceWallet).isAdmin(bobSettings));
+        assertTrue(IOwnerManager(_aliceWallet).hasOwner(bobKeyHash));
+        assertFalse(OwnerManager(_aliceWallet).isAdmin(bobSettings));
 
         // Prepare inner calls that execute will try to run
         Call[] memory innerCalls = new Call[](2);

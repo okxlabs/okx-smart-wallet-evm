@@ -6,7 +6,7 @@ import {Errors} from "src/libraries/Errors.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {InitialOwner} from "src/Types.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
-import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
+import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 
 contract InitializationTest is Base {
     function setUp() public override {
@@ -75,11 +75,11 @@ contract InitializationTest is Base {
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
 
         assertEq(
-            IOwnersManager(_bob).ownerValidators(aliceKeyHash),
+            IOwnerManager(_bob).ownerValidators(aliceKeyHash),
             address(_ecdsaValidator)
         );
         assertEq(
-            IOwnersManager(_bob).ownerValidators(bobKeyHash),
+            IOwnerManager(_bob).ownerValidators(bobKeyHash),
             address(_ecdsaValidator)
         );
     }

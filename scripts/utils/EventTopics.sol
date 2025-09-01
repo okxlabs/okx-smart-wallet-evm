@@ -3,24 +3,24 @@ pragma solidity ^0.8.23;
 
 import "lib/forge-std/src/Script.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
-import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
+import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {IAllowanceManager} from "src/interfaces/IAllowanceManager.sol";
 import {ISmartWalletFactory} from "src/interfaces/ISmartWalletFactory.sol";
-import {ExecuteManager} from "src/ExecuteManager.sol";
+import {ExecutionManager} from "src/ExecutionManager.sol";
 
 /// @title EventTopics
 /// @notice A script for printing the event topics of all contract events
 contract EventTopics is Script {
     function run() external pure {
-        // IOwnersManager events
-        console.log("\n=== IOwnersManager Events ===");
+        // IOwnerManager events
+        console.log("\n=== IOwnerManager Events ===");
         console.log("OwnerAdded:");
-        console.logBytes32(IOwnersManager.OwnerAdded.selector);
+        console.logBytes32(IOwnerManager.OwnerAdded.selector);
         console.log("OwnerRemoved:");
-        console.logBytes32(IOwnersManager.OwnerRemoved.selector);
+        console.logBytes32(IOwnerManager.OwnerRemoved.selector);
         console.log("OwnerUpdated:");
-        console.logBytes32(IOwnersManager.OwnerUpdated.selector);
+        console.logBytes32(IOwnerManager.OwnerUpdated.selector);
 
         // INonceManager events
         console.log("\n=== INonceManager Events ===");
@@ -47,9 +47,9 @@ contract EventTopics is Script {
         console.log("AccountCreated:");
         console.logBytes32(ISmartWalletFactory.AccountCreated.selector);
 
-        // ExecuteManager events
-        console.log("\n=== ExecuteManager Events ===");
+        // ExecutionManager events
+        console.log("\n=== ExecutionManager Events ===");
         console.log("ExecuteSuccessEvent:");
-        console.logBytes32(ExecuteManager.ExecuteSuccessEvent.selector);
+        console.logBytes32(ExecutionManager.ExecuteSuccessEvent.selector);
     }
 }

@@ -64,10 +64,10 @@ The wallet deployment uses a factory pattern:
 The implementation follows a modular manager-based design:
 
 - `SmartWallet`: Main wallet contract inheriting all managers
-- `OwnersManager`: Manages owner registration, settings, and permissions
+- `OwnerManager`: Manages owner registration, settings, and permissions
 - `NonceManager`: Handles nonce validation and management
-- `ValidateManager`: Signature validation with multiple validator types
-- `ExecuteManager`: Low-level call execution functionality
+- `ValidationManager`: Signature validation with multiple validator types
+- `ExecutionManager`: Low-level call execution functionality
 - `AllowanceManager`: Token allowance and spending controls
 - `FallbackHandler`: Token receiving and standard interface support
 

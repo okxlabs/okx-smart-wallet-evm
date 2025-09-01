@@ -4,8 +4,8 @@ pragma solidity ^0.8.23;
 import {Base} from "./Base.t.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
-import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
-import {OwnersManager} from "src/OwnersManager.sol";
+import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
+import {OwnerManager} from "src/OwnerManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 import {Errors} from "src/libraries/Errors.sol";
@@ -78,7 +78,7 @@ contract SmartWalletUpgradeTest is Base {
     function test_upgrade_preserves_owners_through_relayer() public {
         // Add an additional owner before upgrade
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(true, 0, address(0));
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(true, 0, address(0));
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), settings);
         
         // Create upgrade call
@@ -106,8 +106,8 @@ contract SmartWalletUpgradeTest is Base {
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, validatorData);
         
         // Verify owners are preserved after upgrade
-        assertTrue(IOwnersManager(_aliceWallet).hasOwner(keccak256(abi.encodePacked(_alice))));
-        assertTrue(IOwnersManager(_aliceWallet).hasOwner(bobKeyHash));
+        assertTrue(IOwnerManager(_aliceWallet).hasOwner(keccak256(abi.encodePacked(_alice))));
+        assertTrue(IOwnerManager(_aliceWallet).hasOwner(bobKeyHash));
     }
     
     function test_upgrade_preserves_nonce_state_through_relayer() public {
@@ -197,7 +197,7 @@ contract SmartWalletUpgradeTest is Base {
     function test_non_admin_owner_cannot_upgrade_through_relayer() public {
         // Add bob as a non-admin owner
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(false, 0, address(0));
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(0));
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), settings);
         
         // Bob (non-admin) tries to upgrade through executeWithRelayer

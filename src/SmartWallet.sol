@@ -6,10 +6,10 @@ import {ERC7201} from "./ERC7201.sol";
 import {ISmartWallet} from "./interfaces/ISmartWallet.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
-import {OwnersManager} from "./OwnersManager.sol";
+import {OwnerManager} from "./OwnerManager.sol";
 import {NonceManager} from "./NonceManager.sol";
-import {ValidateManager} from "./ValidateManager.sol";
-import {ExecuteManager} from "./ExecuteManager.sol";
+import {ValidationManager} from "./ValidationManager.sol";
+import {ExecutionManager} from "./ExecutionManager.sol";
 import {FallbackHandler} from "./FallbackHandler.sol";
 import {Call, BatchedCall, InitialOwner} from "./Types.sol";
 import {Errors} from "./libraries/Errors.sol";
@@ -30,10 +30,10 @@ abstract contract SmartWallet is
     ISmartWallet,
     ERC7201,
     ERC4337Account,
-    OwnersManager,
+    OwnerManager,
     NonceManager,
-    ValidateManager,
-    ExecuteManager,
+    ValidationManager,
+    ExecutionManager,
     ERC712,
     FallbackHandler,
     Initializable,

@@ -8,7 +8,7 @@ import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {HelperLib} from "scripts/utils/Helper.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
-import {OwnersManager} from "src/OwnersManager.sol";
+import {OwnerManager} from "src/OwnerManager.sol";
 import {InitialOwner} from "src/Types.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
 
@@ -34,7 +34,7 @@ contract IsValidSignatureTest is Base {
         );
 
         // Add PasskeyValidator for Alice's wallet
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             true,
             0,
             address(0)
@@ -454,7 +454,7 @@ contract IsValidSignatureTest is Base {
         // Add validator using _bob to avoid EIP-7702 fallback collision
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
 
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0, // No expiry in storage
             address(0)
@@ -563,7 +563,7 @@ contract IsValidSignatureTest is Base {
         uint256 testPubY = 987654321;
         bytes32 passkeyKeyHash = keccak256(abi.encode([testPubX, testPubY]));
 
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             true,
             0,
             address(0)
@@ -666,7 +666,7 @@ contract IsValidSignatureTest is Base {
         bytes32 passkeyKeyHash = keccak256(abi.encode([testPubX, testPubY]));
         uint40 expiry = uint40(block.timestamp + 1 days);
 
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             expiry,
             address(0)

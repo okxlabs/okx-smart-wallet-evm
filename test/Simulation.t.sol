@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {Base, MockERC20} from "./Base.t.sol";
-import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
+import {Call, BatchedCall} from "src/Types.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {ISmartWalletSimulator} from "src/interfaces/ISmartWalletSimulator.sol";
 import {SmartWalletSimulator} from "../scripts/utils/SmartWalletSimulator.sol";
@@ -11,11 +11,10 @@ import {console} from "forge-std/console.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Static} from "src/libraries/Static.sol";
-import {OwnersManager} from "src/OwnersManager.sol";
+import {OwnerManager} from "src/OwnerManager.sol";
 import {IValidator} from "src/interfaces/IValidator.sol";
 import {ERC712} from "src/ERC712.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
-import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 
 /// @notice Test contract that returns different values for testing delegateAndRevert
 contract TestTarget {
@@ -1002,7 +1001,7 @@ contract SimulationTest is Base {
             target: _aliceWallet, // Call addOwner on the actual wallet being simulated
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 keccak256(
                     abi.encodePacked(
                         address(0x1234567890123456789012345678901234567890)
@@ -1221,7 +1220,7 @@ contract SimulationTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 keccak256(
                     abi.encodePacked(
                         address(0x3333333333333333333333333333333333333333)
@@ -1240,7 +1239,7 @@ contract SimulationTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.updateOwner.selector,
+                OwnerManager.updateOwner.selector,
                 keccak256(abi.encodePacked(_alice)),
                 address(_ecdsaValidator),
                 0 // settings

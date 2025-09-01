@@ -10,7 +10,7 @@ import {SmartWallet} from "src/SmartWallet.sol";
 import {IERC4337Account} from "src/interfaces/IERC4337Account.sol";
 import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
-import {OwnersManager} from "src/OwnersManager.sol";
+import {OwnerManager} from "src/OwnerManager.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 
 /**
@@ -130,7 +130,7 @@ contract ChainlessExecutionTest is Base {
             target: testAccount,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 newOwnerKeyHash,
                 address(_ecdsaValidator),
                 0
@@ -224,7 +224,7 @@ contract ChainlessExecutionTest is Base {
             target: _bob, // Not self - should fail
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 keccak256(abi.encodePacked(address(0x123))),
                 address(_ecdsaValidator),
                 0
@@ -292,7 +292,7 @@ contract ChainlessExecutionTest is Base {
             target: testAccount,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 bobKeyHash,
                 address(_ecdsaValidator),
                 0
@@ -413,7 +413,7 @@ contract ChainlessExecutionTest is Base {
             target: testAccount,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 bobKeyHash,
                 address(_ecdsaValidator),
                 0
@@ -453,7 +453,7 @@ contract ChainlessExecutionTest is Base {
             target: testAccount,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.updateOwner.selector,
+                OwnerManager.updateOwner.selector,
                 aliceKeyHash,
                 address(_ecdsaValidator),
                 adminSettings
@@ -485,7 +485,7 @@ contract ChainlessExecutionTest is Base {
             target: testAccount,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.removeOwner.selector,
+                OwnerManager.removeOwner.selector,
                 keyHash
             )
         });
@@ -542,7 +542,7 @@ contract ChainlessExecutionTest is Base {
             target: testAccount,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 bobKeyHash,
                 address(_ecdsaValidator),
                 0

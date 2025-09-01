@@ -2,8 +2,8 @@
 pragma solidity ^0.8.23;
 
 import {Test} from "forge-std/Test.sol";
-import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
-import {OwnersManager} from "src/OwnersManager.sol";
+import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
+import {OwnerManager} from "src/OwnerManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {OKXSmartWalletEntry} from "src/OKXSmartWalletEntry.sol";
@@ -251,7 +251,7 @@ contract Base is Test {
             target: account,
             value: 0,
             data: abi.encodeWithSelector(
-                IOwnersManager.addOwner.selector,
+                IOwnerManager.addOwner.selector,
                 keyHash,
                 validator,
                 settings
@@ -278,7 +278,7 @@ contract Base is Test {
             target: account,
             value: 0,
             data: abi.encodeWithSelector(
-                IOwnersManager.addOwner.selector,
+                IOwnerManager.addOwner.selector,
                 keyHash,
                 validator,
                 settings
@@ -683,8 +683,8 @@ contract Base is Test {
         address wallet,
         bytes32 keyHash
     ) internal view returns (bool) {
-        uint256 settings = IOwnersManager(wallet).ownerSettings(keyHash);
-        return settings != 0 && IOwnersManager(wallet).isAdmin(settings);
+        uint256 settings = IOwnerManager(wallet).ownerSettings(keyHash);
+        return settings != 0 && IOwnerManager(wallet).isAdmin(settings);
     }
 
     // Helper function to test validateUserOp from EntryPoint's perspective
@@ -729,9 +729,9 @@ contract Base is Test {
         address wallet,
         bytes32 keyHash
     ) internal view returns (bool) {
-        uint256 settings = IOwnersManager(wallet).ownerSettings(keyHash);
+        uint256 settings = IOwnerManager(wallet).ownerSettings(keyHash);
         return
-            settings != 0 && IOwnersManager(wallet).isSettingsExpired(settings);
+            settings != 0 && IOwnerManager(wallet).isSettingsExpired(settings);
     }
 
     // Helper function for tests to get signer expiration
@@ -739,9 +739,9 @@ contract Base is Test {
         address wallet,
         bytes32 keyHash
     ) internal view returns (uint40) {
-        uint256 settings = IOwnersManager(wallet).ownerSettings(keyHash);
+        uint256 settings = IOwnerManager(wallet).ownerSettings(keyHash);
         return
-            settings != 0 ? IOwnersManager(wallet).getExpiration(settings) : 0;
+            settings != 0 ? IOwnerManager(wallet).getExpiration(settings) : 0;
     }
     // Helper function to call removeValidator through execute
     function _executeRemoveValidator(address wallet, bytes32 keyHash) internal {
@@ -750,7 +750,7 @@ contract Base is Test {
             target: wallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.removeOwner.selector,
+                OwnerManager.removeOwner.selector,
                 keyHash
             )
         });

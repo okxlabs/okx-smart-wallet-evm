@@ -4,8 +4,8 @@ pragma solidity ^0.8.23;
 import {Base} from "./Base.t.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
-import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
-import {OwnersManager} from "src/OwnersManager.sol";
+import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
+import {OwnerManager} from "src/OwnerManager.sol";
 
 /**
  * @title AdminPermissionsTest
@@ -26,7 +26,7 @@ contract AdminPermissionsTest is Base {
 
         // Add admin user with admin privileges
         bytes32 adminKeyHash = keccak256(abi.encodePacked(adminUser));
-        uint256 adminSettings = OwnersManager(_aliceWallet).packSettings(
+        uint256 adminSettings = OwnerManager(_aliceWallet).packSettings(
             true, // isAdmin = true
             0,
             address(0)
@@ -41,7 +41,7 @@ contract AdminPermissionsTest is Base {
 
         // Add non-admin user without admin privileges
         bytes32 nonAdminKeyHash = keccak256(abi.encodePacked(nonAdminUser));
-        uint256 nonAdminSettings = OwnersManager(_aliceWallet).packSettings(
+        uint256 nonAdminSettings = OwnerManager(_aliceWallet).packSettings(
             false, // isAdmin = false
             0,
             address(0)
@@ -64,10 +64,10 @@ contract AdminPermissionsTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 keccak256("malicious"),
                 address(_ecdsaValidator),
-                IOwnersManager(_aliceWallet).packSettings(false, 0, address(0))
+                IOwnerManager(_aliceWallet).packSettings(false, 0, address(0))
             )
         });
 
@@ -100,10 +100,10 @@ contract AdminPermissionsTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 keccak256("newValidator"),
                 address(_ecdsaValidator),
-                IOwnersManager(_aliceWallet).packSettings(false, 0, address(0))
+                IOwnerManager(_aliceWallet).packSettings(false, 0, address(0))
             )
         });
 
@@ -129,7 +129,7 @@ contract AdminPermissionsTest is Base {
 
         // Verify the self-call succeeded
         assertTrue(
-            IOwnersManager(_aliceWallet).hasOwner(keccak256("newValidator"))
+            IOwnerManager(_aliceWallet).hasOwner(keccak256("newValidator"))
         );
     }
 
@@ -178,10 +178,10 @@ contract AdminPermissionsTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 newValidatorKeyHash,
                 address(_ecdsaValidator),
-                IOwnersManager(_aliceWallet).packSettings(false, 0, address(0))
+                IOwnerManager(_aliceWallet).packSettings(false, 0, address(0))
             )
         });
 
@@ -204,7 +204,7 @@ contract AdminPermissionsTest is Base {
             validatorData
         );
 
-        assertTrue(IOwnersManager(_aliceWallet).hasOwner(newValidatorKeyHash));
+        assertTrue(IOwnerManager(_aliceWallet).hasOwner(newValidatorKeyHash));
     }
 
     function test_admin_can_remove_validators() public {
@@ -216,7 +216,7 @@ contract AdminPermissionsTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.removeOwner.selector,
+                OwnerManager.removeOwner.selector,
                 nonAdminKeyHash
             )
         });
@@ -240,14 +240,14 @@ contract AdminPermissionsTest is Base {
             validatorData
         );
 
-        assertFalse(IOwnersManager(_aliceWallet).hasOwner(nonAdminKeyHash));
+        assertFalse(IOwnerManager(_aliceWallet).hasOwner(nonAdminKeyHash));
     }
 
     function test_admin_can_update_validator_settings() public {
         bytes32 nonAdminKeyHash = keccak256(abi.encodePacked(nonAdminUser));
 
         // Admin updates non-admin validator to have expiry
-        uint256 newSettings = IOwnersManager(_aliceWallet).packSettings(
+        uint256 newSettings = IOwnerManager(_aliceWallet).packSettings(
             false,
             uint40(block.timestamp + 1 days),
             address(0)
@@ -258,7 +258,7 @@ contract AdminPermissionsTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.updateOwner.selector,
+                OwnerManager.updateOwner.selector,
                 nonAdminKeyHash,
                 address(_ecdsaValidator),
                 newSettings
@@ -285,11 +285,11 @@ contract AdminPermissionsTest is Base {
         );
 
         // Verify settings were updated
-        uint256 updatedSettings = IOwnersManager(_aliceWallet).ownerSettings(
+        uint256 updatedSettings = IOwnerManager(_aliceWallet).ownerSettings(
             nonAdminKeyHash
         );
         assertGt(
-            IOwnersManager(_aliceWallet).getExpiration(updatedSettings),
+            IOwnerManager(_aliceWallet).getExpiration(updatedSettings),
             block.timestamp
         );
     }
@@ -305,10 +305,10 @@ contract AdminPermissionsTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.updateOwner.selector,
+                OwnerManager.updateOwner.selector,
                 adminKeyHash,
                 address(_ecdsaValidator),
-                IOwnersManager(_aliceWallet).packSettings(false, 0, address(0)) // isAdmin = false
+                IOwnerManager(_aliceWallet).packSettings(false, 0, address(0)) // isAdmin = false
             )
         });
 
@@ -337,10 +337,10 @@ contract AdminPermissionsTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 keccak256("shouldFail"),
                 address(_ecdsaValidator),
-                IOwnersManager(_aliceWallet).packSettings(false, 0, address(0))
+                IOwnerManager(_aliceWallet).packSettings(false, 0, address(0))
             )
         });
 
@@ -374,10 +374,10 @@ contract AdminPermissionsTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.updateOwner.selector,
+                OwnerManager.updateOwner.selector,
                 nonAdminKeyHash,
                 address(_ecdsaValidator),
-                IOwnersManager(_aliceWallet).packSettings(true, 0, address(0)) // isAdmin = true
+                IOwnerManager(_aliceWallet).packSettings(true, 0, address(0)) // isAdmin = true
             )
         });
 
@@ -406,10 +406,10 @@ contract AdminPermissionsTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 keccak256("newAdminValidator"),
                 address(_ecdsaValidator),
-                IOwnersManager(_aliceWallet).packSettings(false, 0, address(0))
+                IOwnerManager(_aliceWallet).packSettings(false, 0, address(0))
             )
         });
 
@@ -434,9 +434,7 @@ contract AdminPermissionsTest is Base {
 
         // Verify the self-call succeeded
         assertTrue(
-            IOwnersManager(_aliceWallet).hasOwner(
-                keccak256("newAdminValidator")
-            )
+            IOwnerManager(_aliceWallet).hasOwner(keccak256("newAdminValidator"))
         );
     }
 
@@ -450,10 +448,10 @@ contract AdminPermissionsTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 keccak256("mixedValidator"),
                 address(_ecdsaValidator),
-                IOwnersManager(_aliceWallet).packSettings(false, 0, address(0))
+                IOwnerManager(_aliceWallet).packSettings(false, 0, address(0))
             )
         });
 
@@ -480,7 +478,7 @@ contract AdminPermissionsTest is Base {
         // Verify both calls succeeded
         assertEq(address(_bob).balance, 0.5 ether);
         assertTrue(
-            IOwnersManager(_aliceWallet).hasOwner(keccak256("mixedValidator"))
+            IOwnerManager(_aliceWallet).hasOwner(keccak256("mixedValidator"))
         );
     }
 
@@ -492,10 +490,10 @@ contract AdminPermissionsTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 keccak256("shouldFailValidator"),
                 address(_ecdsaValidator),
-                IOwnersManager(_aliceWallet).packSettings(false, 0, address(0))
+                IOwnerManager(_aliceWallet).packSettings(false, 0, address(0))
             )
         });
 
@@ -523,7 +521,7 @@ contract AdminPermissionsTest is Base {
         // Verify no calls executed (atomic failure)
         assertEq(address(_bob).balance, 0 ether);
         assertFalse(
-            IOwnersManager(_aliceWallet).hasOwner(
+            IOwnerManager(_aliceWallet).hasOwner(
                 keccak256("shouldFailValidator")
             )
         );
@@ -541,7 +539,7 @@ contract AdminPermissionsTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.removeOwner.selector,
+                OwnerManager.removeOwner.selector,
                 aliceKeyHash
             )
         });
@@ -567,7 +565,7 @@ contract AdminPermissionsTest is Base {
         );
 
         // Verify alice was removed but adminUser is still there
-        assertFalse(IOwnersManager(_aliceWallet).hasOwner(aliceKeyHash));
-        assertTrue(IOwnersManager(_aliceWallet).hasOwner(adminKeyHash));
+        assertFalse(IOwnerManager(_aliceWallet).hasOwner(aliceKeyHash));
+        assertTrue(IOwnerManager(_aliceWallet).hasOwner(adminKeyHash));
     }
 }

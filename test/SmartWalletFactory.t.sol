@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {Base} from "./Base.t.sol";
-import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
+import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 
@@ -23,7 +23,7 @@ contract FactoryTest is Base {
         );
 
         assertEq(
-            IOwnersManager(address(wallet)).hasOwner(
+            IOwnerManager(address(wallet)).hasOwner(
                 keccak256(abi.encodePacked(_alice))
             ),
             true
@@ -100,12 +100,12 @@ contract FactoryTest is Base {
 
         // Step 5: Verify the account is properly initialized
         assertTrue(
-            IOwnersManager(deployedAddress).hasOwner(
+            IOwnerManager(deployedAddress).hasOwner(
                 keccak256(abi.encodePacked(_alice))
             )
         );
         assertTrue(
-            IOwnersManager(deployedAddress).hasOwner(
+            IOwnerManager(deployedAddress).hasOwner(
                 keccak256(abi.encodePacked(_bob))
             )
         );
@@ -255,7 +255,7 @@ contract FactoryTest is Base {
 
         // Verify the account still has the original configuration
         assertTrue(
-            IOwnersManager(firstDeployment).hasOwner(
+            IOwnerManager(firstDeployment).hasOwner(
                 keccak256(abi.encodePacked(_alice))
             )
         );

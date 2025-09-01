@@ -6,8 +6,8 @@ import {Errors} from "src/libraries/Errors.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
-import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
-import {OwnersManager} from "src/OwnersManager.sol";
+import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
+import {OwnerManager} from "src/OwnerManager.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 import {Static} from "src/libraries/Static.sol";
 import {ERC712} from "src/ERC712.sol";
@@ -234,7 +234,7 @@ contract ValidationTest is Base {
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         uint40 expiry = uint40(block.timestamp + 1 days);
 
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             expiry,
             address(0)
@@ -269,7 +269,7 @@ contract ValidationTest is Base {
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         uint40 expiry = uint40(block.timestamp + 7 days);
 
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             expiry,
             address(0)
@@ -712,7 +712,7 @@ contract ValidationTest is Base {
     {
         // Create addOwner call
         bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(_bob));
-        uint256 newOwnerSettings = OwnersManager(_aliceWallet).packSettings(
+        uint256 newOwnerSettings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -722,7 +722,7 @@ contract ValidationTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 newOwnerKeyHash,
                 address(_ecdsaValidator),
                 newOwnerSettings
@@ -753,7 +753,7 @@ contract ValidationTest is Base {
 
         // Verify the owner was added
         assertTrue(
-            IOwnersManager(_aliceWallet).hasOwner(newOwnerKeyHash),
+            IOwnerManager(_aliceWallet).hasOwner(newOwnerKeyHash),
             "New owner should be added"
         );
     }
@@ -763,7 +763,7 @@ contract ValidationTest is Base {
     {
         // First add an owner to update
         bytes32 ownerKeyHash = keccak256(abi.encodePacked(_bob));
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -777,7 +777,7 @@ contract ValidationTest is Base {
         );
 
         // Create updateOwner call
-        uint256 newSettings = IOwnersManager(_aliceWallet).packSettings(
+        uint256 newSettings = IOwnerManager(_aliceWallet).packSettings(
             true, // Make admin
             uint40(block.timestamp + 1 days), // Set expiry
             address(0) // No hook
@@ -787,7 +787,7 @@ contract ValidationTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.updateOwner.selector,
+                OwnerManager.updateOwner.selector,
                 ownerKeyHash,
                 address(_ecdsaValidator),
                 newSettings
@@ -827,7 +827,7 @@ contract ValidationTest is Base {
     {
         // First add an owner to remove
         bytes32 ownerKeyHash = keccak256(abi.encodePacked(_bob));
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -846,7 +846,7 @@ contract ValidationTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.removeOwner.selector,
+                OwnerManager.removeOwner.selector,
                 ownerKeyHash
             )
         });
@@ -926,7 +926,7 @@ contract ValidationTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 newOwnerKeyHash,
                 address(_ecdsaValidator),
                 0
@@ -935,7 +935,7 @@ contract ValidationTest is Base {
 
         // updateOwner call (NOT supported for chainless)
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
-        uint256 adminSettings = IOwnersManager(_aliceWallet).packSettings(
+        uint256 adminSettings = IOwnerManager(_aliceWallet).packSettings(
             true, // Make admin
             0, // No expiry
             address(0) // No hook
@@ -944,7 +944,7 @@ contract ValidationTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.updateOwner.selector,
+                OwnerManager.updateOwner.selector,
                 aliceKeyHash,
                 address(_ecdsaValidator),
                 adminSettings
@@ -1040,7 +1040,7 @@ contract ValidationTest is Base {
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
 
         // First add an owner that we can later remove
-        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(0)
@@ -1061,7 +1061,7 @@ contract ValidationTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.addOwner.selector,
+                OwnerManager.addOwner.selector,
                 newOwnerKeyHash2,
                 address(_ecdsaValidator),
                 0 // Default settings
@@ -1069,7 +1069,7 @@ contract ValidationTest is Base {
         });
 
         // 2. updateOwner call (NOT supported for chainless)
-        uint256 adminSettings = IOwnersManager(_aliceWallet).packSettings(
+        uint256 adminSettings = IOwnerManager(_aliceWallet).packSettings(
             true,
             0,
             address(0)
@@ -1078,7 +1078,7 @@ contract ValidationTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.updateOwner.selector,
+                OwnerManager.updateOwner.selector,
                 aliceKeyHash,
                 address(_ecdsaValidator),
                 adminSettings
@@ -1090,7 +1090,7 @@ contract ValidationTest is Base {
             target: _aliceWallet,
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.removeOwner.selector,
+                OwnerManager.removeOwner.selector,
                 newOwnerKeyHash
             )
         });

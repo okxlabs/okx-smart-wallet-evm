@@ -2,7 +2,7 @@
 pragma solidity ^0.8.29;
 
 import {Call} from "../Types.sol";
-import {OwnersManager} from "../OwnersManager.sol";
+import {OwnerManager} from "../OwnerManager.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 
 /// @title ChainlessLib
@@ -19,7 +19,7 @@ library ChainlessLib {
         bytes4 functionSelector
     ) internal pure returns (bool) {
         if (
-            functionSelector == OwnersManager.addOwner.selector ||
+            functionSelector == OwnerManager.addOwner.selector ||
             functionSelector == UUPSUpgradeable.upgradeToAndCall.selector
         ) {
             return true;

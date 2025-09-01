@@ -4,8 +4,8 @@ pragma solidity ^0.8.29;
 import {console} from "forge-std/console.sol";
 import {Base, MockERC20} from "./Base.t.sol";
 import {ISmartWallet} from "../src/interfaces/ISmartWallet.sol";
-import {IOwnersManager} from "../src/interfaces/IOwnersManager.sol";
-import {OwnersManager} from "../src/OwnersManager.sol";
+import {IOwnerManager} from "../src/interfaces/IOwnerManager.sol";
+import {OwnerManager} from "../src/OwnerManager.sol";
 import {Errors} from "../src/libraries/Errors.sol";
 import {Call, BatchedCall} from "../src/Types.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -156,10 +156,10 @@ contract HookTest is Base {
             target: address(_aliceWallet),
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.updateOwner.selector,
+                OwnerManager.updateOwner.selector,
                 keyHash,
                 address(_ecdsaValidator), // Use the existing validator
-                IOwnersManager(_aliceWallet).packSettings(
+                IOwnerManager(_aliceWallet).packSettings(
                     true,
                     uint40(expiration),
                     hook
@@ -199,10 +199,10 @@ contract HookTest is Base {
             target: address(_aliceWallet),
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.updateOwner.selector,
+                OwnerManager.updateOwner.selector,
                 keyHash,
                 address(_ecdsaValidator), // Use the existing validator
-                IOwnersManager(_aliceWallet).packSettings(
+                IOwnerManager(_aliceWallet).packSettings(
                     true,
                     uint40(expiration),
                     hook
@@ -243,7 +243,7 @@ contract HookTest is Base {
         _setHookForOwnerDirect(aliceKeyHash, address(mockHook), 0);
 
         // Verify hook is properly set
-        (, address hookAddress, , , ) = IOwnersManager(_aliceWallet)
+        (, address hookAddress, , , ) = IOwnerManager(_aliceWallet)
             .getOwnerSettings(aliceKeyHash);
         assertEq(hookAddress, address(mockHook));
 
@@ -983,7 +983,7 @@ contract HookTest is Base {
 
     function test_ExecuteWithRelayer_WithHook_NonAdminSelfCall() public {
         // Set up hook without admin privileges
-        uint256 settings = IOwnersManager(_aliceWallet).packSettings(
+        uint256 settings = IOwnerManager(_aliceWallet).packSettings(
             false,
             0,
             address(mockHook)
@@ -1207,10 +1207,10 @@ contract HookTest is Base {
             target: address(_aliceWallet),
             value: 0,
             data: abi.encodeWithSelector(
-                OwnersManager.updateOwner.selector,
+                OwnerManager.updateOwner.selector,
                 aliceKeyHash,
                 address(_ecdsaValidator), // Use the existing validator
-                IOwnersManager(_aliceWallet).packSettings(
+                IOwnerManager(_aliceWallet).packSettings(
                     true,
                     0,
                     address(mockHook)
@@ -1239,7 +1239,7 @@ contract HookTest is Base {
         );
 
         // Now verify the hook is set
-        uint256 settings = IOwnersManager(_aliceWallet).ownerSettings(
+        uint256 settings = IOwnerManager(_aliceWallet).ownerSettings(
             aliceKeyHash
         );
         address hook = address(uint160(settings));
@@ -1286,7 +1286,7 @@ contract HookTest is Base {
         _setHookForOwnerWithRelayer(aliceKeyHash, address(mockHook), 0);
 
         // Check what the contract actually reads for ownerSettings
-        uint256 contractSettings = IOwnersManager(_aliceWallet).ownerSettings(
+        uint256 contractSettings = IOwnerManager(_aliceWallet).ownerSettings(
             aliceKeyHash
         );
         console.log("Contract settings:", contractSettings);

@@ -7,7 +7,7 @@ import {RecoverySigner} from "smart-wallet-recovery/RecoverySigner.sol";
 import {RecoveryTypes} from "smart-wallet-recovery/utils/RecoveryTypes.sol";
 import {ISmartWallet as ISmartWalletRecovery} from "smart-wallet-recovery/interfaces/ISmartWallet.sol";
 import {IRecoveryVerifier} from "smart-wallet-recovery/interfaces/IRecoveryVerifier.sol";
-import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
+import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {LibClone} from "solady/utils/LibClone.sol";
 
 /**
@@ -128,12 +128,12 @@ contract RecoveryTest is Base {
 
         // Verify RecoverySigner is registered as owner
         assertTrue(
-            IOwnersManager(recoveredAccount).hasOwner(recoverySignerKeyHash),
+            IOwnerManager(recoveredAccount).hasOwner(recoverySignerKeyHash),
             "RecoverySigner should be registered as owner"
         );
 
         // Verify the validator is set correctly
-        address validator = IOwnersManager(recoveredAccount).ownerValidators(
+        address validator = IOwnerManager(recoveredAccount).ownerValidators(
             recoverySignerKeyHash
         );
         assertEq(
@@ -185,12 +185,12 @@ contract RecoveryTest is Base {
 
         // Verify the new owner was added
         assertTrue(
-            IOwnersManager(recoveredAccount).hasOwner(newOwnerKeyHash),
+            IOwnerManager(recoveredAccount).hasOwner(newOwnerKeyHash),
             "New owner should be added"
         );
 
         // Verify the settings are correct
-        (, , , bool isAdmin, ) = IOwnersManager(recoveredAccount)
+        (, , , bool isAdmin, ) = IOwnerManager(recoveredAccount)
             .getOwnerSettings(newOwnerKeyHash);
         assertTrue(isAdmin, "New owner should have admin privileges");
     }
@@ -237,21 +237,21 @@ contract RecoveryTest is Base {
 
         // Verify the new owner was added
         assertTrue(
-            IOwnersManager(recoveredAccount).hasOwner(newOwnerKeyHash),
+            IOwnerManager(recoveredAccount).hasOwner(newOwnerKeyHash),
             "Recovery should add new owner"
         );
 
         // Verify the new owner has admin privileges
-        uint256 settings = IOwnersManager(recoveredAccount).ownerSettings(
+        uint256 settings = IOwnerManager(recoveredAccount).ownerSettings(
             newOwnerKeyHash
         );
         assertTrue(
-            IOwnersManager(recoveredAccount).isAdmin(settings),
+            IOwnerManager(recoveredAccount).isAdmin(settings),
             "Recovered owner should have admin privileges"
         );
 
         // Verify the validator is set correctly
-        address validator = IOwnersManager(recoveredAccount).ownerValidators(
+        address validator = IOwnerManager(recoveredAccount).ownerValidators(
             newOwnerKeyHash
         );
         assertEq(
@@ -314,7 +314,7 @@ contract RecoveryTest is Base {
         uint256 expectedSettings = uint256(1) << 200;
 
         // Verify our packSettings produces the same result
-        uint256 packedSettings = IOwnersManager(recoveredAccount).packSettings(
+        uint256 packedSettings = IOwnerManager(recoveredAccount).packSettings(
             true, // adminFlag
             0, // expiration
             address(0) // hook
@@ -328,16 +328,16 @@ contract RecoveryTest is Base {
 
         // Verify the components
         assertTrue(
-            IOwnersManager(recoveredAccount).isAdmin(expectedSettings),
+            IOwnerManager(recoveredAccount).isAdmin(expectedSettings),
             "Should be admin"
         );
         assertEq(
-            IOwnersManager(recoveredAccount).getExpiration(expectedSettings),
+            IOwnerManager(recoveredAccount).getExpiration(expectedSettings),
             0,
             "Should have no expiration"
         );
         assertEq(
-            IOwnersManager(recoveredAccount).getHook(expectedSettings),
+            IOwnerManager(recoveredAccount).getHook(expectedSettings),
             address(0),
             "Should have no hook"
         );
@@ -388,7 +388,7 @@ contract RecoveryTest is Base {
         // Verify all accounts have the new owner
         for (uint i = 0; i < accounts.length; i++) {
             assertTrue(
-                IOwnersManager(accounts[i]).hasOwner(newOwnerKeyHash),
+                IOwnerManager(accounts[i]).hasOwner(newOwnerKeyHash),
                 "Each account should have new owner"
             );
         }
@@ -459,7 +459,7 @@ contract RecoveryTest is Base {
 
         // Verify second recovery succeeded
         assertTrue(
-            IOwnersManager(recoveredAccount).hasOwner(secondOwnerKeyHash),
+            IOwnerManager(recoveredAccount).hasOwner(secondOwnerKeyHash),
             "Second recovery should succeed with new timestamp"
         );
 

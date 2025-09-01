@@ -4,7 +4,7 @@ pragma solidity ^0.8.12;
 import "lib/forge-std/src/Script.sol";
 import "src/interfaces/ISmartWallet.sol";
 import "src/SmartWallet.sol";
-import "src/interfaces/IOwnersManager.sol";
+import "src/interfaces/IOwnerManager.sol";
 import "src/libraries/BatchedCallLib.sol";
 import "src/Types.sol";
 
@@ -38,7 +38,7 @@ contract SendTxsAsRelayer is Script {
             target: sender,
             value: 0,
             data: abi.encodeWithSelector(
-                IOwnersManager.addOwner.selector,
+                IOwnerManager.addOwner.selector,
                 keccak256(abi.encodePacked(sender)),
                 ecdsaValidator,
                 0  // default settings

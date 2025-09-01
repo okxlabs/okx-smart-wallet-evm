@@ -3,7 +3,7 @@ pragma solidity ^0.8.29;
 
 import {Call} from "./Types.sol";
 
-abstract contract ExecuteManager {
+abstract contract ExecutionManager {
     event ExecuteSuccessEvent(
         bytes32 indexed intentHash,
         address sender,

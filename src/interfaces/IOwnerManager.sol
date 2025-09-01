@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.29;
 
-interface IOwnersManager {
+interface IOwnerManager {
     // EVENTS
     event OwnerAdded(bytes32 keyHash, address validator);
     event OwnerRemoved(bytes32 keyHash, address validator);

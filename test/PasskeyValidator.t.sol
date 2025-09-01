@@ -6,7 +6,7 @@ import {Base} from "./Base.t.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 import {Errors} from "src/libraries/Errors.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
-import {IOwnersManager} from "src/interfaces/IOwnersManager.sol";
+import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
@@ -24,7 +24,7 @@ import {InitialOwner} from "src/Types.sol";
  * @notice Comprehensive test suite for both external and built-in Passkey validators
  * @dev Tests two different validation pathways:
  *      1. External PasskeyValidator contract (deployed contract)
- *      2. Built-in Passkey validator (Static.PASSKEY_VALIDATOR_ADDRESS) - covers ValidateManager lines 46-54
+ *      2. Built-in Passkey validator (Static.PASSKEY_VALIDATOR_ADDRESS) - covers ValidationManager lines 46-54
  */
 contract PasskeyValidatorTest is Base {
     PasskeyValidator internal passkeyValidator;
@@ -85,7 +85,7 @@ contract PasskeyValidatorTest is Base {
     }
 
     function test_passkeyValidator_added_to_wallet() public view {
-        address validator = IOwnersManager(_aliceWallet).ownerValidators(
+        address validator = IOwnerManager(_aliceWallet).ownerValidators(
             testKeyHash
         );
         assertEq(validator, address(passkeyValidator));
@@ -547,14 +547,14 @@ contract PasskeyValidatorTest is Base {
 
     // ================================================================
     // BUILT-IN PASSKEY VALIDATOR TESTS
-    // Tests ValidateManager._validateSignature lines 46-54
+    // Tests ValidationManager._validateSignature lines 46-54
     // ================================================================
 
     /**
      * @dev Verify built-in validator setup is correct
      */
     function test_builtin_validator_setup() public view {
-        address validator = IOwnersManager(builtinWallet).ownerValidators(
+        address validator = IOwnerManager(builtinWallet).ownerValidators(
             builtinKeyHash
         );
         assertEq(
@@ -563,7 +563,7 @@ contract PasskeyValidatorTest is Base {
             "Built-in validator should be registered"
         );
 
-        address verified = IOwnersManager(builtinWallet).getVerifiedValidator(
+        address verified = IOwnerManager(builtinWallet).getVerifiedValidator(
             builtinKeyHash
         );
         assertEq(
