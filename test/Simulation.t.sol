@@ -1020,10 +1020,6 @@ contract SimulationTest is Base {
         });
 
         // Create validator data
-        bytes32 hash = _getValidationTypedHashSansChainId(
-            _aliceWallet,
-            batchedCall
-        );
         bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _alice,
