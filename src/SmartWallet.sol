@@ -23,6 +23,7 @@ import {AllowanceManager} from "./AllowanceManager.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 import {DecodeLib} from "./libraries/DecodeLib.sol";
 import {ChainlessLib} from "./libraries/ChainlessLib.sol";
+import {MessageSignLib} from "./libraries/MessageSignLib.sol";
 
 // Do not set any states in this contract
 contract SmartWallet is
@@ -354,19 +355,17 @@ contract SmartWallet is
         // 7702 Post upgrade compatibility: try validate signature for EOA sigs
         // Make sure the _signature can be decoded
         if (signature.length == 65) {
-            // Create bound hash for EIP-1271 validation (same as validator path)
-            bytes32 boundHash = keccak256(
-                abi.encode(bytes32(block.chainid), address(this), _hash)
+            bytes32 typedDatahash = hashTypedData(_hash);
+            (address recovered, , ) = ECDSA.tryRecover(
+                typedDatahash,
+                signature
             );
-            bytes32 digest = keccak256(abi.encodePacked("\x19\x01", boundHash));
-
-            (address recovered, , ) = ECDSA.tryRecover(digest, signature);
             if (recovered == address(this)) return Static.MAGIC_VALUE;
         }
 
         // Extract pubKeyHash, validUntil and signature from the input
-        // Format: pubKeyHash (32) + validUntil (6) + signatures[64/65 bytes]
-        if (signature.length > 65) {
+        // Format: pubKeyHash (32) + validUntil (6) + signatures
+        if (signature.length > 38) {
             bytes32 pubKeyHash = bytes32(signature[:32]);
             uint48 validUntil = uint48(bytes6(signature[32:38]));
 
@@ -377,23 +376,14 @@ contract SmartWallet is
             address validator = getVerifiedValidator(pubKeyHash);
             if (validator == address(0)) return Static.INVALID_VALUE;
 
-            // Create bound hash for EIP-1271 validation with validUntil
-            bytes32 boundHash = keccak256(
-                abi.encode(
-                    bytes32(block.chainid),
-                    address(this),
-                    _hash,
-                    validUntil,
-                    IMPLEMENTATION
-                )
+            bytes32 typedDatahash = hashTypedData(
+                MessageSignLib.hash(_hash, validUntil, IMPLEMENTATION)
             );
-            bytes32 digest = keccak256(abi.encodePacked("\x19\x01", boundHash));
-
             return
                 _validateSignature(
                     validator,
                     pubKeyHash,
-                    digest,
+                    typedDatahash,
                     signature[38:]
                 )
                     ? Static.MAGIC_VALUE

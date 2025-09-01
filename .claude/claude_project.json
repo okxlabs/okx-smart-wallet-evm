@@ -1,0 +1,57 @@
+{
+  "name": "Smart Wallet VS",
+  "description": "Smart Wallet project with custom commands",
+  "custom_commands": [
+    {
+      "name": "test",
+      "description": "Run Foundry tests",
+      "command": "forge test"
+    },
+    {
+      "name": "test-coverage",
+      "description": "Run tests with coverage report",
+      "command": "forge coverage"
+    },
+    {
+      "name": "build",
+      "description": "Build the smart contracts",
+      "command": "forge build"
+    },
+    {
+      "name": "test-gas",
+      "description": "Run tests with gas reporting",
+      "command": "forge test --gas-report"
+    },
+    {
+      "name": "test-verbose",
+      "description": "Run tests with verbose output",
+      "command": "forge test -vvv"
+    },
+    {
+      "name": "test-match",
+      "description": "Run specific test by name",
+      "command": "forge test --match-test",
+      "requires_args": true
+    },
+    {
+      "name": "clean",
+      "description": "Clean build artifacts",
+      "command": "forge clean"
+    },
+    {
+      "name": "format",
+      "description": "Format Solidity files",
+      "command": "forge fmt"
+    },
+    {
+      "name": "snapshot",
+      "description": "Create gas snapshot",
+      "command": "forge snapshot"
+    },
+    {
+      "name": "deploy-local",
+      "description": "Deploy to local network",
+      "command": "forge script scripts/deploy/DeployInit.sol --rpc-url localhost --broadcast"
+    }
+  ]
+}

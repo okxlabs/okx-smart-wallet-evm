@@ -1608,4 +1608,86 @@ contract ValidatorTest is Base {
             validatorData
         );
     }
+
+    function test_addOwner_reverts_with_NotFromSelf_for_direct_call() public {
+        bytes32 newKeyHash = keccak256(abi.encodePacked(makeAddr("newOwner")));
+        address newValidator = Static.ECDSA_VALIDATOR_ADDRESS;
+        uint256 newSettings = OwnersManager(_aliceWallet).packSettings(
+            false,
+            0,
+            address(0)
+        );
+
+        // Test 1: Direct call from external address should revert with NotFromSelf
+        vm.prank(_bob);
+        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        OwnersManager(_aliceWallet).addOwner(
+            newKeyHash,
+            newValidator,
+            newSettings
+        );
+
+        // Test 2: Direct call from owner (Alice) should also revert with NotFromSelf
+        vm.prank(_alice);
+        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        OwnersManager(_aliceWallet).addOwner(
+            newKeyHash,
+            newValidator,
+            newSettings
+        );
+
+        // Verify owner was not added
+        assertFalse(IOwnersManager(_aliceWallet).hasOwner(newKeyHash));
+    }
+
+    function test_updateOwner_reverts_with_NotFromSelf_for_direct_call()
+        public
+    {
+        // First add an owner to update (through execute)
+        bytes32 keyHash = keccak256(abi.encodePacked(_charlie));
+        uint256 settings = OwnersManager(_aliceWallet).packSettings(
+            false,
+            0,
+            address(0)
+        );
+        _addOwnerToAccount(
+            _alice,
+            _aliceWallet,
+            keyHash,
+            Static.ECDSA_VALIDATOR_ADDRESS,
+            settings
+        );
+
+        // Now try to update it directly
+        address newValidator = Static.PASSKEY_VALIDATOR_ADDRESS;
+        uint256 newSettings = OwnersManager(_aliceWallet).packSettings(
+            true,
+            0,
+            address(0)
+        );
+
+        // Test 1: Direct call from external address should revert with NotFromSelf
+        vm.prank(_bob);
+        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        OwnersManager(_aliceWallet).updateOwner(
+            keyHash,
+            newValidator,
+            newSettings
+        );
+
+        // Test 2: Direct call from owner (Alice) should also revert with NotFromSelf
+        vm.prank(_alice);
+        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        OwnersManager(_aliceWallet).updateOwner(
+            keyHash,
+            newValidator,
+            newSettings
+        );
+
+        // Verify owner was not updated
+        assertEq(
+            IOwnersManager(_aliceWallet).ownerValidators(keyHash),
+            Static.ECDSA_VALIDATOR_ADDRESS
+        );
+    }
 }

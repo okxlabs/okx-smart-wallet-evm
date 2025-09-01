@@ -9,6 +9,8 @@ import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {HelperLib} from "scripts/utils/Helper.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {OwnersManager} from "src/OwnersManager.sol";
+import {InitialOwner} from "src/Types.sol";
+import {SmartWallet} from "src/SmartWallet.sol";
 
 contract IsValidSignatureTest is Base {
     // Passkey-related constants and variables
@@ -1025,5 +1027,79 @@ contract IsValidSignatureTest is Base {
         // Sign the digest
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
         return abi.encodePacked(r, s, v);
+    }
+
+    /// @notice Test EIP-7702 scenario where wallet signs for itself
+    function test_isValidSignature_succeeds_with_wallet_self_signing() public {
+        // Create a new EOA that will become a smart wallet
+        uint256 eoaPrivateKey = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef;
+        address eoaAddress = vm.addr(eoaPrivateKey);
+
+        // Deploy a new wallet at the EOA address using vm.etch
+        // This simulates EIP-7702 delegation where an EOA delegates to wallet code
+        bytes memory walletCode = address(_smartWallet).code;
+        vm.etch(eoaAddress, walletCode);
+
+        // Initialize the wallet with the EOA as owner
+        bytes32 eoaKeyHash = keccak256(abi.encodePacked(eoaAddress));
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: eoaKeyHash,
+            validator: address(1) // Built-in ECDSA validator
+        });
+
+        ISmartWallet(eoaAddress).initialize(initialOwners);
+
+        // Now test that the wallet can validate its own signature
+        bytes32 hash = keccak256("test_wallet_self_signing");
+
+        // Get the typed data hash that the wallet would use
+        bytes32 typedDataHash = SmartWallet(payable(eoaAddress)).hashTypedData(
+            hash
+        );
+
+        // Sign with the EOA's private key
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, typedDataHash);
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        // The wallet should recognize its own signature (recovered == address(this))
+        bytes4 result = ISmartWallet(eoaAddress).isValidSignature(
+            hash,
+            signature
+        );
+
+        assertEq(
+            result,
+            Static.MAGIC_VALUE,
+            "65-byte signature from wallet itself (EIP-7702) should succeed"
+        );
+    }
+
+    /// @notice Test that 65-byte signature fails when signer is not the wallet itself
+    function test_isValidSignature_fails_with_65_byte_non_wallet_signer()
+        public
+        view
+    {
+        bytes32 hash = keccak256("test_non_wallet_signer");
+
+        // Get the typed data hash that the wallet would use
+        bytes32 typedDataHash = SmartWallet(payable(_aliceWallet))
+            .hashTypedData(hash);
+
+        // Sign with Bob's private key (not the wallet)
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_bobPk, typedDataHash);
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        // The wallet should reject the signature (recovered != address(this))
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            signature
+        );
+
+        assertEq(
+            result,
+            Static.INVALID_VALUE,
+            "65-byte signature from non-wallet signer should fail"
+        );
     }
 }

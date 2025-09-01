@@ -25,6 +25,7 @@ import {IAccount} from "account-abstraction/interfaces/IAccount.sol";
 import {Static} from "src/libraries/Static.sol";
 import {ERC4337Account} from "src/ERC4337Account.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import {MessageSignLib} from "src/libraries/MessageSignLib.sol";
 
 // ============ Mock Contracts for Testing ============
 
@@ -57,6 +58,15 @@ contract MockComplexContract {
 contract MockRevertingContract {
     function alwaysReverts() external pure {
         revert("Always reverts");
+    }
+
+    function revertWithLargeMessage() external pure {
+        // Create a 300-byte error message (larger than MAX_RETURNDATA_SIZE of 256)
+        bytes memory largeMessage = new bytes(300);
+        for (uint i = 0; i < 300; i++) {
+            largeMessage[i] = bytes1(uint8(65 + (i % 26))); // Fill with A-Z pattern
+        }
+        revert(string(largeMessage));
     }
 }
 
@@ -372,20 +382,16 @@ contract Base is Test {
         address wallet,
         uint48 validUntil
     ) internal view returns (bytes32) {
-        // Create bound hash matching SmartWallet.isValidSignature logic
-        // Get the IMPLEMENTATION address from the wallet
+        // Use MessageSignLib to create the struct hash matching SmartWallet.isValidSignature logic
         address implementation = SmartWallet(payable(wallet)).IMPLEMENTATION();
-        bytes32 boundHash = keccak256(
-            abi.encode(
-                bytes32(block.chainid),
-                wallet,
-                hash,
-                validUntil,
-                implementation
-            )
+        bytes32 structHash = MessageSignLib.hash(
+            hash,
+            validUntil,
+            implementation
         );
-        // Apply EIP-191 prefix
-        return keccak256(abi.encodePacked("\x19\x01", boundHash));
+
+        // Use the wallet's ERC712 hashTypedData function
+        return SmartWallet(payable(wallet)).hashTypedData(structHash);
     }
 
     function _getValidationTypedHash(
