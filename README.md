@@ -71,31 +71,6 @@ The implementation follows a modular manager-based design:
 - `AllowanceManager`: Token allowance and spending controls
 - `FallbackHandler`: Token receiving and standard interface support
 
-## Deployed Contracts
-
-### Local Development (Anvil)
-
-| Contract | Address | Description |
-| -------- | ------- | ----------- |
-| DeployFactory | `0x890a66d57ce06d6b41f9e848ea58588fed8e6667` | Contract factory for deterministic deployments |
-| PasskeyValidator | `0x14e162dc1efe884946b8443a54871357c906c771` | WebAuthn/Passkey signature validator |
-
-### XLayer Mainnet
-
-| Contract | Address | Description |
-| -------- | ------- | ----------- |
-| SmartWallet | `0xe5c170b631d93edced30f654f58551dcfbee8d72` | Main wallet implementation |
-| SmartWalletFactory | `0x0e9c0de106c0193f40a87b3cb45cd6e81ad5a895` | Factory for wallet deployment |
-| ECDSAValidator | `0x54ca77dabd3cf025ef08545189f298023e7dc2f6` | ECDSA signature validator |
-
-### Validator Addresses
-
-| Validator Type | Built-in Address | Description |
-| -------------- | --------------- | ----------- |
-| ECDSA | `Static.ECDSA_VALIDATOR_ADDRESS` | Built-in ECDSA validation |
-| Passkey | `Static.PASSKEY_VALIDATOR_ADDRESS` | Built-in P256/WebAuthn validation |
-| External | Custom contracts | User-deployed validator contracts |
-
 ## Usage
 
 ### Prepare environment
