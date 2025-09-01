@@ -47,9 +47,9 @@ contract SmartWalletFactory is ISmartWalletFactory {
         uint256 salt,
         BatchedCall calldata batchedCall,
         bytes calldata validatorData
-    ) external payable returns (address acount) {
-        acount = createAccount(initialOwners, salt);
-        ISmartWallet(acount).executeWithRelayer(batchedCall, validatorData);
+    ) external payable returns (address account) {
+        account = createAccount(initialOwners, salt);
+        ISmartWallet(account).executeWithRelayer(batchedCall, validatorData);
     }
 
     /// @notice predict deterministic address

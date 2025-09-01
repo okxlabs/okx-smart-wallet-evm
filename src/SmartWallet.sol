@@ -95,7 +95,7 @@ abstract contract SmartWallet is
         _batchCall(calls, keccak256(abi.encodePacked(msg.sender)));
     }
 
-    /// @dev This function is executeable only by the EntryPoint contract, and is the main pathway for UserOperations to be executed.
+    /// @dev This function is executable only by the EntryPoint contract, and is the main pathway for UserOperations to be executed.
     /// UserOperations can be executed through the execute function, but another method of authorization (ie through a passed in signature) is required.
     /// userOp.callData is abi.encodePacked(IAccountExecute.executeUserOp.selector, (abi.encode(Call[]))
     /// Note that this contract is only compatible with Entrypoint versions v0.7.0 and v0.8.0. It is not compatible with v0.6.0, as that version does not support the "executeUserOp" selector.
