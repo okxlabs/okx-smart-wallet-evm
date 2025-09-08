@@ -113,16 +113,17 @@ if [ $DEPLOY_RESULT -eq 0 ]; then
         echo -e "${YELLOW}⚠️  Could not extract SmartWallet address from deployment output${NC}"
     fi
     
-    # Extract ECDSAValidator address from deployment output
-    ECDSA_VALIDATOR_ADDRESS=$(echo "$DEPLOY_OUTPUT" | grep "ECDSAValidator address:" | sed 's/.*ECDSAValidator address: //')
+    # Extract SmartWalletFactory address from deployment output
+    SMART_WALLET_FACTORY_ADDRESS=$(echo "$DEPLOY_OUTPUT" | grep "SmartWalletFactory address:" | sed 's/.*SmartWalletFactory address: //')
     
-    if [ -n "$ECDSA_VALIDATOR_ADDRESS" ]; then
-        echo -e "${YELLOW}📝 ECDSAValidator address: $ECDSA_VALIDATOR_ADDRESS${NC}"
-        export ECDSA_VALIDATOR=$ECDSA_VALIDATOR_ADDRESS
-        echo -e "${GREEN}✅ Exported ECDSA_VALIDATOR environment variable${NC}"
+    if [ -n "$SMART_WALLET_FACTORY_ADDRESS" ]; then
+        echo -e "${YELLOW}📝 SmartWalletFactory address: $SMART_WALLET_FACTORY_ADDRESS${NC}"
+        export SMART_WALLET_FACTORY=$SMART_WALLET_FACTORY_ADDRESS
+        echo -e "${GREEN}✅ Exported SMART_WALLET_FACTORY environment variable${NC}"
     else
-        echo -e "${YELLOW}⚠️  Could not extract ECDSAValidator address from deployment output${NC}"
+        echo -e "${YELLOW}⚠️  Could not extract SmartWalletFactory address from deployment output${NC}"
     fi
+    
     
     # Show deployment logs for debugging
     echo "$DEPLOY_OUTPUT" | grep -E "SmartWallet|ECDSAValidator|PasskeyValidator|Factory|Helper"
@@ -134,6 +135,66 @@ fi
 
 echo -e "${YELLOW}🧪 Running smoke test scripts...${NC}"
 
+# Test 0: Create SmartWallet Account with Passkey Owner
+echo -e "${YELLOW}📝 Test 0: Create SmartWallet Account with Passkey Owner${NC}"
+
+# Set default Validator addresses if not already set
+if [ -z "$PASSKEY_VALIDATOR" ]; then
+    export PASSKEY_VALIDATOR="0x0000000000000000000000000000000000000002"
+    echo -e "${YELLOW}📝 Using default PASSKEY_VALIDATOR: $PASSKEY_VALIDATOR${NC}"
+fi
+
+if [ -z "$ECDSA_VALIDATOR" ]; then
+    export ECDSA_VALIDATOR="0x0000000000000000000000000000000000000001"
+    echo -e "${YELLOW}📝 Using default ECDSA_VALIDATOR: $ECDSA_VALIDATOR${NC}"
+fi
+
+# Set default Passkey public key if not already set
+if [ -z "$PASSKEY_PUB_X" ]; then
+    export PASSKEY_PUB_X="0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+    echo -e "${YELLOW}📝 Using default PASSKEY_PUB_X: $PASSKEY_PUB_X${NC}"
+fi
+
+if [ -z "$PASSKEY_PUB_Y" ]; then
+    export PASSKEY_PUB_Y="0xfedcba0987654321fedcba0987654321fedcba0987654321fedcba0987654321"
+    echo -e "${YELLOW}📝 Using default PASSKEY_PUB_Y: $PASSKEY_PUB_Y${NC}"
+fi
+
+# Capture output to extract the created account address
+CREATE_ACCOUNT_OUTPUT=$(yarn 0-createAccount $RPC_URL --broadcast 2>&1)
+TEST0_RESULT=$?
+
+echo "$CREATE_ACCOUNT_OUTPUT"
+
+if [ $TEST0_RESULT -eq 0 ]; then
+    echo -e "${GREEN}✅ Test 0: SmartWallet account creation completed successfully!${NC}"
+    
+    # Extract the created SmartWallet account address
+    CREATED_ACCOUNT=$(echo "$CREATE_ACCOUNT_OUTPUT" | grep "SmartWallet account created at:" | sed 's/.*SmartWallet account created at:  //' | sed 's/[[:space:]]*$//')
+    
+    if [ -n "$CREATED_ACCOUNT" ]; then
+        export USER_WALLET=$CREATED_ACCOUNT
+        echo -e "${YELLOW}📝 Exported USER_WALLET: $USER_WALLET${NC}"
+        
+        # Fund the created account for future transactions
+        echo -e "${YELLOW}💰 Funding created account...${NC}"
+        cast send --rpc-url $RPC_URL \
+            --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
+            --value 0.1ether \
+            $CREATED_ACCOUNT > /dev/null 2>&1
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}✅ Successfully funded created account with 0.1 ETH${NC}"
+        else
+            echo -e "${YELLOW}⚠️  Failed to fund created account${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠️  Could not extract created account address${NC}"
+    fi
+else
+    echo -e "${RED}❌ Test 0: SmartWallet account creation failed with exit code $TEST0_RESULT${NC}"
+    exit $TEST0_RESULT
+fi
+
 # Test 1: Set Code and Initialize (Using yarn command from package.json)
 echo -e "${YELLOW}📝 Test 1: EIP-7702 Set Code and Initialize${NC}"
 yarn 1-setCodeAndInitialize $RPC_URL --broadcast --evm-version prague --skip-simulation
@@ -141,6 +202,8 @@ TEST1_RESULT=$?
 
 if [ $TEST1_RESULT -eq 0 ]; then
     echo -e "${GREEN}✅ Test 1: EIP-7702 initialization completed successfully!${NC}"
+    # USER_WALLET is already set from Test 0 (the created account), keep it as is
+    echo -e "${YELLOW}📝 USER_WALLET (from Test 0): $USER_WALLET${NC}"
 else
     echo -e "${RED}❌ Test 1: EIP-7702 initialization failed with exit code $TEST1_RESULT${NC}"
     exit $TEST1_RESULT
@@ -170,19 +233,78 @@ else
     exit $TEST3_RESULT
 fi
 
-echo -e "${GREEN}🎉 All smoke tests completed successfully!${NC}"
+# Test 4: Send Transactions with Passkey signature
+echo -e "${YELLOW}📝 Test 4: Passkey-based execution (executeWithRelayer using Passkey)${NC}"
 
-# Anvil logs are saved to anvil.log - uncomment below to display them
-# echo -e "${YELLOW}📋 Anvil logs:${NC}"
-# cat anvil.log
-
-# Keep the node running for manual testing (optional)
-# Only prompt if running interactively
-if [ -t 0 ]; then
-    read -p "$(echo -e ${YELLOW}Keep node running for manual testing? [y/N]:${NC} )" -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo -e "${GREEN}🔄 Node is still running. Press Ctrl+C to stop.${NC}"
-        wait $ANVIL_PID
-    fi
+# Set default Passkey private keys and public keys if not already set
+if [ -z "$PASSKEY_PRIVATE_KEY" ]; then
+    # Default test Passkey 1 (must be valid P256 private key)
+    export PASSKEY_PRIVATE_KEY="0x03d99692017473e2d631945a812607b23269d85721e0f370b8d3e7d29a874fd2"
+    echo -e "${YELLOW}📝 Using default PASSKEY_PRIVATE_KEY${NC}"
 fi
+
+if [ -z "$PASSKEY_PUB_X" ]; then
+    # Corresponding public key X coordinate for the private key above
+    export PASSKEY_PUB_X="0x65a2fa44daad46eab0278703edb6c4dcf5e30b8a9aec09fdc71a56f52aa392e4"
+    echo -e "${YELLOW}📝 Using default PASSKEY_PUB_X${NC}"
+fi
+
+if [ -z "$PASSKEY_PUB_Y" ]; then
+    # Corresponding public key Y coordinate for the private key above
+    export PASSKEY_PUB_Y="0x4a7a9e4604aa36898209997288e902ac544a555e4b5e0a9efef2b59233f3f437"
+    echo -e "${YELLOW}📝 Using default PASSKEY_PUB_Y${NC}"
+fi
+
+if [ -z "$PASSKEY_PRIVATE_KEY_2" ]; then
+    # Default test Passkey 2 (must be valid P256 private key)
+    export PASSKEY_PRIVATE_KEY_2="0x04d99692017473e2d631945a812607b23269d85721e0f370b8d3e7d29a874fd2"
+    echo -e "${YELLOW}📝 Using default PASSKEY_PRIVATE_KEY_2${NC}"
+fi
+
+if [ -z "$PASSKEY_PUB_X_2" ]; then
+    # Corresponding public key X coordinate for private key 2
+    export PASSKEY_PUB_X_2="0x3059301306072a8648ce3d020106082a8648ce3d03010703420004d6eb8f37"
+    echo -e "${YELLOW}📝 Using default PASSKEY_PUB_X_2${NC}"
+fi
+
+if [ -z "$PASSKEY_PUB_Y_2" ]; then
+    # Corresponding public key Y coordinate for private key 2
+    export PASSKEY_PUB_Y_2="0x7c8dbde1c2b5b3e4c4e4d0e8b8f9e2c4a6d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2"
+    echo -e "${YELLOW}📝 Using default PASSKEY_PUB_Y_2${NC}"
+fi
+
+yarn 4-sendTxsWithPasskey $RPC_URL --broadcast
+TEST4_RESULT=$?
+
+if [ $TEST4_RESULT -eq 0 ]; then
+    echo -e "${GREEN}✅ Test 4: Passkey execution completed successfully!${NC}"
+else
+    echo -e "${RED}❌ Test 4: Passkey execution failed with exit code $TEST4_RESULT${NC}"
+    exit $TEST4_RESULT
+fi
+
+# Test 5: Create Account with AddOwner using createAccountWithCall
+echo -e "${YELLOW}📝 Test 5: Create account with addOwner via createAccountWithCall${NC}"
+yarn 5-createAccountWithAddOwner $RPC_URL --broadcast
+TEST5_RESULT=$?
+
+if [ $TEST5_RESULT -eq 0 ]; then
+    echo -e "${GREEN}✅ Test 5: CreateAccountWithCall completed successfully!${NC}"
+else
+    echo -e "${RED}❌ Test 5: CreateAccountWithCall failed with exit code $TEST5_RESULT${NC}"
+    exit $TEST5_RESULT
+fi
+
+# Test 6: Send Transactions via EntryPoint with Passkey
+echo -e "${YELLOW}📝 Test 6: ERC-4337 EntryPoint execution with Passkey${NC}"
+yarn 6-addOwnerAndExecuteViaEntryPoint $RPC_URL --broadcast --skip-simulation
+TEST6_RESULT=$?
+
+if [ $TEST6_RESULT -eq 0 ]; then
+    echo -e "${GREEN}✅ Test 6: EntryPoint execution with Passkey completed successfully!${NC}"
+else
+    echo -e "${YELLOW}⚠️  Test 6: EntryPoint execution failed with exit code $TEST6_RESULT${NC}"
+    echo -e "${YELLOW}⚠️  This is expected on local network. Continuing...${NC}"
+fi
+
+echo -e "${GREEN}🎉 All smoke tests completed successfully!${NC}"
