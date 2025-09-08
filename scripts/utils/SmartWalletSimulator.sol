@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
 import {SmartWallet} from "../../src/SmartWallet.sol";
@@ -17,7 +17,7 @@ import {DecodeLib} from "../../src/libraries/DecodeLib.sol";
 ///      It allows relayers to simulate transactions without actually executing them
 contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
     using BatchedCallLib for BatchedCall;
-    
+
     /// @notice Simulate a sponsored transaction, measuring gas costs for validation and execution, then reverts with detailed metrics.
     /// @dev Always reverts with `Errors.SimulateExecutionWithGas` containing execution gas and total gas metrics.
     /// 1) If the simulation fails during validation or the sponsor call, those other errors bubble up directly instead.
@@ -33,13 +33,20 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
     ) external {
         // Start measuring execution gas (everything except intrinsic gas)
         uint256 executionGasStart = gasleft();
-        
+
         // Validate and extract relayer data using the simulation function with custom validator
-        (bytes32 pubKeyHash, bytes32 dataHash) = _validateAndExtractRelayerDataForSimulation(batchedCall, validator, validatorData);
-        
+        (
+            bytes32 pubKeyHash,
+            bytes32 dataHash
+        ) = _validateAndExtractRelayerDataForSimulation(
+                batchedCall,
+                validator,
+                validatorData
+            );
+
         // Execute the batch calls - any errors will bubble up and be caught by the caller
         _batchCall(batchedCall.calls, pubKeyHash);
-        
+
         // If we reach here, the call succeeded
         // Emit success event with the intent hash that the user signed
         emit ExecuteSuccessEvent(
@@ -50,7 +57,7 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
 
         // Calculate execution gas (everything except intrinsic gas)
         uint256 executionGas = executionGasStart - gasleft();
-        
+
         // Calculate calldata intrinsic gas for executeWithRelayer call
         uint256 calldataIntrinsicGas = _intrinsicGas(
             abi.encodeWithSelector(
@@ -59,17 +66,17 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
                 validatorData
             )
         );
-        
+
         // Calculate total intrinsic gas (base + calldata)
         uint256 intrinsicGas = 21000 + calldataIntrinsicGas; // Base intrinsic gas + calldata intrinsic gas
-        
+
         // Calculate total gas (execution gas + intrinsic gas)
         uint256 totalGas = executionGas + intrinsicGas;
-        
+
         // Revert with gas metrics
         revert Errors.SimulateExecution(executionGas, intrinsicGas, totalGas);
     }
-    
+
     /// @notice Validate and extract relayer data for simulation with custom validator
     /// @dev All reverts are commented out to allow simulation to continue
     /// @param batchedCall The batched call data
@@ -89,7 +96,9 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
 
         // Step 2: Extract validation components from validatorData
         uint48 validUntil;
-        (pubKeyHash, validUntil) = DecodeLib.decodeSignatureComponents(validatorData);
+        (pubKeyHash, validUntil) = DecodeLib.decodeSignatureComponents(
+            validatorData
+        );
 
         // Step 3: Verify transaction hasn't expired
         if (_isExpired(validUntil)) {
@@ -157,7 +166,9 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
             let word
 
             // scan 32 bytes at a time
-            for {} lt(ptr, end) {
+            for {
+
+            } lt(ptr, end) {
                 ptr := add(ptr, 0x20)
             } {
                 word := mload(ptr)

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
 
 import "lib/forge-std/src/Script.sol";
@@ -18,21 +18,21 @@ contract SendTxsAsRelayer is Script {
         address payable sender = payable(vm.addr(senderPk));
         console.log("Sender: ", sender);
         console.log("Receiver: ", 0xFeeCC911175C2B6D46BaE4fd357c995a4DC43C60);
-        
+
         // First, add the sender as an owner with ECDSAValidator
         _addOwner(sender);
-        
+
         // Then execute the relayer transaction
         _executeRelayerTransaction(sender, senderPk);
 
         console.log("Completed ExecuteWithRelayer script");
         vm.stopBroadcast();
     }
-    
+
     function _addOwner(address sender) private {
         address ecdsaValidator = vm.envAddress("ECDSA_VALIDATOR");
         console.log("ECDSAValidator address:", ecdsaValidator);
-        
+
         Call[] memory addOwnerCalls = new Call[](1);
         addOwnerCalls[0] = Call({
             target: sender,
@@ -41,16 +41,19 @@ contract SendTxsAsRelayer is Script {
                 IOwnerManager.addOwner.selector,
                 keccak256(abi.encodePacked(sender)),
                 ecdsaValidator,
-                0  // default settings
+                0 // default settings
             )
         });
-        
+
         // Execute addOwner through the SmartWallet
         ISmartWallet(sender).execute(addOwnerCalls);
         console.log("Added sender as owner with ECDSAValidator");
     }
-    
-    function _executeRelayerTransaction(address payable sender, uint256 senderPk) private {
+
+    function _executeRelayerTransaction(
+        address payable sender,
+        uint256 senderPk
+    ) private {
         // Construct the call data
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -60,32 +63,36 @@ contract SendTxsAsRelayer is Script {
         });
 
         // Create BatchedCall for executeWithRelayer
-        BatchedCall memory batchedCall = BatchedCall({
-            calls: calls,
-            nonce: 0
-        });
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
 
         // Prepare validation data (validUntil = 1 hour from now)
         uint48 validUntil = uint48(block.timestamp + 1 hours);
-        
+
         // Get typed hash for signing - use implementation address since that's what the contract uses
         address implementation = vm.envAddress("SMART_WALLET");
-        console.log("Using SmartWallet implementation from env:", implementation);
-        
+        console.log(
+            "Using SmartWallet implementation from env:",
+            implementation
+        );
+
         // The third parameter should match what executeWithRelayer uses: IMPLEMENTATION constant
-        bytes32 hash = BatchedCallLib.hash(batchedCall, validUntil, implementation);
+        bytes32 hash = BatchedCallLib.hash(
+            batchedCall,
+            validUntil,
+            implementation
+        );
         console.log("BatchedCall hash:", vm.toString(hash));
-        
+
         // Check if the sender has SmartWallet code
         console.log("Sender code length:", sender.code.length);
-        
+
         bytes32 typedHash = SmartWallet(sender).hashTypedData(hash);
 
         // Sign and prepare validator data
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(senderPk, typedHash);
         bytes memory validatorData = abi.encodePacked(
             keccak256(abi.encodePacked(sender)), // pubKeyHash
-            validUntil,                            // validUntil (6 bytes)
+            validUntil, // validUntil (6 bytes)
             r,
             s,
             v

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
 import {OKXSmartWalletEntry} from "src/OKXSmartWalletEntry.sol";
@@ -23,12 +23,14 @@ library DeployInitHelper {
         );
         smartWalletImpl = OKXSmartWalletEntry(smartWalletAddr);
 
-        factoryImpl = SmartWalletFactory(deployFactory.deploy(
-            abi.encodePacked(
-                type(SmartWalletFactory).creationCode,
-                abi.encode(address(smartWalletImpl))
-            ),
-            deployFactorySalt
-        ));
+        factoryImpl = SmartWalletFactory(
+            deployFactory.deploy(
+                abi.encodePacked(
+                    type(SmartWalletFactory).creationCode,
+                    abi.encode(address(smartWalletImpl))
+                ),
+                deployFactorySalt
+            )
+        );
     }
 }
