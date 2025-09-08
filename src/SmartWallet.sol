@@ -106,7 +106,9 @@ abstract contract SmartWallet is
         // Parse the keyHash from the signature. This is the keyHash that has been pre-validated as the correct signer over the UserOp data
         // and must be used to check further on-chain permissions over the call execution.
         // Signature format: pubKeyHash (32) + validUntil (6) + signatures
-        bytes32 keyHash = bytes32(userOp.signature[:32]);
+        (bytes32 keyHash, ) = DecodeLib.decodeSignatureComponents(
+            userOp.signature
+        );
 
         Call[] calldata calls = DecodeLib.decodeCalls(userOp.callData[4:]);
 
@@ -123,58 +125,14 @@ abstract contract SmartWallet is
         BatchedCall calldata batchedCall,
         bytes calldata validatorData
     ) external {
-        // Extract validation components from new format
-        // Format: pubkeyHash (32) + validUntil (6) + signatures
-        bytes32 pubKeyHash = bytes32(validatorData[:32]);
-        uint48 validUntil = uint48(bytes6(validatorData[32:38]));
-
-        // Check transaction expiry
-        if (_isExpired(validUntil)) revert Errors.ExpiryPassed(validUntil);
-
-        // Validate and update nonce
-        if (!validateAndUpdateNonce(batchedCall.nonce))
-            revert Errors.InvalidNonce(batchedCall.nonce);
-
-        uint256 nonceKey = batchedCall.nonce >> 64;
-        bytes32 dataHash = batchedCall.hash(validUntil, IMPLEMENTATION);
-
-        if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
-            // Validate all calls are allowed to skip chain ID validation
-            if (
-                !ChainlessLib.validateChainlessNonceCallData(
-                    batchedCall.calls,
-                    address(this)
-                )
-            ) {
-                revert Errors.InvalidNonceKey(nonceKey);
-            }
-            dataHash = hashTypedDataSansChainId(dataHash);
-        } else {
-            dataHash = hashTypedData(dataHash);
-        }
-
-        // Validate validator
-        address validator = getVerifiedValidator(pubKeyHash);
-        if (validator == address(0)) revert Errors.InvalidKeyHash(pubKeyHash);
-
-        // Validate signature
-        if (
-            !_validateSignature(
-                validator,
-                pubKeyHash,
-                dataHash,
-                validatorData[38:]
-            )
-        ) revert Errors.InvalidSignature();
+        (bytes32 pubKeyHash, bytes32 dataHash) = _validateAndExtractRelayerData(
+            batchedCall,
+            validatorData
+        );
 
         _batchCall(batchedCall.calls, pubKeyHash);
 
-        // Emit success event with the intent hash that the user signed
-        emit ExecuteSuccessEvent(
-            dataHash, // This is the intentHash - the hash of the user's execution intent
-            msg.sender,
-            batchedCall.nonce
-        );
+        emit ExecuteSuccessEvent(dataHash, msg.sender, batchedCall.nonce);
     }
 
     /// @notice Executes multiple contract calls in a single transaction
@@ -207,6 +165,70 @@ abstract contract SmartWallet is
         }
     }
 
+    /// @notice Validates and extracts data for relayer execution
+    /// @dev Comprehensive validation function for executeWithRelayer
+    /// @param batchedCall The batched call data
+    /// @param validatorData The validator data containing pubKeyHash, validUntil, and signature
+    /// @return pubKeyHash The extracted public key hash
+    /// @return dataHash The computed data hash for event emission
+    function _validateAndExtractRelayerData(
+        BatchedCall calldata batchedCall,
+        bytes calldata validatorData
+    ) internal returns (bytes32 pubKeyHash, bytes32 dataHash) {
+        // Step 1: Validate and consume nonce
+        if (!validateAndUpdateNonce(batchedCall.nonce))
+            revert Errors.InvalidNonce(batchedCall.nonce);
+
+        // Step 2: Extract validation components from validatorData
+        uint48 validUntil;
+        (pubKeyHash, validUntil) = DecodeLib.decodeSignatureComponents(
+            validatorData
+        );
+
+        // Step 3: Verify transaction hasn't expired
+        if (_isExpired(validUntil)) revert Errors.ExpiryPassed(validUntil);
+
+        // Step 4: Verify validator exists and is not expired
+        address validator = ownerValidators[pubKeyHash];
+        if (validator == address(0)) revert Errors.InvalidKeyHash(pubKeyHash);
+
+        uint256 settings = ownerSettings[pubKeyHash];
+        if (settings != 0 && isSettingsExpired(settings))
+            revert Errors.ValidatorExpired(pubKeyHash);
+
+        // Step 5: Compute the data hash based on nonce type
+        uint256 nonceKey = batchedCall.nonce >> 64;
+        bytes32 intentHash = batchedCall.hash(validUntil, IMPLEMENTATION);
+
+        // Step 6: Handle chainless execution if applicable
+        if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
+            // Validate all calls are allowed for chainless execution
+            if (
+                !ChainlessLib.validateChainlessNonceCallData(
+                    batchedCall.calls,
+                    address(this)
+                )
+            ) {
+                revert Errors.InvalidNonceKey(nonceKey);
+            }
+            // Hash without chain ID for cross-chain compatibility
+            dataHash = hashTypedDataSansChainId(intentHash);
+        } else {
+            // Standard hash with chain ID
+            dataHash = hashTypedData(intentHash);
+        }
+
+        // Step 7: Validate the signature
+        if (
+            !_validateSignature(
+                validator,
+                pubKeyHash,
+                dataHash,
+                validatorData[38:]
+            )
+        ) revert Errors.InvalidSignature();
+    }
+
     /// @notice Validate the user operation
     /// @param userOp The user operation to be validated
     /// @param userOpHash The hash of the user operation
@@ -217,16 +239,18 @@ abstract contract SmartWallet is
         bytes32 userOpHash,
         uint256 missingAccountFunds
     ) external onlyEntryPoint returns (uint256 validationData) {
+        // Step 1: Pay the prefund
         _payPrefund(missingAccountFunds);
 
-        // Extract validation components from signature
-        // Signature format: pubKeyHash (32) + validUntil (6) + signatures
-        bytes32 pubKeyHash = bytes32(userOp.signature[:32]);
-        uint48 validUntil = uint48(bytes6(userOp.signature[32:38]));
+        // Step 2: Extract validation components from signature
+        (bytes32 pubKeyHash, uint48 validUntil) = DecodeLib
+            .decodeSignatureComponents(userOp.signature);
 
+        // Step 3: Verify validator exists and is not expired
         address validator = getVerifiedValidator(pubKeyHash);
         if (validator == address(0)) return Static.SIG_VALIDATION_FAILED;
 
+        // Step 4: Handle chainless execution if applicable
         uint256 nonceKey = userOp.nonce >> 64;
         if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
             // Decode calls from userOp.callData
@@ -245,11 +269,12 @@ abstract contract SmartWallet is
             userOpHash = getUserOpHashWithoutChainId(userOp);
         }
 
-        // Add validUntil and IMPLEMENTATION to hash after chainless processing
+        // Step 5: Add validUntil and IMPLEMENTATION to hash after chainless processing
         userOpHash = keccak256(
             abi.encode(userOpHash, validUntil, IMPLEMENTATION)
         );
 
+        // Step 6: Validate signature
         if (
             !_validateSignature(
                 validator,
@@ -259,7 +284,7 @@ abstract contract SmartWallet is
             )
         ) return Static.SIG_VALIDATION_FAILED;
 
-        // Return the validation data in EntryPoint-compatible format
+        // Step 7: Return the validation data in EntryPoint-compatible format
         return uint256(validUntil) << 160;
     }
 
@@ -290,19 +315,23 @@ abstract contract SmartWallet is
         // Extract pubKeyHash, validUntil and signature from the input
         // Format: pubKeyHash (32) + validUntil (6) + signatures
         if (signature.length > 38) {
-            bytes32 pubKeyHash = bytes32(signature[:32]);
-            uint48 validUntil = uint48(bytes6(signature[32:38]));
+            // Step 1: Extract validation components from signature
+            (bytes32 pubKeyHash, uint48 validUntil) = DecodeLib
+                .decodeSignatureComponents(signature);
 
-            // Check expiry
+            // Step 2: Verify signature hasn't expired
             if (_isExpired(validUntil)) return Static.INVALID_VALUE;
 
-            // Use _validateSignature with calldata signature directly
+            // Step 3: Get and verify validator exists
             address validator = getVerifiedValidator(pubKeyHash);
             if (validator == address(0)) return Static.INVALID_VALUE;
 
+            // Step 4: Hash the message with EIP-712 standard
             bytes32 typedDataHash = hashTypedData(
                 MessageSignLib.hash(_hash, validUntil, IMPLEMENTATION)
             );
+
+            // Step 5: Validate the signature and return result
             return
                 _validateSignature(
                     validator,

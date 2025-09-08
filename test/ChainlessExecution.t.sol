@@ -237,7 +237,7 @@ contract ChainlessExecutionTest is Base {
         });
 
         bytes memory validatorData = _constructRelayerSignature(
-            address(_smartWallet),
+            testAccount, // Use testAccount which has alice as owner
             _alice,
             _alicePk,
             batchedCall,
@@ -251,7 +251,10 @@ contract ChainlessExecutionTest is Base {
                 Static.CHAIN_LESS_NONCE_KEY
             )
         );
-        _smartWallet.executeWithRelayer(batchedCall, validatorData);
+        SmartWallet(payable(testAccount)).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     /**

@@ -9,6 +9,7 @@ import {ChainlessLib} from "../../src/libraries/ChainlessLib.sol";
 import {ERC712} from "../../src/ERC712.sol";
 import {ISmartWalletSimulator} from "../../src/interfaces/ISmartWalletSimulator.sol";
 import {BatchedCallLib} from "../../src/libraries/BatchedCallLib.sol";
+import {DecodeLib} from "../../src/libraries/DecodeLib.sol";
 
 /// @title SmartWalletSimulator
 /// @notice A simulation contract that inherits from SmartWallet and implements simulation functionality
@@ -23,7 +24,7 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
     /// 2) "Successful simulation" means both validation and the sponsorship call passed.
     ///    Any failure in the user's batch calls is then captured in `errorData` and surfaced inside the `SimulateExecutionWithGas` revert.
     /// @param batchedCall BatchedCall struct containing calls, nonce, and expiry
-    /// @param validator Validator address intended to be used for validation during execution
+    /// @param validator Validator address to use for gas estimation
     /// @param validatorData Encoded data containing keyHash and signature: abi.encodePacked(keyHash, signature)
     function simulateExecuteWithRelayer(
         BatchedCall calldata batchedCall,
@@ -33,59 +34,8 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
         // Start measuring execution gas (everything except intrinsic gas)
         uint256 executionGasStart = gasleft();
         
-        // Extract validation components from new format
-        // Format: pubkeyHash (32) + validUntil (6) + signatures
-        bytes32 pubKeyHash = bytes32(validatorData[:32]);
-        uint48 validUntil = uint48(bytes6(validatorData[32:38]));
-
-        // Check transaction expiry
-        if (_isExpired(validUntil)) {
-            // revert Errors.ExpiryPassed(validUntil);
-        }
-
-        // Validate and update nonce
-        if (!validateAndUpdateNonce(batchedCall.nonce)) {
-            // revert Errors.InvalidNonce(batchedCall.nonce);
-        }
-
-        uint256 nonceKey = batchedCall.nonce >> 64;
-        bytes32 dataHash = batchedCall.hash(validUntil, IMPLEMENTATION);
-
-        if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
-            // Validate all calls are allowed to skip chain ID validation
-            if (
-                !ChainlessLib.validateChainlessNonceCallData(
-                    batchedCall.calls,
-                    address(this)
-                )
-            ) {
-                // revert Errors.InvalidNonceKey(nonceKey);
-            }
-            dataHash = hashTypedDataSansChainId(dataHash);
-        } else {
-            dataHash = hashTypedData(dataHash);
-        }
-
-        // Validate validator
-        address mockValidator = getVerifiedValidator(pubKeyHash);
-        // Use mockValidator to avoid unused variable warning since it is only used for gas measurement
-        mockValidator;
-
-        if (validator == address(0)) {
-            // revert Errors.InvalidKeyHash(pubKeyHash);
-        }
-
-        // Validate signature
-        if (
-            !_validateSignature(
-                validator,
-                pubKeyHash,
-                dataHash,
-                validatorData[38:]
-            )
-        ) {
-            // revert Errors.InvalidSignature();
-        }
+        // Validate and extract relayer data using the simulation function with custom validator
+        (bytes32 pubKeyHash, bytes32 dataHash) = _validateAndExtractRelayerDataForSimulation(batchedCall, validator, validatorData);
         
         // Execute the batch calls - any errors will bubble up and be caught by the caller
         _batchCall(batchedCall.calls, pubKeyHash);
@@ -118,6 +68,78 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
         
         // Revert with gas metrics
         revert Errors.SimulateExecution(executionGas, intrinsicGas, totalGas);
+    }
+    
+    /// @notice Validate and extract relayer data for simulation with custom validator
+    /// @dev All reverts are commented out to allow simulation to continue
+    /// @param batchedCall The batched call data
+    /// @param validator Custom validator address for simulation
+    /// @param validatorData The validator data containing pubKeyHash, validUntil, and signature
+    /// @return pubKeyHash The extracted public key hash
+    /// @return dataHash The computed data hash for event emission
+    function _validateAndExtractRelayerDataForSimulation(
+        BatchedCall calldata batchedCall,
+        address validator,
+        bytes calldata validatorData
+    ) internal returns (bytes32 pubKeyHash, bytes32 dataHash) {
+        // Step 1: Validate and consume nonce
+        if (!validateAndUpdateNonce(batchedCall.nonce)) {
+            // revert Errors.InvalidNonce(batchedCall.nonce);
+        }
+
+        // Step 2: Extract validation components from validatorData
+        uint48 validUntil;
+        (pubKeyHash, validUntil) = DecodeLib.decodeSignatureComponents(validatorData);
+
+        // Step 3: Verify transaction hasn't expired
+        if (_isExpired(validUntil)) {
+            // revert Errors.ExpiryPassed(validUntil);
+        }
+
+        // Step 4: Verify validator exists and is not expired
+        address actualValidator = ownerValidators[pubKeyHash];
+        if (actualValidator == address(0)) {
+            // revert Errors.InvalidKeyHash(pubKeyHash);
+        }
+
+        uint256 settings = ownerSettings[pubKeyHash];
+        if (settings != 0 && isSettingsExpired(settings)) {
+            // revert Errors.ValidatorExpired(pubKeyHash);
+        }
+
+        // Step 5: Compute the data hash based on nonce type
+        uint256 nonceKey = batchedCall.nonce >> 64;
+        bytes32 intentHash = batchedCall.hash(validUntil, IMPLEMENTATION);
+
+        // Step 6: Handle chainless execution if applicable
+        if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
+            // Validate all calls are allowed for chainless execution
+            if (
+                !ChainlessLib.validateChainlessNonceCallData(
+                    batchedCall.calls,
+                    address(this)
+                )
+            ) {
+                // revert Errors.InvalidNonceKey(nonceKey);
+            }
+            // Hash without chain ID for cross-chain compatibility
+            dataHash = hashTypedDataSansChainId(intentHash);
+        } else {
+            // Standard hash with chain ID
+            dataHash = hashTypedData(intentHash);
+        }
+
+        // Step 7: Validate the signature (use passed validator parameter for gas estimation)
+        if (
+            !_validateSignature(
+                validator,
+                pubKeyHash,
+                dataHash,
+                validatorData[38:]
+            )
+        ) {
+            // revert Errors.InvalidSignature();
+        }
     }
 
     /// @notice Compute intrinsic calldata-expansion gas: 16 per non-zero byte, 4 per zero byte
