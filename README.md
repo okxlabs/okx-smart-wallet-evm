@@ -1,12 +1,13 @@
-# Smart Wallet - EIP-4337 Account Abstraction Wallet
+# Unified Smart Wallet - Next-Generation Account Infrastructure
 
-A modular and secure smart contract wallet implementation supporting EIP-4337 account abstraction with advanced security features and multiple validator types.
+A modular and secure smart contract wallet implementation unifying EOA and smart contract accounts with support for multiple execution patterns and advanced security features.
 
 ## Overview
 
 This implementation provides a flexible smart contract wallet that supports:
 
 - EIP-4337 Account Abstraction standard
+- EIP-7702 EOA-to-Smart Contract upgrade functionality
 - Multiple execution methods (direct, relayer-based, UserOperation)
 - Advanced validator system (ECDSA, Passkey, External validators)
 - Modular architecture with managers and upgradeable proxy pattern
@@ -21,7 +22,9 @@ The wallet deployment uses a factory pattern:
 1. **Smart Wallet Factory**:
    - Creates deterministic wallet addresses using CREATE2
    - Deploys proxy contracts pointing to implementation
+   - Supports both direct factory calls and EIP-4337 EntryPoint initCode deployment
    - Supports batch wallet creation
+   - Offers `createAccountWithCall` to deploy and execute initial transactions atomically
 
 2. **Initialize Wallet**:
    - Calls the `initialize` function with initial owners
@@ -63,87 +66,88 @@ The wallet deployment uses a factory pattern:
  
 The implementation follows a modular manager-based design:
 
-- `SmartWallet`: Main wallet contract inheriting all managers
-- `OwnerManager`: Manages owner registration, settings, and permissions
-- `NonceManager`: Handles nonce validation and management
+### Core Contracts
+- `OKXSmartWalletEntry`: Production implementation extending SmartWallet with custom ERC7201 storage layout
+- `SmartWallet`: Base wallet contract inheriting all managers and core functionality
+- `SmartWalletFactory`: Factory for deterministic wallet deployment using CREATE2
+- `BaseAuthorization`: Access control foundation for self-executed functions
+
+### Manager Modules
+- `OwnerManager`: Owner registration, settings, and permissions
 - `ValidationManager`: Signature validation with multiple validator types
-- `ExecutionManager`: Low-level call execution functionality
+- `ExecutionManager`: Low-level call execution and batched operations
+- `NonceManager`: Nonce validation and replay protection
 - `AllowanceManager`: Token allowance and spending controls
+- `ERC4337Account`: EIP-4337 UserOperation support
+
+### Supporting Components
 - `FallbackHandler`: Token receiving and standard interface support
+- `ERC712`: Structured data signing standard implementation
+- `ERC7201`: Storage layout standard for upgradeable contracts
+
+### Validators
+- `ECDSAValidator`: Standard ECDSA signature validation
+- `PasskeyValidator`: WebAuthn/Passkey validation support
+
+### Libraries
+- `BatchedCallLib`: Batched transaction execution
+- `ChainlessLib`: Cross-chain signature validation
+- `MerkleProofProcessor`: Merkle proof verification for multi-chain operations
+- `MessageSignLib`: Message signing utilities
+- `CallLib`: Low-level call helpers
+- `DecodeLib`: Data decoding utilities
+
+### Utility Tools
+- `SmartWalletSimulator`: Gas estimation and simulation utility (located in scripts/utils/)
 
 ## Usage
 
 ### Prepare environment
 
+Requirements:
+- Node.js (v18 or higher)
+- npm or yarn package manager
+- Foundry toolkit for Solidity development
+
+Setup:
 ```bash
 git submodule update --init --recursive
+npm install  # or yarn install
 ```
 
-### Deploy
+### Testing
 
-Deploy on XLayer Mainnet:
+Run the test suite with Foundry:
 ```bash
-RPC_URL=https://rpc.xlayer.tech
-forge script scripts/deploy/DeployInit.sol --rpc-url $RPC_URL --legacy --broadcast
+forge test
 ```
 
-Deploy and initialize 7702 wallet on local
+For detailed test output:
 ```bash
-# Start local blockchain node with 7702 support
-anvil --hardfork prague
-./initialise.sh
+forge test -vvvv
 ```
 
-### 1. Deploy & Initialize Wallet
+### Run Smoke Tests on local node
 
-Deploy a new smart wallet using the factory:
+Execute the complete smoke test suite:
 
 ```bash
-npx hardhat run scripts/smoke_test/1-setCodeAndInitialize.ts --network <NETWORK>
+yarn smoke-test
 ```
 
-This script:
-
-- Creates a new wallet instance via SmartWalletFactory
-- Initializes with initial owners and validators
-- Sets up permissions and admin settings
-
-### 2. Execute Direct Transactions
-
-Send transactions directly from the wallet:
-
-```bash
-forge script scripts/smoke_test/2-sendTxs.sol --rpc-url <RPC_URL> --broadcast
-```
-
-This demonstrates:
-
-- Self-executed transactions
-- Batch call functionality
-- Direct interaction with external contracts
-
-### 3. Execute via Relayer
-
-Send transactions through a relayer:
-
-```bash
-forge script scripts/smoke_test/3-sendTxsAsRelayer.sol --rpc-url <RPC_URL> --broadcast
-```
-
-This demonstrates:
-
-- Off-chain signature generation with proper keyHash format
-- Relayer-based transaction execution via `executeWithRelayer`
-- Signature validation using registered validators
-- Nonce management and replay protection
-- Support for chain-agnostic signatures
+This will run through all test scenarios including wallet deployment, initialization, direct execution, and relayer-based transactions.
 
 ## Security Considerations
 
 - Multi-layered validation system with external validator support
+- Built-in support for ECDSA and Passkey (WebAuthn) validation
+- Cross-chain replay protection with Merkle proof signatures
 - Comprehensive nonce management prevents replay attacks
 - Admin privilege controls with expiration mechanisms
 - Hook-based validation for additional security checks
 - Owner permission system with granular access controls
-- Built-in support for ECDSA and Passkey (WebAuthn) validation
 - Upgradeable implementation with authorized upgrade controls
+
+## Documentation
+
+This README provides a high-level overview and quick start guide. For detailed technical documentation, implementation specifics, and usage patterns, see the [Technical Documentation](./documents/README.md) folder.
