@@ -18,7 +18,6 @@ library Errors {
     error InvalidValidatorImpl(address validatorImpl);
     error ValidatorAlreadyExists();
     error ValidatorNotFound();
-    error ValidatorExpired(bytes32 keyHash);
 
     // ECDSAValidator related
     error InvalidSignature();

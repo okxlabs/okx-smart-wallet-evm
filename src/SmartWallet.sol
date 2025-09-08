@@ -189,12 +189,8 @@ abstract contract SmartWallet is
         if (_isExpired(validUntil)) revert Errors.ExpiryPassed(validUntil);
 
         // Step 4: Verify validator exists and is not expired
-        address validator = ownerValidators[pubKeyHash];
+        address validator = getVerifiedValidator(pubKeyHash);
         if (validator == address(0)) revert Errors.InvalidKeyHash(pubKeyHash);
-
-        uint256 settings = ownerSettings[pubKeyHash];
-        if (settings != 0 && isSettingsExpired(settings))
-            revert Errors.ValidatorExpired(pubKeyHash);
 
         // Step 5: Compute the data hash based on nonce type
         uint256 nonceKey = batchedCall.nonce >> 64;
