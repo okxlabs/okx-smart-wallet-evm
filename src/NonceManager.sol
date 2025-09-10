@@ -7,10 +7,11 @@ import {INonceManager} from "./interfaces/INonceManager.sol";
 /// @notice Abstract contract providing nonce management functionality
 /// @dev Handles nonce validation, updates, and expiry checking
 abstract contract NonceManager is INonceManager {
-    // ============ Storage Variables ============
+    // State Variables
+
     mapping(uint192 => uint64) public _nonces; // nonceKey => nonce value
 
-    // ============ Nonce Management ============
+    // Nonce Management Functions
     /// @notice Validates the provided nonce matches the stored value and increments it
     /// @dev Returns true if nonce is valid, false otherwise. Always updates nonce and emits event.
     /// @param packedNonce The packed nonce containing nonceKey (upper 192 bits) and nonce (lower 64 bits)
@@ -23,9 +24,9 @@ abstract contract NonceManager is INonceManager {
 
         unchecked {
             emit NonceConsumed(key, nonce);
-            // NOTE: Nonce is always incremented, but if validation fails,
-            // outer function will revert, undoing this change.
-            // This design saves ~500 gas compared to conditional increment.
+            // Gas optimization: Nonce is always incremented optimistically.
+            // If validation fails, the outer function reverts, undoing this change.
+            // Saves ~500 gas compared to conditional increment pattern.
             return nonce == _nonces[key]++;
         }
     }

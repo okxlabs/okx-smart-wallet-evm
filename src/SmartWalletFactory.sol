@@ -3,7 +3,7 @@ pragma solidity ^0.8.29;
 
 import {LibClone} from "solady/utils/LibClone.sol";
 import {ISmartWallet} from "./interfaces/ISmartWallet.sol";
-import {ISmartWalletFactory, InitialOwner} from "./interfaces/ISmartWalletFactory.sol";
+import {ISmartWalletFactory, InitialOwner} from "../script/utils/ISmartWalletFactory.sol";
 import {BatchedCall} from "./Types.sol";
 
 contract SmartWalletFactory is ISmartWalletFactory {

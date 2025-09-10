@@ -3,7 +3,6 @@ pragma solidity ^0.8.23;
 
 import {Base} from "./Base.t.sol";
 import {Static} from "src/libraries/Static.sol";
-import {Errors} from "src/libraries/Errors.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
@@ -247,7 +246,7 @@ contract ChainlessExecutionTest is Base {
         // Should revert because target is not self
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidNonceKey.selector,
+                ISmartWallet.InvalidNonceKey.selector,
                 Static.CHAIN_LESS_NONCE_KEY
             )
         );
@@ -276,7 +275,7 @@ contract ChainlessExecutionTest is Base {
         // Should revert with InvalidNonceKey
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidNonceKey.selector,
+                ISmartWallet.InvalidNonceKey.selector,
                 Static.CHAIN_LESS_NONCE_KEY
             )
         );
@@ -319,7 +318,7 @@ contract ChainlessExecutionTest is Base {
         // Should revert because second call is not chainless-compatible
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidNonceKey.selector,
+                ISmartWallet.InvalidNonceKey.selector,
                 Static.CHAIN_LESS_NONCE_KEY
             )
         );
@@ -355,7 +354,7 @@ contract ChainlessExecutionTest is Base {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidNonceKey.selector,
+                ISmartWallet.InvalidNonceKey.selector,
                 Static.CHAIN_LESS_NONCE_KEY
             )
         );

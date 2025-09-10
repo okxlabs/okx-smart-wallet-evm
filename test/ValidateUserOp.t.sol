@@ -4,12 +4,11 @@ pragma solidity ^0.8.23;
 import {Base} from "./Base.t.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 import {IERC4337Account} from "src/interfaces/IERC4337Account.sol";
-import {Errors} from "src/libraries/Errors.sol";
 import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
 import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
-import {HelperLib} from "scripts/utils/Helper.sol";
+import {HelperLib} from "script/utils/Helper.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 import {Static} from "src/libraries/Static.sol";
@@ -484,7 +483,7 @@ contract ValidateUserOpTest is Base {
             100 ether + t.missingAccountFunds * 2
         );
         // Not entry point reverts.
-        vm.expectRevert(Errors.NotEntryPoint.selector);
+        vm.expectRevert(IERC4337Account.NotEntryPoint.selector);
         IERC4337Account(account).validateUserOp(
             userOp,
             t.userOpHash,
@@ -814,7 +813,7 @@ contract ValidateUserOpTest is Base {
         uint256 missingAccountFunds = 100;
 
         // Test 1: Direct call from non-EntryPoint should revert
-        vm.expectRevert(Errors.NotEntryPoint.selector);
+        vm.expectRevert(IERC4337Account.NotEntryPoint.selector);
         IERC4337Account(account).validateUserOp(
             userOp,
             userOpHash,
@@ -823,7 +822,7 @@ contract ValidateUserOpTest is Base {
 
         // Test 2: Call from another EOA should revert
         vm.prank(_bob);
-        vm.expectRevert(Errors.NotEntryPoint.selector);
+        vm.expectRevert(IERC4337Account.NotEntryPoint.selector);
         IERC4337Account(account).validateUserOp(
             userOp,
             userOpHash,
@@ -832,7 +831,7 @@ contract ValidateUserOpTest is Base {
 
         // Test 3: Call from the account itself should still revert (not EntryPoint)
         vm.prank(account);
-        vm.expectRevert(Errors.NotEntryPoint.selector);
+        vm.expectRevert(IERC4337Account.NotEntryPoint.selector);
         IERC4337Account(account).validateUserOp(
             userOp,
             userOpHash,

@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import "lib/forge-std/src/Script.sol";
+import {Script, console} from "lib/forge-std/src/Script.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {IAllowanceManager} from "src/interfaces/IAllowanceManager.sol";
-import {ISmartWalletFactory} from "src/interfaces/ISmartWalletFactory.sol";
-import {ExecutionManager} from "src/ExecutionManager.sol";
+import {ISmartWalletFactory} from "./ISmartWalletFactory.sol";
 
 /// @title EventTopics
 /// @notice A script for printing the event topics of all contract events
@@ -29,8 +28,6 @@ contract EventTopics is Script {
 
         // IAllowanceManager events
         console.log("\n=== IAllowanceManager Events ===");
-        console.log("ApproveNative:");
-        console.logBytes32(IAllowanceManager.ApproveNative.selector);
         console.log("ApproveToken:");
         console.logBytes32(IAllowanceManager.ApproveToken.selector);
         console.log("TransferFromNative:");
@@ -42,14 +39,16 @@ contract EventTopics is Script {
         console.log("TokenAllowanceUpdated:");
         console.logBytes32(IAllowanceManager.TokenAllowanceUpdated.selector);
 
+        // ISmartWallet events
+        console.log("\n=== ISmartWallet Events ===");
+        console.log("WalletInitialized:");
+        console.logBytes32(ISmartWallet.WalletInitialized.selector);
+        console.log("ExecuteSuccessEvent:");
+        console.logBytes32(ISmartWallet.ExecuteSuccessEvent.selector);
+
         // ISmartWalletFactory events
         console.log("\n=== ISmartWalletFactory Events ===");
         console.log("AccountCreated:");
         console.logBytes32(ISmartWalletFactory.AccountCreated.selector);
-
-        // ExecutionManager events
-        console.log("\n=== ExecutionManager Events ===");
-        console.log("ExecuteSuccessEvent:");
-        console.logBytes32(ExecutionManager.ExecuteSuccessEvent.selector);
     }
 }

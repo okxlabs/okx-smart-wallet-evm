@@ -2,11 +2,11 @@
 pragma solidity ^0.8.23;
 
 import {Base} from "./Base.t.sol";
+import {BaseAuthorization} from "src/BaseAuthorization.sol";
 import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
 import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
-import {Errors} from "src/libraries/Errors.sol";
 import {Static} from "src/libraries/Static.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
@@ -100,7 +100,10 @@ contract ValidatorTest is Base {
         // Non-owner tries to execute - should revert with InvalidCaller
         vm.prank(nonOwner);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidCaller.selector, nonOwner)
+            abi.encodeWithSelector(
+                ISmartWallet.InvalidCaller.selector,
+                nonOwner
+            )
         );
         ISmartWallet(_aliceWallet).execute(calls);
     }
@@ -125,7 +128,10 @@ contract ValidatorTest is Base {
 
         vm.prank(_alice);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidValidatorImpl.selector, dave)
+            abi.encodeWithSelector(
+                IOwnerManager.InvalidValidatorImpl.selector,
+                dave
+            )
         );
         ISmartWallet(_aliceWallet).execute(calls);
     }
@@ -152,7 +158,7 @@ contract ValidatorTest is Base {
         );
 
         vm.prank(_alice);
-        vm.expectRevert(Errors.ValidatorAlreadyExists.selector);
+        vm.expectRevert(IOwnerManager.ValidatorAlreadyExists.selector);
         ISmartWallet(_aliceWallet).execute(calls);
     }
 
@@ -179,7 +185,7 @@ contract ValidatorTest is Base {
         vm.prank(_alice);
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidValidatorImpl.selector,
+                IOwnerManager.InvalidValidatorImpl.selector,
                 address(0)
             )
         );
@@ -263,7 +269,7 @@ contract ValidatorTest is Base {
         );
 
         vm.prank(_alice);
-        vm.expectRevert(Errors.ValidatorAlreadyExists.selector);
+        vm.expectRevert(IOwnerManager.ValidatorAlreadyExists.selector);
         ISmartWallet(_aliceWallet).execute(calls);
 
         // Test removing the validator
@@ -683,7 +689,9 @@ contract ValidatorTest is Base {
 
         // Try to call removeValidator directly from external address (not through execute)
         vm.prank(_bob);
-        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        vm.expectRevert(
+            abi.encodeWithSelector(BaseAuthorization.NotFromSelf.selector)
+        );
         (bool success, ) = _aliceWallet.call(
             abi.encodeWithSelector(OwnerManager.removeOwner.selector, keyHash)
         );
@@ -749,7 +757,7 @@ contract ValidatorTest is Base {
 
         // Should revert with NonAdminSelfCall
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.NonAdminSelfCall.selector)
+            abi.encodeWithSelector(ISmartWallet.NonAdminSelfCall.selector)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, signature);
     }
@@ -805,7 +813,7 @@ contract ValidatorTest is Base {
 
         // Should revert with NonAdminSelfCall
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.NonAdminSelfCall.selector)
+            abi.encodeWithSelector(ISmartWallet.NonAdminSelfCall.selector)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, signature);
     }
@@ -1027,7 +1035,7 @@ contract ValidatorTest is Base {
 
         // Should revert
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.ValidatorNotFound.selector)
+            abi.encodeWithSelector(IOwnerManager.ValidatorNotFound.selector)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, signature);
     }
@@ -1083,7 +1091,7 @@ contract ValidatorTest is Base {
         // Should revert
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidValidatorImpl.selector,
+                IOwnerManager.InvalidValidatorImpl.selector,
                 _charlie
             )
         );
@@ -1318,7 +1326,7 @@ contract ValidatorTest is Base {
 
         vm.prank(_bob);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+            abi.encodeWithSelector(ISmartWallet.InvalidSignature.selector)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
@@ -1357,7 +1365,7 @@ contract ValidatorTest is Base {
         );
         vm.prank(_bob);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+            abi.encodeWithSelector(ISmartWallet.InvalidSignature.selector)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
@@ -1376,7 +1384,7 @@ contract ValidatorTest is Base {
         );
         vm.prank(_bob);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+            abi.encodeWithSelector(ISmartWallet.InvalidSignature.selector)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
@@ -1393,7 +1401,7 @@ contract ValidatorTest is Base {
         );
         vm.prank(_bob);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+            abi.encodeWithSelector(ISmartWallet.InvalidSignature.selector)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
@@ -1425,7 +1433,7 @@ contract ValidatorTest is Base {
         vm.prank(_bob);
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidKeyHash.selector,
+                ISmartWallet.InvalidKeyHash.selector,
                 invalidKeyHash
             )
         );
@@ -1570,7 +1578,7 @@ contract ValidatorTest is Base {
 
         // The transaction should revert with InvalidSignature because the validator reverts
         // and _validateSignature returns false when external validator reverts
-        vm.expectRevert(Errors.InvalidSignature.selector);
+        vm.expectRevert(ISmartWallet.InvalidSignature.selector);
         vm.prank(_alice);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
@@ -1616,7 +1624,7 @@ contract ValidatorTest is Base {
         );
 
         // The transaction should revert with InvalidSignature because validator returns false
-        vm.expectRevert(Errors.InvalidSignature.selector);
+        vm.expectRevert(ISmartWallet.InvalidSignature.selector);
         vm.prank(_alice);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
@@ -1635,7 +1643,9 @@ contract ValidatorTest is Base {
 
         // Test 1: Direct call from external address should revert with NotFromSelf
         vm.prank(_bob);
-        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        vm.expectRevert(
+            abi.encodeWithSelector(BaseAuthorization.NotFromSelf.selector)
+        );
         OwnerManager(_aliceWallet).addOwner(
             newKeyHash,
             newValidator,
@@ -1644,7 +1654,9 @@ contract ValidatorTest is Base {
 
         // Test 2: Direct call from owner (Alice) should also revert with NotFromSelf
         vm.prank(_alice);
-        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        vm.expectRevert(
+            abi.encodeWithSelector(BaseAuthorization.NotFromSelf.selector)
+        );
         OwnerManager(_aliceWallet).addOwner(
             newKeyHash,
             newValidator,
@@ -1683,7 +1695,9 @@ contract ValidatorTest is Base {
 
         // Test 1: Direct call from external address should revert with NotFromSelf
         vm.prank(_bob);
-        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        vm.expectRevert(
+            abi.encodeWithSelector(BaseAuthorization.NotFromSelf.selector)
+        );
         OwnerManager(_aliceWallet).updateOwner(
             keyHash,
             newValidator,
@@ -1692,7 +1706,9 @@ contract ValidatorTest is Base {
 
         // Test 2: Direct call from owner (Alice) should also revert with NotFromSelf
         vm.prank(_alice);
-        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        vm.expectRevert(
+            abi.encodeWithSelector(BaseAuthorization.NotFromSelf.selector)
+        );
         OwnerManager(_aliceWallet).updateOwner(
             keyHash,
             newValidator,

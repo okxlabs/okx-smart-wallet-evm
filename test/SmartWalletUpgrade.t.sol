@@ -2,13 +2,13 @@
 pragma solidity ^0.8.23;
 
 import {Base} from "./Base.t.sol";
+import {BaseAuthorization} from "src/BaseAuthorization.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
-import {Errors} from "src/libraries/Errors.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 
 // SmartWalletEntryV2 - Upgraded version for testing
@@ -226,7 +226,7 @@ contract SmartWalletUpgradeTest is Base {
         
         // Should fail because non-admin cannot make self-calls
         vm.prank(makeAddr("relayer"));
-        vm.expectRevert(abi.encodeWithSelector(Errors.NonAdminSelfCall.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISmartWallet.NonAdminSelfCall.selector));
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, validatorData);
     }
     
@@ -256,14 +256,14 @@ contract SmartWalletUpgradeTest is Base {
         
         // Should revert with InvalidSignature
         vm.prank(_alice);
-        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidSignature.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISmartWallet.InvalidSignature.selector));
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, invalidValidatorData);
     }
     
     function test_direct_upgrade_call_fails() public {
         // Direct call from non-owner should fail with NotFromSelf
         vm.prank(_bob);
-        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        vm.expectRevert(abi.encodeWithSelector(BaseAuthorization.NotFromSelf.selector));
         UUPSUpgradeable(_aliceWallet).upgradeToAndCall(
             address(smartWalletV2Implementation),
             ""
@@ -271,7 +271,7 @@ contract SmartWalletUpgradeTest is Base {
         
         // Direct call from EOA owner also fails with NotFromSelf
         vm.prank(_alice);
-        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        vm.expectRevert(abi.encodeWithSelector(BaseAuthorization.NotFromSelf.selector));
         UUPSUpgradeable(_aliceWallet).upgradeToAndCall(
             address(smartWalletV2Implementation),
             ""

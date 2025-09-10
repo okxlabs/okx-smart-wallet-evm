@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
 
-import "lib/forge-std/src/Vm.sol";
+import {Vm} from "lib/forge-std/src/Vm.sol";
 
 /// @title EIP2470
 /// @notice Library for deploying and interacting with the EIP-2470 Singleton Factory

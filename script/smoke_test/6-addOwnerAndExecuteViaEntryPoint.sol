@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
 
-import "lib/forge-std/src/Script.sol";
-import "src/interfaces/ISmartWallet.sol";
-import "src/SmartWallet.sol";
-import "src/interfaces/IOwnerManager.sol";
-import "src/libraries/BatchedCallLib.sol";
-import "src/libraries/PasskeyValidatorLib.sol";
-import "src/Types.sol";
+import {Script, console} from "lib/forge-std/src/Script.sol";
+import {SmartWallet} from "src/SmartWallet.sol";
+import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
+import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {HelperLib} from "../utils/Helper.sol";
 import {EntryPoint} from "account-abstraction/core/EntryPoint.sol";
@@ -15,6 +12,7 @@ import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 import {IERC4337Account} from "src/interfaces/IERC4337Account.sol";
 import {Static} from "src/libraries/Static.sol";
+import {Call} from "src/Types.sol";
 
 /// @title AddOwnerAndExecuteViaEntryPoint
 /// @notice A script for adding an owner and executing transactions using Passkey signature through ERC-4337 EntryPoint

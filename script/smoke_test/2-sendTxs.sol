@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
 
-import "lib/forge-std/src/Script.sol";
-import "src/interfaces/ISmartWallet.sol";
-import "src/Types.sol";
+import {Script, console} from "lib/forge-std/src/Script.sol";
+import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
+import {Call} from "src/Types.sol";
 
 /// @title SendTxs
 /// @notice A script for sending transactions through SmartWallet

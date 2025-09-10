@@ -6,7 +6,6 @@ import {Base, MockERC20} from "./Base.t.sol";
 import {ISmartWallet} from "../src/interfaces/ISmartWallet.sol";
 import {IOwnerManager} from "../src/interfaces/IOwnerManager.sol";
 import {OwnerManager} from "../src/OwnerManager.sol";
-import {Errors} from "../src/libraries/Errors.sol";
 import {Call, BatchedCall} from "../src/Types.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IHook} from "../src/interfaces/IHook.sol";
@@ -392,7 +391,7 @@ contract HookTest is Base {
 
         // Use execute with EOA as msg.sender - should fail because owner is expired
         vm.prank(_alice);
-        vm.expectRevert(Errors.OwnerExpired.selector);
+        vm.expectRevert(ISmartWallet.OwnerExpired.selector);
         ISmartWallet(_aliceWallet).execute(calls2);
 
         // Verify no additional transfer happened (execution failed due to owner expiration)

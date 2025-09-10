@@ -2,7 +2,6 @@
 pragma solidity ^0.8.29;
 
 import {IOwnerManager} from "./interfaces/IOwnerManager.sol";
-import {Errors} from "./libraries/Errors.sol";
 import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
 import {Static} from "./libraries/Static.sol";
 import {BaseAuthorization} from "./BaseAuthorization.sol";
@@ -13,13 +12,13 @@ import {BaseAuthorization} from "./BaseAuthorization.sol";
 abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
 
-    // ============ State Variables ============
+    // State Variables
 
     EnumerableSetLib.Bytes32Set internal _ownerKeys; // Set of all owner keyHashes
     mapping(bytes32 => address) public ownerValidators; // keyHash => validator address for this owner
     mapping(bytes32 => uint256) public ownerSettings; // keyHash => packed settings (isAdmin + expiration + hook)
 
-    // ============ External Functions ============
+    // External Functions
 
     /// @notice Registers a validator with optional settings
     /// @dev Only callable by the wallet itself. Use packSettings() to create the settings parameter.
@@ -45,7 +44,7 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
     ) internal {
         // Check if keyHash is already registered
         if (_ownerKeys.contains(keyHash)) {
-            revert Errors.ValidatorAlreadyExists();
+            revert IOwnerManager.ValidatorAlreadyExists();
         }
 
         // Validate validator address
@@ -69,7 +68,7 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
     ) external onlySelf {
         // Check if keyHash exists
         if (!_ownerKeys.contains(keyHash)) {
-            revert Errors.ValidatorNotFound();
+            revert IOwnerManager.ValidatorNotFound();
         }
 
         // Validate new validator address
@@ -91,9 +90,8 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
         _removeValidator(keyHash);
     }
 
-    // ============ External View Functions (Interface Implementation) ============
-    // Note: Function names retain "Validator" for interface compatibility,
-    // but they actually enumerate wallet owners and their keyHashes
+    // External View Functions
+    // Note: Function names retain "Validator" for interface compatibility
 
     function ownerCount() external view override returns (uint256) {
         return _ownerKeys.length();
@@ -146,7 +144,7 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
         expired = isSettingsExpired(settings);
     }
 
-    // ============ Public View Functions ============
+    // Public View Functions
 
     /// @notice Get the verified validator address for a given keyHash with EIP-7702 support
     /// @dev Returns built-in ECDSA validator (address(1)) for self-signing when no validator installed
@@ -177,10 +175,8 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
         return expiration != 0 && expiration < block.timestamp;
     }
 
-    // ============ Public Pure Functions (Settings Management) ============
-    // Bit layout for settings
-    // Layout: 6 bytes UNUSED | 1 byte isAdmin | 5 bytes expiration | 20 bytes hook
-    // Bits:   [255-208]       | [207-200]      | [199-160]        | [159-0]
+    // Public Pure Functions (Settings Management)
+    // Bit layout: [255-208: UNUSED] [207-200: isAdmin] [199-160: expiration] [159-0: hook]
 
     /// @notice Pack settings into uint256
     /// @param adminFlag Admin flag
@@ -219,7 +215,7 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
         return ((settings >> 200) & 0xff) == 1;
     }
 
-    // ============ Internal Functions ============
+    // Internal Functions
 
     /// @notice Internal function to set an owner's validator with settings atomically
     /// @param keyHash The owner's public key hash
@@ -252,7 +248,7 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
             validator != Static.PASSKEY_VALIDATOR_ADDRESS &&
             validator.code.length == 0
         ) {
-            revert Errors.InvalidValidatorImpl(validator);
+            revert IOwnerManager.InvalidValidatorImpl(validator);
         }
     }
 }

@@ -12,7 +12,6 @@ import {ValidationManager} from "./ValidationManager.sol";
 import {ExecutionManager} from "./ExecutionManager.sol";
 import {FallbackHandler} from "./FallbackHandler.sol";
 import {Call, BatchedCall, InitialOwner} from "./Types.sol";
-import {Errors} from "./libraries/Errors.sol";
 import {Static} from "./libraries/Static.sol";
 import {IHook} from "./interfaces/IHook.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
@@ -25,7 +24,7 @@ import {DecodeLib} from "./libraries/DecodeLib.sol";
 import {ChainlessLib} from "./libraries/ChainlessLib.sol";
 import {MessageSignLib} from "./libraries/MessageSignLib.sol";
 
-// Do not set any states in this contract
+/// @dev This contract uses UUPS upgradeable pattern. All state is stored via inherited contracts.
 abstract contract SmartWallet is
     ISmartWallet,
     ERC7201,
@@ -63,12 +62,12 @@ abstract contract SmartWallet is
 
         bytes32 keyHash = keccak256(abi.encodePacked(msg.sender));
         if (!hasOwner(keyHash)) {
-            revert Errors.InvalidCaller(msg.sender);
+            revert ISmartWallet.InvalidCaller(msg.sender);
         }
 
         uint256 settings = ownerSettings[keyHash];
         if (settings != 0 && isSettingsExpired(settings)) {
-            revert Errors.OwnerExpired();
+            revert ISmartWallet.OwnerExpired();
         }
         _;
     }
@@ -89,6 +88,8 @@ abstract contract SmartWallet is
 
             _addOwner(keyHash, validator, settings);
         }
+
+        emit WalletInitialized();
     }
 
     /// @notice Executes multiple contract calls in a single transaction
@@ -156,7 +157,7 @@ abstract contract SmartWallet is
 
         for (uint256 i; i < calls.length; i++) {
             if (calls[i].target == address(this) && !allowSelfCall) {
-                revert Errors.NonAdminSelfCall();
+                revert ISmartWallet.NonAdminSelfCall();
             }
             _call(calls[i]);
         }
@@ -179,7 +180,7 @@ abstract contract SmartWallet is
     ) internal returns (bytes32 pubKeyHash, bytes32 dataHash) {
         // Step 1: Validate and consume nonce
         if (!validateAndUpdateNonce(batchedCall.nonce))
-            revert Errors.InvalidNonce(batchedCall.nonce);
+            revert ISmartWallet.InvalidNonce(batchedCall.nonce);
 
         // Step 2: Extract validation components from validatorData
         uint48 validUntil;
@@ -188,11 +189,13 @@ abstract contract SmartWallet is
         );
 
         // Step 3: Verify transaction hasn't expired
-        if (_isExpired(validUntil)) revert Errors.ExpiryPassed(validUntil);
+        if (_isExpired(validUntil))
+            revert ISmartWallet.ExpiryPassed(validUntil);
 
         // Step 4: Verify validator exists and is not expired
         address validator = getVerifiedValidator(pubKeyHash);
-        if (validator == address(0)) revert Errors.InvalidKeyHash(pubKeyHash);
+        if (validator == address(0))
+            revert ISmartWallet.InvalidKeyHash(pubKeyHash);
 
         // Step 5: Compute the data hash based on nonce type
         uint256 nonceKey = batchedCall.nonce >> 64;
@@ -207,7 +210,7 @@ abstract contract SmartWallet is
                     address(this)
                 )
             ) {
-                revert Errors.InvalidNonceKey(nonceKey);
+                revert ISmartWallet.InvalidNonceKey(nonceKey);
             }
             // Hash without chain ID for cross-chain compatibility
             dataHash = hashTypedDataSansChainId(intentHash);
@@ -224,7 +227,7 @@ abstract contract SmartWallet is
                 dataHash,
                 validatorData[38:]
             )
-        ) revert Errors.InvalidSignature();
+        ) revert ISmartWallet.InvalidSignature();
     }
 
     /// @notice Validates the user operation
@@ -358,6 +361,6 @@ abstract contract SmartWallet is
     /// @param data Calldata to pass to the target
     function delegateAndRevert(address target, bytes calldata data) external {
         (bool success, bytes memory ret) = target.delegatecall(data);
-        revert Errors.DelegateAndRevert(success, ret);
+        revert ISmartWallet.DelegateAndRevert(success, ret);
     }
 }

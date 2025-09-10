@@ -103,7 +103,7 @@ if [ $DEPLOY_RESULT -eq 0 ]; then
     echo -e "${GREEN}✅ SmartWallet contracts deployed successfully!${NC}"
     
     # Extract SmartWallet address from deployment output
-    SMART_WALLET_ADDRESS=$(echo "$DEPLOY_OUTPUT" | grep "SmartWallet address:" | sed 's/.*SmartWallet address: //')
+    SMART_WALLET_ADDRESS=$(echo "$DEPLOY_OUTPUT" | grep "SmartWallet Implementation address:" | sed 's/.*SmartWallet Implementation address: //')
     
     if [ -n "$SMART_WALLET_ADDRESS" ]; then
         echo -e "${YELLOW}📝 SmartWallet implementation address: $SMART_WALLET_ADDRESS${NC}"

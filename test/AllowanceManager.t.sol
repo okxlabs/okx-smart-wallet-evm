@@ -2,6 +2,7 @@
 pragma solidity ^0.8.29;
 
 import {Base, MockERC20} from "./Base.t.sol";
+import {BaseAuthorization} from "src/BaseAuthorization.sol";
 import {SmartWallet} from "../src/SmartWallet.sol";
 import {IAllowanceManager} from "../src/interfaces/IAllowanceManager.sol";
 import {ISmartWallet} from "../src/interfaces/ISmartWallet.sol";
@@ -9,7 +10,6 @@ import {Call, BatchedCall} from "../src/Types.sol";
 import {Static} from "../src/libraries/Static.sol";
 import {BatchedCallLib} from "../src/libraries/BatchedCallLib.sol";
 import {ERC712} from "../src/ERC712.sol";
-import {Errors} from "../src/libraries/Errors.sol";
 
 // Contract that rejects ETH transfers
 contract ETHRejectingContract {
@@ -277,7 +277,9 @@ contract AllowanceManagerTest is Base {
 
         // Test 1: Should fail for unauthorized user - trying to call directly
         vm.prank(unauthorized);
-        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        vm.expectRevert(
+            abi.encodeWithSelector(BaseAuthorization.NotFromSelf.selector)
+        );
         IAllowanceManager.ApprovalInfo[]
             memory approvals1 = new IAllowanceManager.ApprovalInfo[](1);
         approvals1[0] = IAllowanceManager.ApprovalInfo({
@@ -289,7 +291,9 @@ contract AllowanceManagerTest is Base {
 
         // Test 2: Should fail for external address (Bob)
         vm.prank(_bob);
-        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        vm.expectRevert(
+            abi.encodeWithSelector(BaseAuthorization.NotFromSelf.selector)
+        );
         IAllowanceManager.ApprovalInfo[]
             memory approvals2 = new IAllowanceManager.ApprovalInfo[](1);
         approvals2[0] = IAllowanceManager.ApprovalInfo({
@@ -395,7 +399,9 @@ contract AllowanceManagerTest is Base {
 
         // Test 1: Should fail for unauthorized user
         vm.prank(unauthorized);
-        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        vm.expectRevert(
+            abi.encodeWithSelector(BaseAuthorization.NotFromSelf.selector)
+        );
         IAllowanceManager.ApprovalInfo[]
             memory approvals = new IAllowanceManager.ApprovalInfo[](1);
         approvals[0] = IAllowanceManager.ApprovalInfo({
@@ -407,7 +413,9 @@ contract AllowanceManagerTest is Base {
 
         // Test 2: Should fail for external address (Bob)
         vm.prank(_bob);
-        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        vm.expectRevert(
+            abi.encodeWithSelector(BaseAuthorization.NotFromSelf.selector)
+        );
         IAllowanceManager.ApprovalInfo[]
             memory approvals2 = new IAllowanceManager.ApprovalInfo[](1);
         approvals2[0] = IAllowanceManager.ApprovalInfo({
@@ -1065,12 +1073,16 @@ contract AllowanceManagerTest is Base {
 
         // Try to call directly as unauthorized user
         vm.prank(unauthorized);
-        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        vm.expectRevert(
+            abi.encodeWithSelector(BaseAuthorization.NotFromSelf.selector)
+        );
         aliceSmartWallet.batchApproveToken(approvals);
 
         // Try to call as external address (Bob)
         vm.prank(_bob);
-        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        vm.expectRevert(
+            abi.encodeWithSelector(BaseAuthorization.NotFromSelf.selector)
+        );
         aliceSmartWallet.batchApproveToken(approvals);
     }
 

@@ -4,7 +4,6 @@ pragma solidity ^0.8.23;
 import {console} from "forge-std/Test.sol";
 import {Base} from "./Base.t.sol";
 import {Call, BatchedCall} from "src/Types.sol";
-import {Errors} from "src/libraries/Errors.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
@@ -13,7 +12,7 @@ import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {ERC712} from "src/ERC712.sol";
-import {HelperLib} from "scripts/utils/Helper.sol";
+import {HelperLib} from "script/utils/Helper.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {Static} from "src/libraries/Static.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
@@ -492,7 +491,7 @@ contract PasskeyValidatorTest is Base {
 
         // Should revert with InvalidSignature because PasskeyValidator will return false
         vm.prank(_bob);
-        vm.expectRevert(Errors.InvalidSignature.selector);
+        vm.expectRevert(ISmartWallet.InvalidSignature.selector);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             shortValidatorData
@@ -642,7 +641,7 @@ contract PasskeyValidatorTest is Base {
         );
 
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+            abi.encodeWithSelector(ISmartWallet.InvalidSignature.selector)
         );
         vm.prank(_bob);
         ISmartWallet(_aliceWallet).executeWithRelayer(
@@ -756,7 +755,7 @@ contract PasskeyValidatorTest is Base {
         );
 
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+            abi.encodeWithSelector(ISmartWallet.InvalidSignature.selector)
         );
         vm.prank(_bob);
         ISmartWallet(_aliceWallet).executeWithRelayer(

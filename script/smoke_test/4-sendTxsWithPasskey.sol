@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
 
-import "lib/forge-std/src/Script.sol";
-import "src/interfaces/ISmartWallet.sol";
-import "src/SmartWallet.sol";
-import "src/interfaces/IOwnerManager.sol";
-import "src/interfaces/INonceManager.sol";
-import "src/libraries/BatchedCallLib.sol";
-import "src/libraries/PasskeyValidatorLib.sol";
-import "src/Types.sol";
+import {Script, console} from "lib/forge-std/src/Script.sol";
+import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
+import {SmartWallet} from "src/SmartWallet.sol";
+import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
+import {INonceManager} from "src/interfaces/INonceManager.sol";
+import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
+import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
+import {Call, BatchedCall} from "src/Types.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {HelperLib} from "../utils/Helper.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
@@ -42,14 +42,14 @@ contract SendTxsWithPasskey is Script {
         console.log("\n=== Add EOA owner using first Passkey + Merkle ===");
 
         // Generate a random EOA owner address for testing
-        address payable newEOAOwner = payable(
+        address payable newEoaOwner = payable(
             address(0x1234567890AbcdEF1234567890aBcdef12345678)
         );
 
         // Add EOA owner using Merkle proof via executeWithRelayer
-        _addEOAOwnerWithMerkle(
+        _addEoaOwnerWithMerkle(
             userWallet,
-            newEOAOwner,
+            newEoaOwner,
             passkeyPrivateKey1,
             passkeyPubX1,
             passkeyPubY1,
@@ -60,17 +60,17 @@ contract SendTxsWithPasskey is Script {
         vm.stopBroadcast();
     }
 
-    function _addEOAOwnerWithMerkle(
+    function _addEoaOwnerWithMerkle(
         address payable userWallet,
-        address payable newEOAOwner,
+        address payable newEoaOwner,
         uint256 signerPrivateKey,
         uint256 signerPubX,
         uint256 signerPubY,
         address validator
     ) private {
         // Calculate new EOA owner's keyHash
-        bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(newEOAOwner));
-        console.log("New EOA owner address:", newEOAOwner);
+        bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(newEoaOwner));
+        console.log("New EOA owner address:", newEoaOwner);
         console.log("New EOA owner keyHash:");
         console.logBytes32(newOwnerKeyHash);
 

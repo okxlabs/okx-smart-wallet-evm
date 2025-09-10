@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
 
-import "lib/forge-std/src/Script.sol";
-import "src/interfaces/ISmartWallet.sol";
-import "src/SmartWallet.sol";
-import "src/interfaces/IOwnerManager.sol";
-import "src/libraries/BatchedCallLib.sol";
-import "src/Types.sol";
+import {Script, console} from "lib/forge-std/src/Script.sol";
+import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
+import {SmartWallet} from "src/SmartWallet.sol";
+import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
+import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
+import {Call, BatchedCall} from "src/Types.sol";
 
 /// @title SendTxsAsRelayer
 /// @notice A script for sending transactions as a relayer using executeWithRelayer

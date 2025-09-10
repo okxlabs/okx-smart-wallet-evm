@@ -5,8 +5,7 @@ import {Base, MockERC20} from "./Base.t.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {ISmartWalletSimulator} from "src/interfaces/ISmartWalletSimulator.sol";
-import {SmartWalletSimulator} from "../scripts/utils/SmartWalletSimulator.sol";
-import {Errors} from "src/libraries/Errors.sol";
+import {SmartWalletSimulator} from "../script/utils/SmartWalletSimulator.sol";
 import {console} from "forge-std/console.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -744,7 +743,7 @@ contract SimulationTest is Base {
             // Check for SimulateExecution error
             assertEq(
                 uint32(selector),
-                uint32(Errors.SimulateExecution.selector),
+                uint32(ISmartWalletSimulator.SimulateExecution.selector),
                 "Expected SimulateExecution error"
             );
 
@@ -808,7 +807,7 @@ contract SimulationTest is Base {
             // Check for SimulateExecution error
             assertEq(
                 uint32(selector),
-                uint32(Errors.SimulateExecution.selector),
+                uint32(ISmartWalletSimulator.SimulateExecution.selector),
                 "Expected SimulateExecution error"
             );
 
@@ -969,7 +968,7 @@ contract SimulationTest is Base {
             // Check for SimulateExecution error
             assertEq(
                 uint32(selector),
-                uint32(Errors.SimulateExecution.selector),
+                uint32(ISmartWalletSimulator.SimulateExecution.selector),
                 "Expected SimulateExecution error"
             );
 
@@ -1052,7 +1051,7 @@ contract SimulationTest is Base {
             // The simulation should fail with NonAdminSelfCall since Alice doesn't have admin privileges
             assertEq(
                 uint32(selector),
-                uint32(Errors.NonAdminSelfCall.selector),
+                uint32(ISmartWallet.NonAdminSelfCall.selector),
                 "Expected NonAdminSelfCall error due to lack of admin privileges"
             );
         }
@@ -1121,7 +1120,7 @@ contract SimulationTest is Base {
             // Check for SimulateExecution error
             assertEq(
                 uint32(selector),
-                uint32(Errors.SimulateExecution.selector),
+                uint32(ISmartWalletSimulator.SimulateExecution.selector),
                 "Expected SimulateExecution error"
             );
 
@@ -1194,7 +1193,7 @@ contract SimulationTest is Base {
             console.log("Got error selector:", vm.toString(selector));
             console.log(
                 "Expected SimulateExecution selector:",
-                vm.toString(Errors.SimulateExecution.selector)
+                vm.toString(ISmartWalletSimulator.SimulateExecution.selector)
             );
 
             // Note: Currently, execution errors bubble up directly instead of being caught and surfaced
@@ -1288,13 +1287,13 @@ contract SimulationTest is Base {
             );
             console.log(
                 "Expected SimulateExecution selector",
-                vm.toString(Errors.SimulateExecution.selector)
+                vm.toString(ISmartWalletSimulator.SimulateExecution.selector)
             );
 
             // The simulation should complete successfully and return gas metrics
             assertEq(
                 uint32(selector),
-                uint32(Errors.SimulateExecution.selector),
+                uint32(ISmartWalletSimulator.SimulateExecution.selector),
                 "Expected SimulateExecution error"
             );
 

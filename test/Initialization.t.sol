@@ -2,7 +2,6 @@
 pragma solidity ^0.8.23;
 
 import {Base} from "./Base.t.sol";
-import {Errors} from "src/libraries/Errors.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {InitialOwner} from "src/Types.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
@@ -84,6 +83,30 @@ contract InitializationTest is Base {
         );
     }
 
+    function test_initialize_emits_WalletInitialized_event() public {
+        _setCodeToEoa(address(_smartWallet), _bob);
+
+        // Create initial owners
+        bytes32[] memory keyHashes = new bytes32[](2);
+        keyHashes[0] = keccak256(abi.encodePacked(_alice));
+        keyHashes[1] = keccak256(abi.encodePacked(_bob));
+        address[] memory validators = new address[](2);
+        validators[0] = address(_ecdsaValidator);
+        validators[1] = address(_ecdsaValidator);
+        InitialOwner[] memory initialOwners = _createOwners(
+            keyHashes,
+            validators
+        );
+
+        // Expect the WalletInitialized event (no parameters)
+        vm.expectEmit(_bob);
+        emit ISmartWallet.WalletInitialized();
+
+        // Initialize the wallet
+        vm.prank(_bob);
+        ISmartWallet(_bob).initialize(initialOwners);
+    }
+
     function test_initialize_reverts_with_zero_validator() public {
         _setCodeToEoa(address(_smartWallet), _bob);
 
@@ -95,7 +118,7 @@ contract InitializationTest is Base {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidValidatorImpl.selector,
+                IOwnerManager.InvalidValidatorImpl.selector,
                 address(0)
             )
         );

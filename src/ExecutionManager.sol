@@ -4,12 +4,6 @@ pragma solidity ^0.8.29;
 import {Call} from "./Types.sol";
 
 abstract contract ExecutionManager {
-    event ExecuteSuccessEvent(
-        bytes32 indexed intentHash,
-        address sender,
-        uint256 nonce
-    );
-
     uint256 private constant MAX_RETURNDATA_SIZE = 256; // Good enough for common customised error
 
     /// @notice Executes a low-level call to a target contract
@@ -33,7 +27,7 @@ abstract contract ExecutionManager {
                 0 // no output len
             )
 
-            // manually revert truncated data
+            // Revert with truncated error data for gas efficiency
             if iszero(success) {
                 let len := returndatasize()
                 if gt(len, MAX_RETURNDATA_SIZE) {

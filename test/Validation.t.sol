@@ -2,7 +2,6 @@
 pragma solidity ^0.8.23;
 
 import {Base} from "./Base.t.sol";
-import {Errors} from "src/libraries/Errors.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
@@ -42,7 +41,7 @@ contract ValidationTest is Base {
 
         vm.prank(_alice);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+            abi.encodeWithSelector(ISmartWallet.InvalidSignature.selector)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0}),
@@ -68,7 +67,10 @@ contract ValidationTest is Base {
 
         vm.prank(_bob);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidKeyHash.selector, bobKeyHash)
+            abi.encodeWithSelector(
+                ISmartWallet.InvalidKeyHash.selector,
+                bobKeyHash
+            )
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0}),
@@ -104,7 +106,10 @@ contract ValidationTest is Base {
 
         vm.prank(_alice);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidKeyHash.selector, bobKeyHash)
+            abi.encodeWithSelector(
+                ISmartWallet.InvalidKeyHash.selector,
+                bobKeyHash
+            )
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             BatchedCall({calls: calls, nonce: 0}),
@@ -177,7 +182,7 @@ contract ValidationTest is Base {
         // Execute transaction that should revert
         vm.prank(_alice);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+            abi.encodeWithSelector(ISmartWallet.InvalidSignature.selector)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
@@ -260,7 +265,7 @@ contract ValidationTest is Base {
 
         // Bob should be rejected after expiration
         vm.prank(_bob);
-        vm.expectRevert(Errors.OwnerExpired.selector);
+        vm.expectRevert(ISmartWallet.OwnerExpired.selector);
         ISmartWallet(_aliceWallet).execute(calls);
     }
 
@@ -324,7 +329,10 @@ contract ValidationTest is Base {
 
         // Should revert with ExpiryPassed error
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.ExpiryPassed.selector, validUntil)
+            abi.encodeWithSelector(
+                ISmartWallet.ExpiryPassed.selector,
+                validUntil
+            )
         );
         vm.prank(_alice);
         ISmartWallet(_aliceWallet).executeWithRelayer(
@@ -421,7 +429,7 @@ contract ValidationTest is Base {
         // The signature is bound to alice's specific wallet address
         vm.prank(relayer);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+            abi.encodeWithSelector(ISmartWallet.InvalidSignature.selector)
         );
         ISmartWallet(independentWallet).executeWithRelayer(
             batchedCall,
@@ -496,7 +504,7 @@ contract ValidationTest is Base {
         // the signature is bound to the specific wallet address
         vm.prank(relayer);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+            abi.encodeWithSelector(ISmartWallet.InvalidSignature.selector)
         );
         ISmartWallet(secondWallet).executeWithRelayer(
             batchedCall,
@@ -812,7 +820,7 @@ contract ValidationTest is Base {
         vm.prank(_alice);
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidNonceKey.selector,
+                ISmartWallet.InvalidNonceKey.selector,
                 Static.CHAIN_LESS_NONCE_KEY
             )
         );
@@ -869,7 +877,7 @@ contract ValidationTest is Base {
         vm.prank(_alice);
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidNonceKey.selector,
+                ISmartWallet.InvalidNonceKey.selector,
                 Static.CHAIN_LESS_NONCE_KEY
             )
         );
@@ -904,7 +912,7 @@ contract ValidationTest is Base {
         vm.prank(_alice);
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidNonceKey.selector,
+                ISmartWallet.InvalidNonceKey.selector,
                 Static.CHAIN_LESS_NONCE_KEY
             )
         );
@@ -969,7 +977,7 @@ contract ValidationTest is Base {
         vm.prank(_alice);
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidNonceKey.selector,
+                ISmartWallet.InvalidNonceKey.selector,
                 Static.CHAIN_LESS_NONCE_KEY
             )
         );
@@ -1025,7 +1033,7 @@ contract ValidationTest is Base {
             // but not due to InvalidNonceKey (which would happen before execution)
             bytes4 errorSelector = bytes4(reason);
             assertTrue(
-                errorSelector != Errors.InvalidNonceKey.selector,
+                errorSelector != ISmartWallet.InvalidNonceKey.selector,
                 "Should not fail with InvalidNonceKey for upgradeToAndCall selector"
             );
         }
@@ -1113,7 +1121,7 @@ contract ValidationTest is Base {
         vm.prank(_alice);
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidNonceKey.selector,
+                ISmartWallet.InvalidNonceKey.selector,
                 Static.CHAIN_LESS_NONCE_KEY
             )
         );

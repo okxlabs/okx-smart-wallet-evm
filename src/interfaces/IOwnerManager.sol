@@ -2,13 +2,25 @@
 pragma solidity ^0.8.29;
 
 interface IOwnerManager {
+    // ERRORS
+    error InvalidValidatorImpl(address validatorImpl);
+    error ValidatorAlreadyExists();
+    error ValidatorNotFound();
+
     // EVENTS
     event OwnerAdded(bytes32 keyHash, address validator);
     event OwnerRemoved(bytes32 keyHash, address validator);
     event OwnerUpdated(bytes32 keyHash, address newValidator);
 
     // Public mappings (auto-generated getters)
+    /// @notice Returns the validator address for a given keyHash
+    /// @param keyHash The keyHash to look up
+    /// @return The validator address associated with the keyHash
     function ownerValidators(bytes32 keyHash) external view returns (address);
+
+    /// @notice Returns the packed settings for a given keyHash
+    /// @param keyHash The keyHash to look up
+    /// @return The packed settings value for the owner
     function ownerSettings(bytes32 keyHash) external view returns (uint256);
 
     /// @notice Add an owner to the wallet
@@ -43,25 +55,32 @@ interface IOwnerManager {
     ) external view returns (address);
 
     // Validator enumeration functions
-    /// @notice Returns the total number of registered owners
-    /// @return Count of owners in the wallet
+    /// @notice Returns the total number of owners registered in the wallet
+    /// @return The count of registered owners
     function ownerCount() external view returns (uint256);
 
-    /// @notice Returns the owner key hash at a specific index
-    /// @param index The index in the owner set (0-based)
-    /// @return Key hash of the owner at the specified index
+    /// @notice Returns the keyHash of the owner at the specified index
+    /// @param index The index of the owner to retrieve
+    /// @return The keyHash of the owner at the given index
     function ownerAt(uint256 index) external view returns (bytes32);
 
-    /// @notice Returns all registered owner key hashes
-    /// @return Array of all owner key hashes in the wallet
+    /// @notice Returns all owner keyHashes
+    /// @return Array of all registered owner keyHashes
     function getOwnerKeys() external view returns (bytes32[] memory);
 
-    /// @notice Checks if a key hash is registered as an owner
-    /// @param keyHash The key hash to check
-    /// @return True if the key hash is a registered owner, false otherwise
+    /// @notice Checks if a keyHash is registered as an owner
+    /// @param keyHash The keyHash to check
+    /// @return True if the keyHash is a registered owner, false otherwise
     function hasOwner(bytes32 keyHash) external view returns (bool);
 
     // Validator settings query functions
+    /// @notice Get comprehensive validator settings including hook, expiration, and admin status
+    /// @param keyHash The public key hash to query
+    /// @return validator The validator address
+    /// @return hook The hook address (address(0) if no hook)
+    /// @return expiration Unix timestamp when validator expires (0 = never expires)
+    /// @return adminStatus Whether this validator has admin privileges
+    /// @return expired Whether the validator is currently expired
     function getOwnerSettings(
         bytes32 keyHash
     )
@@ -76,31 +95,30 @@ interface IOwnerManager {
         );
 
     // Settings utility functions
-    /// @notice Extracts the hook address from packed settings
-    /// @param settings The packed settings value
-    /// @return Hook address (bits 0-159)
+    /// @notice Extract hook address from packed settings (bits 0-159)
+    /// @param settings Packed settings value
+    /// @return Hook address (address(0) = no hook)
     function getHook(uint256 settings) external pure returns (address);
 
-    /// @notice Extracts the expiration timestamp from packed settings
-    /// @param settings The packed settings value
-    /// @return Expiration timestamp (bits 160-199)
+    /// @notice Extract expiration timestamp from packed settings (bits 160-199)
+    /// @param settings Packed settings value
+    /// @return Unix timestamp (0 = never expires)
     function getExpiration(uint256 settings) external pure returns (uint40);
 
-    /// @notice Extracts the admin flag from packed settings
-    /// @param settings The packed settings value
-    /// @return True if admin flag is set (bit 200), false otherwise
+    /// @notice Extract admin flag from packed settings (bits 200-207)
+    /// @param settings Packed settings value
+    /// @return True if signer has admin privileges
     function isAdmin(uint256 settings) external pure returns (bool);
 
-    /// @notice Checks if the settings have expired based on current block timestamp
-    /// @param settings The packed settings value
-    /// @return True if expiration > 0 and block.timestamp >= expiration, false otherwise
+    /// @notice Check if settings are expired based on block timestamp
+    /// @param settings Packed settings value
+    /// @return True if settings are expired (expiration != 0 and < block.timestamp)
     function isSettingsExpired(uint256 settings) external view returns (bool);
 
-    /// @notice Packs admin flag, expiration, and hook address into a single uint256
-    /// @dev Bit layout: [unused (55 bits)][admin (1 bit)][expiration (40 bits)][hook (160 bits)]
-    /// @param adminFlag Whether the owner has admin privileges
-    /// @param expiration Timestamp when the owner expires (0 for no expiration)
-    /// @param hook Address of the hook contract for this owner
+    /// @notice Pack settings into uint256
+    /// @param adminFlag Admin flag
+    /// @param expiration Unix timestamp (0 = never expires)
+    /// @param hook Hook address (address(0) = no hook)
     /// @return Packed settings value
     function packSettings(
         bool adminFlag,

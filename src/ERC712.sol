@@ -7,8 +7,8 @@ import {EIP712} from "solady/utils/EIP712.sol";
 abstract contract ERC712 is EIP712 {
     /// @notice Computes the EIP-712 typed data hash with chain ID
     /// @dev Wraps Solady's internal _hashTypedData to provide public access
-    /// @param structHash The hash of the structured data to be signed
-    /// @return digest The EIP-712 compliant hash including domain separator with chain ID
+    /// @param structHash Hash of the structured data to be signed
+    /// @return digest EIP-712 compliant hash including domain separator with chain ID
     function hashTypedData(
         bytes32 structHash
     ) public view returns (bytes32 digest) {
@@ -17,8 +17,8 @@ abstract contract ERC712 is EIP712 {
 
     /// @notice Computes the EIP-712 typed data hash without chain ID for cross-chain compatibility
     /// @dev Wraps Solady's internal _hashTypedDataSansChainId for chainless operation mode
-    /// @param structHash The hash of the structured data to be signed
-    /// @return digest The EIP-712 compliant hash excluding chain ID from domain separator
+    /// @param structHash Hash of the structured data to be signed
+    /// @return digest EIP-712 compliant hash excluding chain ID from domain separator
     function hashTypedDataSansChainId(
         bytes32 structHash
     ) public view returns (bytes32 digest) {

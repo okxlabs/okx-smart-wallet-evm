@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
 
-import "lib/forge-std/src/Script.sol";
+import {Script, console} from "lib/forge-std/src/Script.sol";
 import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 import {IStakeManager} from "account-abstraction/interfaces/IStakeManager.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
-import {HelperLib} from "scripts/utils/Helper.sol";
+import {HelperLib} from "script/utils/Helper.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
@@ -64,28 +64,20 @@ contract WithdrawWithPasskey is Script {
             )
         });
 
-        // Get current nonce
-        uint64 currentNonce = INonceManager(userWallet).getNonce(0);
-
-        // Create BatchedCall
+        // Create BatchedCall with current nonce
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: currentNonce
+            nonce: INonceManager(userWallet).getNonce(0)
         });
 
-        // Prepare validation data (no expiry)
-        uint48 validUntil = 0;
-
-        // Get implementation address for hash calculation
-        address implementation = SmartWallet(userWallet).IMPLEMENTATION();
-
-        // Calculate the hash to sign
-        bytes32 hash = BatchedCallLib.hash(
-            batchedCall,
-            validUntil,
-            implementation
+        // Calculate the hash to sign (inline to reduce stack depth)
+        bytes32 typedHash = SmartWallet(userWallet).hashTypedData(
+            BatchedCallLib.hash(
+                batchedCall,
+                0, // validUntil
+                SmartWallet(userWallet).IMPLEMENTATION()
+            )
         );
-        bytes32 typedHash = SmartWallet(userWallet).hashTypedData(hash);
 
         console.log("Typed hash for withdrawal:");
         console.logBytes32(typedHash);
@@ -131,47 +123,38 @@ contract WithdrawWithPasskey is Script {
         uint256 signerPubX,
         uint256 signerPubY,
         bytes32 messageHash
-    ) private view returns (bytes memory) {
-        uint48 validUntil = 0; // No expiry
-        // Calculate keyHash
-        bytes32 keyHash = keccak256(abi.encodePacked(signerPubX, signerPubY));
-
+    ) private pure returns (bytes memory) {
         // Generate Passkey signature
         (string memory clientDataJson, , bytes32 passkeyMessageHash) = HelperLib
             .getPasskeyMessageHash(messageHash);
 
-        // Sign with P256 curve
+        // Sign with P256 curve and create auth directly
         (bytes32 r, bytes32 s) = vm.signP256(
             signerPrivateKey,
             passkeyMessageHash
         );
 
-        // Create WebAuthnAuth structure
-        WebAuthn.WebAuthnAuth memory auth = WebAuthn.WebAuthnAuth({
-            authenticatorData: HelperLib.AUTHENTICATOR_DATA,
-            clientDataJSON: clientDataJson,
-            typeIndex: HelperLib.TYPE_INDEX,
-            challengeIndex: HelperLib.CHALLENGE_LOCATION,
-            r: uint256(r),
-            s: uint256(s)
-        });
-
-        // Encode the signature (no merkle proofs)
-        bytes memory sig = abi.encode(auth, new bytes32[](0));
-
-        // Create validatorData: keyHash + validUntil + PasskeyPubKey + sig
-        bytes memory validatorData = abi.encodePacked(
-            keyHash,
-            validUntil,
+        // Create validatorData with inline calculations to reduce stack depth
+        return abi.encodePacked(
+            keccak256(abi.encodePacked(signerPubX, signerPubY)), // keyHash
+            uint48(0), // validUntil
             abi.encode(
                 PasskeyValidatorLib.PasskeyPubKey({
                     pubKeyX: signerPubX,
                     pubKeyY: signerPubY
                 })
             ),
-            sig
+            abi.encode(
+                WebAuthn.WebAuthnAuth({
+                    authenticatorData: HelperLib.AUTHENTICATOR_DATA,
+                    clientDataJSON: clientDataJson,
+                    typeIndex: HelperLib.TYPE_INDEX,
+                    challengeIndex: HelperLib.CHALLENGE_LOCATION,
+                    r: uint256(r),
+                    s: uint256(s)
+                }),
+                new bytes32[](0) // no merkle proofs
+            )
         );
-
-        return validatorData;
     }
 }

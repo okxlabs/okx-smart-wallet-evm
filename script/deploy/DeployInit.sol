@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import "lib/forge-std/src/Script.sol";
+import {Script, console} from "lib/forge-std/src/Script.sol";
 import {DeployInitHelper} from "./DeployInitHelper.sol";
 import {IDeployFactory} from "../utils/IDeployFactory.sol";
-import {OwnerManager} from "src/OwnerManager.sol";
-import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
-import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
 

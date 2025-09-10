@@ -2,7 +2,6 @@
 pragma solidity ^0.8.23;
 
 import {Base, MockComplexContract, MockRevertingContract, MockERC20} from "./Base.t.sol";
-import {Errors} from "src/libraries/Errors.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {console} from "forge-std/console.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
@@ -76,7 +75,7 @@ contract ExecutionTest is Base {
         vm.prank(_bob);
         Call[] memory calls = constructCallsData();
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidCaller.selector, _bob)
+            abi.encodeWithSelector(ISmartWallet.InvalidCaller.selector, _bob)
         );
         ISmartWallet(_aliceWallet).execute(calls);
     }
@@ -117,7 +116,7 @@ contract ExecutionTest is Base {
         vm.prank(dave);
         Call[] memory calls = constructCallsData();
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidCaller.selector, dave)
+            abi.encodeWithSelector(ISmartWallet.InvalidCaller.selector, dave)
         );
         ISmartWallet(_aliceWallet).execute(calls);
     }
@@ -174,7 +173,10 @@ contract ExecutionTest is Base {
         vm.prank(_charlie);
         Call[] memory calls = constructCallsData();
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidCaller.selector, _charlie)
+            abi.encodeWithSelector(
+                ISmartWallet.InvalidCaller.selector,
+                _charlie
+            )
         );
         ISmartWallet(_aliceWallet).execute(calls);
 
@@ -822,7 +824,7 @@ contract ExecutionTest is Base {
 
         // Attempt to execute through relayer should revert with NonAdminSelfCall
         vm.prank(_charlie); // Charlie acts as relayer
-        vm.expectRevert(Errors.NonAdminSelfCall.selector);
+        vm.expectRevert(ISmartWallet.NonAdminSelfCall.selector);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData

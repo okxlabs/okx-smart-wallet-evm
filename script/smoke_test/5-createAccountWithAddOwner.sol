@@ -1,16 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
 
-import "lib/forge-std/src/Script.sol";
-import "src/SmartWalletFactory.sol";
-import "src/interfaces/ISmartWallet.sol";
-import "src/interfaces/IOwnerManager.sol";
-import "src/SmartWallet.sol";
-import "src/OwnerManager.sol";
-import "src/Types.sol";
-import "src/libraries/BatchedCallLib.sol";
-import "src/libraries/PasskeyValidatorLib.sol";
-import "src/libraries/Static.sol";
+import {Script, console} from "lib/forge-std/src/Script.sol";
+import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
+import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
+import {InitialOwner, Call, BatchedCall} from "src/Types.sol";
+import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
+import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
+import {Static} from "src/libraries/Static.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {HelperLib} from "../utils/Helper.sol";
 
@@ -90,7 +87,7 @@ contract CreateAccountWithAddOwner is Script {
         console.log("Predicted account address: ", predictedAddress);
 
         // 4. Generate random EOA owner to be added
-        address randomEOAAddress = vm.addr(
+        address randomEoaAddress = vm.addr(
             uint256(
                 keccak256(
                     abi.encodePacked(
@@ -101,10 +98,10 @@ contract CreateAccountWithAddOwner is Script {
                 )
             )
         );
-        bytes32 eoaKeyHash = bytes32(uint256(uint160(randomEOAAddress)));
+        bytes32 eoaKeyHash = bytes32(uint256(uint160(randomEoaAddress)));
 
         console.log("\nEOA owner to be added:");
-        console.log("  Address: ", randomEOAAddress);
+        console.log("  Address: ", randomEoaAddress);
         console.log("  KeyHash: ");
         console.logBytes32(eoaKeyHash);
 
@@ -196,14 +193,14 @@ contract CreateAccountWithAddOwner is Script {
         address predictedWallet
     ) private pure returns (bytes32) {
         // Calculate domain typehash (without chainId)
-        bytes32 DOMAIN_TYPEHASH = keccak256(
+        bytes32 domainTypehash = keccak256(
             "EIP712Domain(string name,string version,address verifyingContract)"
         );
 
         // Build domain separator with predicted wallet address as verifyingContract
         bytes32 domainSeparator = keccak256(
             abi.encode(
-                DOMAIN_TYPEHASH,
+                domainTypehash,
                 keccak256(bytes("SmartWallet")),
                 keccak256(bytes("1.0.0")),
                 predictedWallet // Use predicted wallet address

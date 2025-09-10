@@ -3,10 +3,8 @@ pragma solidity ^0.8.29;
 
 import {SmartWallet} from "../../src/SmartWallet.sol";
 import {BatchedCall} from "../../src/Types.sol";
-import {Errors} from "../../src/libraries/Errors.sol";
 import {Static} from "../../src/libraries/Static.sol";
 import {ChainlessLib} from "../../src/libraries/ChainlessLib.sol";
-import {ERC712} from "../../src/ERC712.sol";
 import {ISmartWalletSimulator} from "../../src/interfaces/ISmartWalletSimulator.sol";
 import {BatchedCallLib} from "../../src/libraries/BatchedCallLib.sol";
 import {DecodeLib} from "../../src/libraries/DecodeLib.sol";
@@ -74,7 +72,7 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
         uint256 totalGas = executionGas + intrinsicGas;
 
         // Revert with gas metrics
-        revert Errors.SimulateExecution(executionGas, intrinsicGas, totalGas);
+        revert ISmartWalletSimulator.SimulateExecution(executionGas, intrinsicGas, totalGas);
     }
 
     /// @notice Validate and extract relayer data for simulation with custom validator

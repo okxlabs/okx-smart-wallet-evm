@@ -3,7 +3,6 @@ pragma solidity ^0.8.23;
 
 import {Base} from "./Base.t.sol";
 import {Call, BatchedCall} from "src/Types.sol";
-import {Errors} from "src/libraries/Errors.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 
 contract MerkleExecutionTest is Base {
@@ -300,7 +299,7 @@ contract MerkleExecutionTest is Base {
 
         vm.prank(_bob);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+            abi.encodeWithSelector(ISmartWallet.InvalidSignature.selector)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
@@ -326,7 +325,7 @@ contract MerkleExecutionTest is Base {
 
         vm.prank(_bob);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+            abi.encodeWithSelector(ISmartWallet.InvalidSignature.selector)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
@@ -351,7 +350,7 @@ contract MerkleExecutionTest is Base {
         vm.prank(_bob);
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidKeyHash.selector,
+                ISmartWallet.InvalidKeyHash.selector,
                 keccak256(abi.encodePacked(eve))
             )
         );
@@ -383,7 +382,7 @@ contract MerkleExecutionTest is Base {
 
         vm.prank(_bob);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidNonce.selector, nonce)
+            abi.encodeWithSelector(ISmartWallet.InvalidNonce.selector, nonce)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             invalidNonceBatchedCall,
@@ -424,7 +423,7 @@ contract MerkleExecutionTest is Base {
         vm.prank(_bob);
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidNonce.selector,
+                ISmartWallet.InvalidNonce.selector,
                 batchedCall.nonce
             )
         );
@@ -461,7 +460,7 @@ contract MerkleExecutionTest is Base {
 
         vm.prank(_bob);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+            abi.encodeWithSelector(ISmartWallet.InvalidSignature.selector)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             manipulatedBatchedCall,
@@ -487,7 +486,7 @@ contract MerkleExecutionTest is Base {
 
         vm.prank(_bob);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+            abi.encodeWithSelector(ISmartWallet.InvalidSignature.selector)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,

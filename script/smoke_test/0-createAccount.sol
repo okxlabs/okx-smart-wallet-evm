@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.12;
 
-import "lib/forge-std/src/Script.sol";
-import "src/interfaces/ISmartWalletFactory.sol";
-import "src/Types.sol";
-import "src/validator/PasskeyValidator.sol";
-import "src/validator/ECDSAValidator.sol";
-import "src/libraries/Static.sol";
+import {Script, console} from "lib/forge-std/src/Script.sol";
+import {ISmartWalletFactory} from "../utils/ISmartWalletFactory.sol";
+import {InitialOwner} from "src/Types.sol";
+import {Static} from "src/libraries/Static.sol";
 
 /// @title CreateAccount
 /// @notice A script for creating a new SmartWallet account with Passkey and ECDSA owners
@@ -48,7 +46,7 @@ contract CreateAccount is Script {
         console.logBytes32(passkeyKeyHash);
 
         // 2. Generate a random ECDSA owner
-        uint256 randomECDSAPrivateKey = uint256(
+        uint256 randomEcdsaPrivateKey = uint256(
             keccak256(
                 abi.encodePacked(
                     block.timestamp,
@@ -57,15 +55,15 @@ contract CreateAccount is Script {
                 )
             )
         );
-        address randomECDSAAddress = vm.addr(randomECDSAPrivateKey);
-        bytes32 ecdsaKeyHash = bytes32(uint256(uint160(randomECDSAAddress)));
+        address randomEcdsaAddress = vm.addr(randomEcdsaPrivateKey);
+        bytes32 ecdsaKeyHash = bytes32(uint256(uint160(randomEcdsaAddress)));
         initialOwners[1] = InitialOwner({
             keyHash: ecdsaKeyHash,
             validator: Static.ECDSA_VALIDATOR_ADDRESS
         });
         console.log("\nAdding ECDSA owner:");
-        console.log("  Address: ", randomECDSAAddress);
-        console.log("  Private Key: ", randomECDSAPrivateKey);
+        console.log("  Address: ", randomEcdsaAddress);
+        console.log("  Private Key: ", randomEcdsaPrivateKey);
         console.log("  KeyHash: ");
         console.logBytes32(ecdsaKeyHash);
 
@@ -124,13 +122,13 @@ contract CreateAccount is Script {
         });
 
         // Random ECDSA owner
-        uint256 randomECDSAPrivateKey = uint256(
+        uint256 randomEcdsaPrivateKey = uint256(
             keccak256(
                 abi.encodePacked(customSalt, deployer, "RANDOM_ECDSA_OWNER")
             )
         );
-        address randomECDSAAddress = vm.addr(randomECDSAPrivateKey);
-        bytes32 ecdsaKeyHash = bytes32(uint256(uint160(randomECDSAAddress)));
+        address randomEcdsaAddress = vm.addr(randomEcdsaPrivateKey);
+        bytes32 ecdsaKeyHash = bytes32(uint256(uint160(randomEcdsaAddress)));
         initialOwners[1] = InitialOwner({
             keyHash: ecdsaKeyHash,
             validator: Static.ECDSA_VALIDATOR_ADDRESS
@@ -143,7 +141,7 @@ contract CreateAccount is Script {
         );
 
         console.log("SmartWallet account created at: ", newAccount);
-        console.log("With ECDSA owner: ", randomECDSAAddress);
+        console.log("With ECDSA owner: ", randomEcdsaAddress);
 
         vm.stopBroadcast();
     }

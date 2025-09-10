@@ -4,6 +4,13 @@ pragma solidity ^0.8.29;
 import {BatchedCall} from "../Types.sol";
 
 interface ISmartWalletSimulator {
+    // ERRORS
+    error SimulateExecution(
+        uint256 executionGas,
+        uint256 intrinsicGas,
+        uint256 totalGas
+    );
+
     /// @notice Simulate a sponsored transaction, measuring gas costs for validation and execution, then reverts with detailed metrics.
     /// @dev Always reverts with `Errors.SimulateExecution` containing execution gas, intrinsic gas (base + calldata), and total gas metrics.
     /// 1) If the simulation fails during validation or the sponsor call, those other errors bubble up directly instead.
