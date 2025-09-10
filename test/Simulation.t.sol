@@ -5,7 +5,7 @@ import {Base, MockERC20} from "./Base.t.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {ISmartWalletSimulator} from "src/interfaces/ISmartWalletSimulator.sol";
-import {SmartWalletSimulator} from "../scripts/utils/SmartWalletSimulator.sol";
+
 import {Errors} from "src/libraries/Errors.sol";
 import {console} from "forge-std/console.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -89,9 +89,6 @@ contract SimulationTest is Base {
 
     uint256 maxDeal = 13132800;
 
-    // Simulation wallet instance for testing simulation functionality
-    address payable internal _smartWalletSimulator;
-
     // Helper function to decode DelegateAndRevert error
     function decodeDelegateAndRevert(
         bytes memory revertData
@@ -124,8 +121,6 @@ contract SimulationTest is Base {
         super.setUp();
 
         // Deploy a SmartWalletSimulator instance for testing simulation functionality
-        SmartWalletSimulator simulator = new SmartWalletSimulator();
-        _smartWalletSimulator = payable(address(simulator));
 
         recipients = [
             relayer,
@@ -721,7 +716,7 @@ contract SimulationTest is Base {
         uint256 gasStart = gasleft();
         try
             ISmartWallet(_aliceWallet).delegateAndRevert(
-                address(_smartWalletSimulator),
+                address(_simulator),
                 abi.encodeWithSelector(
                     ISmartWalletSimulator.simulateExecuteWithRelayer.selector,
                     BatchedCall({calls: calls, nonce: 0}),
@@ -785,7 +780,7 @@ contract SimulationTest is Base {
         vm.prank(relayer);
         try
             ISmartWallet(_aliceWallet).delegateAndRevert(
-                address(_smartWalletSimulator),
+                address(_simulator),
                 abi.encodeWithSelector(
                     ISmartWalletSimulator.simulateExecuteWithRelayer.selector,
                     batchedCall,
@@ -946,7 +941,7 @@ contract SimulationTest is Base {
         vm.prank(relayer);
         try
             ISmartWallet(_aliceWallet).delegateAndRevert(
-                address(_smartWalletSimulator),
+                address(_simulator),
                 abi.encodeWithSelector(
                     ISmartWalletSimulator.simulateExecuteWithRelayer.selector,
                     batchedCall,
@@ -1030,7 +1025,7 @@ contract SimulationTest is Base {
         vm.prank(relayer);
         try
             ISmartWallet(_aliceWallet).delegateAndRevert(
-                address(_smartWalletSimulator),
+                address(_simulator),
                 abi.encodeWithSelector(
                     ISmartWalletSimulator.simulateExecuteWithRelayer.selector,
                     batchedCall,
@@ -1098,7 +1093,7 @@ contract SimulationTest is Base {
         vm.prank(relayer);
         try
             ISmartWallet(_aliceWallet).delegateAndRevert(
-                address(_smartWalletSimulator),
+                address(_simulator),
                 abi.encodeWithSelector(
                     ISmartWalletSimulator.simulateExecuteWithRelayer.selector,
                     batchedCall,
@@ -1171,7 +1166,7 @@ contract SimulationTest is Base {
         vm.prank(relayer);
         try
             ISmartWallet(_aliceWallet).delegateAndRevert(
-                address(_smartWalletSimulator),
+                address(_simulator),
                 abi.encodeWithSelector(
                     ISmartWalletSimulator.simulateExecuteWithRelayer.selector,
                     batchedCall,
@@ -1259,7 +1254,7 @@ contract SimulationTest is Base {
         vm.prank(relayer);
         try
             ISmartWallet(_aliceWallet).delegateAndRevert(
-                address(_smartWalletSimulator),
+                address(_simulator),
                 abi.encodeWithSelector(
                     ISmartWalletSimulator.simulateExecuteWithRelayer.selector,
                     mixedBatchedCall,
@@ -1590,15 +1585,12 @@ contract SimulationTest is Base {
     }
 
     function test_delegateAndRevert_simulation_wallet() public {
-        // Deploy a SmartWalletSimulator
-        SmartWalletSimulator smartWalletSimulator = new SmartWalletSimulator();
-
         TestTarget target = new TestTarget();
         bytes memory callData = abi.encodeWithSelector(
             TestTarget.returnSuccess.selector
         );
 
-        try smartWalletSimulator.delegateAndRevert(address(target), callData) {
+        try _simulator.delegateAndRevert(address(target), callData) {
             revert("Should have reverted");
         } catch (bytes memory revertData) {
             // Decode the DelegateAndRevert error

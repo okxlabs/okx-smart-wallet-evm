@@ -4,6 +4,7 @@ pragma solidity ^0.8.23;
 import {OKXSmartWalletEntry} from "src/OKXSmartWalletEntry.sol";
 import {IDeployFactory} from "../utils/IDeployFactory.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
+import {SmartWalletSimulator} from "../utils/SmartWalletSimulator.sol";
 
 library DeployInitHelper {
     function deployContracts(
@@ -13,7 +14,8 @@ library DeployInitHelper {
         internal
         returns (
             OKXSmartWalletEntry smartWalletImpl,
-            SmartWalletFactory factoryImpl
+            SmartWalletFactory factoryImpl,
+            SmartWalletSimulator simulatorImpl
         )
     {
         // deploy SmartWallet
@@ -30,5 +32,12 @@ library DeployInitHelper {
             ),
             deployFactorySalt
         ));
+
+        // deploy SmartWalletSimulator
+        address payable simulatorAddr = deployFactory.deploy(
+            type(SmartWalletSimulator).creationCode,
+            deployFactorySalt
+        );
+        simulatorImpl = SmartWalletSimulator(simulatorAddr);
     }
 }

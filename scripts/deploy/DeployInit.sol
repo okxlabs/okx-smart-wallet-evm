@@ -9,6 +9,7 @@ import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
 import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
+import {SmartWalletSimulator} from "../utils/SmartWalletSimulator.sol";
 
 /// @title DeployInit
 /// @notice A script for deploying, initializing, and setting the access controls
@@ -31,11 +32,13 @@ contract DeployInit is Script {
         // Deploy the contracts using DeployInitHelper
         (
             SmartWallet smartWallet_,
-            SmartWalletFactory factory_
+            SmartWalletFactory factory_,
+            SmartWalletSimulator simulator_
         ) = DeployInitHelper.deployContracts(deployFactory, deployFactorySalt);
 
         console.log("SmartWallet address: %s", address(smartWallet_));
         console.log("SmartWalletFactory address: %s", address(factory_));
+        console.log("SmartWalletSimulator address: %s", address(simulator_));
         console.log("Completed DeployInit script");
         vm.stopBroadcast();
     }

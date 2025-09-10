@@ -26,6 +26,7 @@ import {Static} from "src/libraries/Static.sol";
 import {ERC4337Account} from "src/ERC4337Account.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {MessageSignLib} from "src/libraries/MessageSignLib.sol";
+import {SmartWalletSimulator} from "scripts/utils/SmartWalletSimulator.sol";
 
 // ============ Mock Contracts for Testing ============
 
@@ -106,6 +107,7 @@ contract Base is Test {
     uint256 internal relayerPk;
     Call[] internal relayerCalls;
     Call[] internal emptyRelayerCalls;
+    SmartWalletSimulator internal _simulator;
 
     event ExecuteSuccessEvent(
         bytes32 indexed intentHash,
@@ -137,8 +139,8 @@ contract Base is Test {
         _ecdsaValidator = new ECDSAValidator();
         _passkeyValidator = new PasskeyValidator();
 
-        // Deploy SmartWallet and Factory using DeployInitHelper
-        (_smartWallet, _factory) = DeployInitHelper.deployContracts(
+        // Deploy SmartWallet, Factory, and Simulator using DeployInitHelper
+        (_smartWallet, _factory, _simulator) = DeployInitHelper.deployContracts(
             deployFactory,
             deployFactorySalt
         );
