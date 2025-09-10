@@ -12,8 +12,8 @@ abstract contract ExecutionManager {
 
     uint256 private constant MAX_RETURNDATA_SIZE = 256; // Good enough for common customised error
 
-    /// @notice try to call a function
-    /// @param call: the call data
+    /// @notice Executes a low-level call to a target contract
+    /// @param call Call data containing target, value, and calldata
     function _call(Call calldata call) internal {
         address target = call.target;
         uint256 value = call.value;

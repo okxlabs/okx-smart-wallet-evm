@@ -3,7 +3,7 @@ pragma solidity ^0.8.29;
 import {InitialOwner} from "../Types.sol";
 
 interface ISmartWalletFactory {
-    /// @notice event when account is created
+    /// @notice Event emitted when an account is created
     event AccountCreated(
         address indexed account,
         address indexed implementation,
@@ -11,17 +11,17 @@ interface ISmartWalletFactory {
         uint256 salt
     );
 
-    /// @notice create smart account with owners and validators
-    /// @param initialOwners: initial owners
-    /// @param salt: salt
+    /// @notice Creates a smart account with owners and validators
+    /// @param initialOwners Initial owners configuration
+    /// @param salt Salt for deterministic address generation
     function createAccount(
         InitialOwner[] calldata initialOwners,
         uint256 salt
     ) external payable returns (address account);
 
-    /// @notice predict deterministic address
-    /// @param initialOwners: initial owners
-    /// @param salt: salt
+    /// @notice Predicts the deterministic address for a smart account
+    /// @param initialOwners Initial owners configuration
+    /// @param salt Salt for deterministic address generation
     function getAddress(
         InitialOwner[] calldata initialOwners,
         uint256 salt

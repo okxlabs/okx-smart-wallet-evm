@@ -46,6 +46,9 @@ abstract contract SmartWallet is
 
     address public immutable override IMPLEMENTATION;
 
+    /// @notice Initializes the implementation contract and prevents direct initialization
+    /// @dev Sets IMPLEMENTATION to this contract's address for proxy pattern identification
+    ///      and disables initializers to prevent the implementation from being initialized
     constructor() {
         IMPLEMENTATION = address(this);
         _disableInitializers();
@@ -115,12 +118,11 @@ abstract contract SmartWallet is
         _batchCall(calls, keyHash);
     }
 
-    /// @notice  Executes a validated call and subsequent batch of user's calls sent by a relayer.
-    /// @dev
-    /// 1) The validator must be previously registered and the validation data must be valid
-    /// 2) Validator is looked up from keyHash in validatorData
+    /// @notice Executes a validated call and subsequent batch of user's calls sent by a relayer
+    /// @dev The validator must be previously registered and the validation data must be valid.
+    ///      Validator is looked up from keyHash in validatorData.
     /// @param batchedCall BatchedCall struct containing calls and nonce
-    /// @param validatorData Encoded data containing keyHash and signature: pubkeyHash + validUntil (6 bytes) + signatures
+    /// @param validatorData Encoded data containing keyHash and signature (pubkeyHash + validUntil 6 bytes + signatures)
     function executeWithRelayer(
         BatchedCall calldata batchedCall,
         bytes calldata validatorData
@@ -225,11 +227,11 @@ abstract contract SmartWallet is
         ) revert Errors.InvalidSignature();
     }
 
-    /// @notice Validate the user operation
-    /// @param userOp The user operation to be validated
-    /// @param userOpHash The hash of the user operation
-    /// @param missingAccountFunds The missing account funds
-    /// @return validationData The validation data
+    /// @notice Validates the user operation
+    /// @param userOp User operation to be validated
+    /// @param userOpHash Hash of the user operation
+    /// @param missingAccountFunds Missing account funds to be paid
+    /// @return validationData Validation data in EntryPoint-compatible format
     function validateUserOp(
         PackedUserOperation calldata userOp,
         bytes32 userOpHash,
@@ -290,9 +292,9 @@ abstract contract SmartWallet is
     ///      2. >65 bytes: abi.encode(keyHash, signature) for validator-based validation
     /// @dev This function does NOT support chainless validation - all signatures are validated with chain ID
     ///      to prevent cross-chain replay attacks per EIP-1271 security best practices
-    /// @param _hash The hash of the data to be validated
-    /// @param signature The signature to be validated
-    /// @return bytes4 Returns Static.MAGIC_VALUE (0x1626ba7e) if valid, Static.INVALID_VALUE (0xffffffff) if invalid
+    /// @param _hash Hash of the data to be validated
+    /// @param signature Signature to be validated
+    /// @return Magic value (0x1626ba7e) if valid, invalid value (0xffffffff) if invalid
     function isValidSignature(
         bytes32 _hash,
         bytes calldata signature
@@ -352,8 +354,8 @@ abstract contract SmartWallet is
     /// @dev This function delegates the call to a simulation contract that handles the actual simulation logic
     ///      Useful for dry-run testing of SmartWallet operations
     /// @dev References EntryPoint's delegateAndRevert function
-    /// @param target The target contract to delegatecall
-    /// @param data The calldata to pass to the target
+    /// @param target Target contract to delegatecall
+    /// @param data Calldata to pass to the target
     function delegateAndRevert(address target, bytes calldata data) external {
         (bool success, bytes memory ret) = target.delegatecall(data);
         revert Errors.DelegateAndRevert(success, ret);

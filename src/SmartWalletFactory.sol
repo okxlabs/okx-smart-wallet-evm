@@ -9,15 +9,15 @@ import {BatchedCall} from "./Types.sol";
 contract SmartWalletFactory is ISmartWalletFactory {
     address public immutable IMPLEMENTATION;
 
-    /// @notice constructor
-    /// @param _implementation implementation address
+    /// @notice Constructor to set the implementation address
+    /// @param _implementation Implementation contract address for proxy deployments
     constructor(address _implementation) {
         IMPLEMENTATION = _implementation;
     }
 
-    /// @notice create smart account with owners and validators
-    /// @param initialOwners initial owners
-    /// @param salt salt
+    /// @notice Creates a smart account with owners and validators
+    /// @param initialOwners Initial owners configuration
+    /// @param salt Salt for deterministic address generation
     function createAccount(
         InitialOwner[] calldata initialOwners,
         uint256 salt
@@ -37,11 +37,11 @@ contract SmartWalletFactory is ISmartWalletFactory {
         account = instance;
     }
 
-    /// @notice create smart account with owners and validators
-    /// @param initialOwners initial owners
-    /// @param salt salt
-    /// @param batchedCall batched call
-    /// @param validatorData validator data
+    /// @notice Creates a smart account and executes a call in the same transaction
+    /// @param initialOwners Initial owners configuration
+    /// @param salt Salt for deterministic address generation
+    /// @param batchedCall Batched call to execute after deployment
+    /// @param validatorData Validator data for call execution
     function createAccountWithCall(
         InitialOwner[] calldata initialOwners,
         uint256 salt,
@@ -52,9 +52,9 @@ contract SmartWalletFactory is ISmartWalletFactory {
         ISmartWallet(account).executeWithRelayer(batchedCall, validatorData);
     }
 
-    /// @notice predict deterministic address
-    /// @param initialOwners initial owners
-    /// @param salt salt
+    /// @notice Predicts the deterministic address for a smart account
+    /// @param initialOwners Initial owners configuration
+    /// @param salt Salt for deterministic address generation
     function getAddress(
         InitialOwner[] calldata initialOwners,
         uint256 salt
@@ -67,9 +67,11 @@ contract SmartWalletFactory is ISmartWalletFactory {
             );
     }
 
-    /// @notice get account salt
-    /// @param initialOwners initial owners
-    /// @param salt salt
+    /// @notice Generates a deterministic salt for CREATE2 deployment
+    /// @dev Combines initial owners configuration with user-provided salt to ensure unique addresses
+    /// @param initialOwners Array of initial owner configurations (keyHash and validator pairs)
+    /// @param salt User-provided salt for additional entropy
+    /// @return Keccak256 hash used as CREATE2 salt for deterministic address generation
     function _getSalt(
         InitialOwner[] calldata initialOwners,
         uint256 salt

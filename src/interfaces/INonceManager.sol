@@ -8,7 +8,7 @@ interface INonceManager {
     event NonceConsumed(uint192 key, uint64 nonce);
 
     /// @notice Returns the current nonce value for a specific key
-    /// @param key The nonce key to query
-    /// @return The current nonce value for this key
+    /// @param key Nonce key to query
+    /// @return Current nonce value for this key
     function getNonce(uint192 key) external view returns (uint64);
 }
