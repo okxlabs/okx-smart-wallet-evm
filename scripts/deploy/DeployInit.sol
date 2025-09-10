@@ -34,9 +34,18 @@ contract DeployInit is Script {
             SmartWalletFactory factory_
         ) = DeployInitHelper.deployContracts(deployFactory, deployFactorySalt);
 
-        console.log("SmartWallet address: %s", address(smartWallet_));
-        console.log("SmartWalletFactory address: %s", address(factory_));
-        console.log("Completed DeployInit script");
         vm.stopBroadcast();
+
+        // Post-deployment verification
+        console.log("=== Deployment Verification ===");
+        require(factory_.IMPLEMENTATION() == address(smartWallet_), "Factory implementation not set correctly");
+        console.log("SmartWallet implementation address verified on SmartWalletFactory!");
+        
+        // Log deployment summary for verification commands
+        console.log("=== Deployment Summary ===");
+        console.log("Deployer:", deployOwner);
+        console.log("SmartWallet Implementation address:", address(smartWallet_));
+        console.log("SmartWalletFactory address:", address(factory_));
+        console.log("DeployInit script completed successfully");
     }
 }
