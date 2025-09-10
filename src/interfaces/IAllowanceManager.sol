@@ -40,23 +40,14 @@ interface IAllowanceManager {
         uint256 newAllowance
     );
 
-    /// @notice Error thrown when sender is incorrect
-    error IncorrectSender();
-
     /// @notice Error thrown when native ETH transfer fails
     error TransferNativeFailed();
 
     /// @notice Error thrown when native ETH allowance is exceeded
     error NativeAllowanceExceeded();
 
-    /// @notice Error thrown when token transfer fails
-    error TokenTransferFailed();
-
     /// @notice Error thrown when token allowance is exceeded
     error TokenAllowanceExceeded();
-
-    /// @notice Error thrown when batch operation arrays have mismatched lengths
-    error BatchLengthMismatch();
 
     /// @notice Error thrown when attempting to use native ETH in token transfer function
     error InvalidTokenForTransfer();
