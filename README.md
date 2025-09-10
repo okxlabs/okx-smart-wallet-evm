@@ -67,7 +67,7 @@ The wallet deployment uses a factory pattern:
 The implementation follows a modular manager-based design:
 
 ### Core Contracts
-- `OKXSmartWalletEntry`: Production implementation extending SmartWallet with custom ERC7201 storage layout
+- `SmartWalletEntry`: Production implementation extending SmartWallet with custom ERC7201 storage layout
 - `SmartWallet`: Base wallet contract inheriting all managers and core functionality
 - `SmartWalletFactory`: Factory for deterministic wallet deployment using CREATE2
 - `BaseAuthorization`: Access control foundation for self-executed functions

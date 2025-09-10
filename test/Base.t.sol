@@ -6,7 +6,7 @@ import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
-import {OKXSmartWalletEntry} from "src/OKXSmartWalletEntry.sol";
+import {SmartWalletEntry} from "src/SmartWalletEntry.sol";
 import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
 import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
@@ -99,7 +99,7 @@ contract Base is Test {
     uint256 internal _passkeyPrivateKey;
     ECDSAValidator internal _ecdsaValidator; // Shared validator instance
     PasskeyValidator internal _passkeyValidator;
-    OKXSmartWalletEntry internal _smartWallet;
+    SmartWalletEntry internal _smartWallet;
     SmartWalletFactory internal _factory;
     IDeployFactory public deployFactory;
     address internal relayer;

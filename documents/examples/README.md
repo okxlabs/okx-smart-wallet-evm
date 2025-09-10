@@ -1,6 +1,6 @@
 # Examples and Use Cases
 
-This document provides practical code examples and common use cases for the OKX Smart Wallet system.
+This document provides practical code examples and common use cases for the Smart Wallet system.
 
 ## Code Examples
 

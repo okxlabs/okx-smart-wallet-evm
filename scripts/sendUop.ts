@@ -1,5 +1,5 @@
 /**
- * Send User Operation script for OKX Smart Wallet
+ * Send User Operation script for Smart Wallet
  * Migrated and adapted from SmartAccount project
  */
 
@@ -17,7 +17,7 @@ async function main() {
     const [deployer] = await hre.ethers.getSigners();
     const bundler = deployer;
 
-    console.log("🚀 OKX Smart Wallet - Send User Operation");
+    console.log("🚀 Smart Wallet - Send User Operation");
     console.log("=========================================");
     console.log("Deployer address:", deployer.address);
     console.log("Network:", network.name);

@@ -2,11 +2,11 @@
 
 ## Background
 
-Currently, our AA wallet technology has successfully served two main products: OKX Pay and 7702 project, and will soon be promoted and used in upcoming wallet products by OKX, and will support more business scenarios in the future.
+Our AA wallet technology has been designed to support multiple use cases and business scenarios:
 
-- **OKX Pay** provides a Passkey wallet for novice exchange users that does not require private key backup, supports account recovery, and can be used gas-free on the XLayer chain. The focus of this solution is to reduce the threshold for Web3 usage, making it easy for users to quickly get started in payment and social scenarios. To this end, we have adopted the industry-proven ERC-4337 standard as the underlying account architecture.
+- **Passkey Wallets**: Provide novice users with wallets that don't require private key backup, support account recovery, and can operate gas-free on supported chains. This solution reduces the barrier to Web3 usage, making it easy for users to quickly get started in payment and social scenarios. We've adopted the industry-proven ERC-4337 standard as the underlying account architecture.
 
-- **Project 7702**: Targeting Web3 native users who already have EOA wallets, it supports upgrading traditional wallets to smart contract wallets, allowing users to enjoy the automation and flexibility advantages brought by AA. This solution focuses more on reducing on-chain operation costs, so we have designed a non-4337 architecture contract account system to achieve higher Gas efficiency.
+- **EOA Upgrades (EIP-7702)**: Target Web3 native users who already have EOA wallets, supporting upgrades from traditional wallets to smart contract wallets. This allows users to enjoy the automation and flexibility advantages brought by AA. This solution focuses on reducing on-chain operation costs through a non-4337 architecture contract account system to achieve higher gas efficiency.
 
 ## Unified Architecture Design
 

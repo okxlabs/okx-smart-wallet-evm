@@ -1,6 +1,6 @@
 /**
- * User Operation utilities for okx-smart-wallet
- * Adapted from SmartAccount project for OKX architecture
+ * User Operation utilities for smart-wallet
+ * Adapted from SmartAccount project for Smart Wallet architecture
  */
 
 import { ethers } from "ethers";
@@ -123,7 +123,7 @@ async function signUserOperationWithECDSA(
     // Sign the hash
     const signature = await signer.signMessage(ethers.getBytes(finalHash));
 
-    // For OKX SmartWallet, we need to format the signature with keyHash prefix
+    // For SmartWallet, we need to format the signature with keyHash prefix
     const signerAddress = await signer.getAddress();
     const keyHash = ethers.keccak256(ethers.solidityPacked(["address"], [signerAddress]));
 

@@ -1,6 +1,6 @@
-# OKX Smart Wallet Scripts
+# Smart Wallet Scripts
 
-This directory contains scripts migrated and adapted from the SmartAccount project to work with the OKX Smart Wallet architecture.
+This directory contains scripts migrated and adapted from the SmartAccount project to work with the Smart Wallet architecture.
 
 ## Local Testing
 
@@ -23,7 +23,7 @@ forge script scripts/deploy/DeployInit.sol --rpc-url http://localhost:8545 --bro
 - **`utils/userOp.ts`** - User Operation utilities and signature generation
 - **`utils/calldata.ts`** - Calldata generation utilities for various operations
 
-### Existing Scripts (Original OKX)
+### Existing Scripts (Original)
 
 - **`smoke_test/1-setCodeAndInitialize.ts`** - EIP-7702 account setup script
 - **`generatePasskeySignature.ts`** - P256 signature generation for Passkey validation
@@ -32,11 +32,11 @@ forge script scripts/deploy/DeployInit.sol --rpc-url http://localhost:8545 --bro
 
 ## Architecture Differences
 
-The scripts have been adapted to work with OKX Smart Wallet's architecture, which differs from the original SmartAccount project:
+The scripts have been adapted to work with Smart Wallet's architecture, which differs from the original SmartAccount project:
 
-### SmartAccount vs OKX Smart Wallet
+### SmartAccount vs Smart Wallet
 
-| Aspect | SmartAccount | OKX Smart Wallet |
+| Aspect | SmartAccount | Smart Wallet |
 |--------|--------------|------------------|
 | Main Contract | `PayableAccount` | `SmartWallet` |
 | Factory Contract | `AccountFactory` | `SmartWalletFactory` |
@@ -57,5 +57,5 @@ The scripts have been adapted to work with OKX Smart Wallet's architecture, whic
 
 3. **Dependency Updates**
    - Removed SmartAccount-specific helper contracts
-   - Updated import statements to match OKX project structure
+   - Updated import statements to match Smart Wallet project structure
    - Fixed ethers.js import patterns

@@ -1,6 +1,6 @@
 /**
- * Calldata generation utilities for okx-smart-wallet
- * Adapted from SmartAccount project for OKX architecture
+ * Calldata generation utilities for smart-wallet
+ * Adapted from SmartAccount project for Smart Wallet architecture
  */
 
 import { ethers } from "ethers";
@@ -11,7 +11,7 @@ import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 const hre = require("hardhat");
 
 /**
- * Call structure for OKX SmartWallet execute function
+ * Call structure for SmartWallet execute function
  */
 export interface Call {
   target: AddressLike;

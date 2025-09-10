@@ -1,6 +1,6 @@
-# OKX Smart Wallet - Technical Documentation
+# Smart Wallet - Technical Documentation
 
-This documentation provides technical details for developers who want to understand the internal architecture, implementation specifics, and advanced usage patterns of the OKX Smart Wallet system.
+This documentation provides technical details for developers who want to understand the internal architecture, implementation specifics, and advanced usage patterns of the Smart Wallet system.
 
 > **Note**: This documentation is designed to complement the main README by providing the technical depth that advanced developers and integrators need. For quick start, deployment, and basic usage, see the [main README](../README.md).
 

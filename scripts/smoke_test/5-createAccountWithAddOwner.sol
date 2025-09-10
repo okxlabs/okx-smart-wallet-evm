@@ -204,7 +204,7 @@ contract CreateAccountWithAddOwner is Script {
         bytes32 domainSeparator = keccak256(
             abi.encode(
                 DOMAIN_TYPEHASH,
-                keccak256(bytes("OKX.SmartWallet")),
+                keccak256(bytes("SmartWallet")),
                 keccak256(bytes("1.0.0")),
                 predictedWallet // Use predicted wallet address
             )

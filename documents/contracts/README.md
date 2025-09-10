@@ -2,7 +2,7 @@
 
 ## Overview
 
-The OKX Smart Wallet system consists of several core smart contracts that work together to provide a unified Account Abstraction solution. This document provides detailed information about each contract's structure, functionality, relationships, and integration patterns.
+The Smart Wallet system consists of several core smart contracts that work together to provide a unified Account Abstraction solution. This document provides detailed information about each contract's structure, functionality, relationships, and integration patterns.
 
 ## Contract Architecture
 
@@ -10,7 +10,7 @@ The OKX Smart Wallet system consists of several core smart contracts that work t
 
 1. **[SmartWallet](#1-smartwallet)**: Main wallet implementation (abstract base contract)
 2. **[SmartWalletFactory](#2-smartwalletfactory)**: Account creation and deployment
-3. **[OKXSmartWalletEntry](#3-okxsmartwalletentry)**: Production implementation with ERC7201 storage
+3. **[SmartWalletEntry](#3-smartwalletentry)**: Production implementation with ERC7201 storage
 4. **[OwnerManager](#4-ownermanager)**: Multi-owner management system with admin permissions
 5. **[NonceManager](#5-noncemanger)**: Nonce validation and management
 6. **[ValidationManager](#6-validationmanager)**: Authentication and signature validation
@@ -188,7 +188,7 @@ struct InitialOwner {
 }
 ```
 
-### 3. OKXSmartWalletEntry
+### 3. SmartWalletEntry
 
 The production implementation of SmartWallet with custom ERC7201 storage layout.
 
@@ -207,8 +207,8 @@ The production implementation of SmartWallet with custom ERC7201 storage layout.
 
 #### Implementation Note
 ```solidity
-// OKXSmartWalletEntry extends SmartWallet with production storage layout
-contract OKXSmartWalletEntry is SmartWallet {
+// SmartWalletEntry extends SmartWallet with production storage layout
+contract SmartWalletEntry is SmartWallet {
     // Uses ERC7201 storage pattern for upgradeability
     // All functionality inherited from SmartWallet abstract contract
 }
@@ -372,7 +372,7 @@ mapping(bytes32 => uint256) public ownerSettings;
 
 #### Admin Permissions
 
-The OKX Smart Wallet implements a hierarchical permission system where certain operations require admin privileges.
+The Smart Wallet implements a hierarchical permission system where certain operations require admin privileges.
 
 **Admin Capabilities:**
 
@@ -675,7 +675,7 @@ The FallbackHandler is an abstract contract that enables the wallet to receive v
 ```
 SmartWalletFactory
   ↓ creates (via proxy)
-OKXSmartWalletEntry
+SmartWalletEntry
   ↓ extends
 SmartWallet (abstract)
   ↓ inherits
@@ -758,7 +758,7 @@ function executeUserOp(
 
 ## Events
 
-The OKX Smart Wallet system emits various events to track important state changes and operations.
+The Smart Wallet system emits various events to track important state changes and operations.
 
 ### OwnerManager Events
 

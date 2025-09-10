@@ -11,10 +11,10 @@ import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 import {Errors} from "src/libraries/Errors.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 
-// OKXSmartWalletEntryV2 - Upgraded version for testing
-// Cannot inherit from OKXSmartWalletEntry directly due to custom storage layout
+// SmartWalletEntryV2 - Upgraded version for testing
+// Cannot inherit from SmartWalletEntry directly due to custom storage layout
 // Instead, inherit from SmartWallet and define the same storage layout
-contract OKXSmartWalletEntryV2 is SmartWallet layout at 0x02a90b95e07536939d6b1617e9cf25c8d725ec1c5c4c03ccc00770cd202e6e00 {
+contract SmartWalletEntryV2 is SmartWallet layout at 0xd2f25270280c292d8930a730093bb680163a837f93acc639d858c440b5c53800 {
     // New state variable (append only to maintain storage layout)
     string public constant VERSION = "v2";
     
@@ -30,13 +30,13 @@ contract OKXSmartWalletEntryV2 is SmartWallet layout at 0x02a90b95e07536939d6b16
 }
 
 contract SmartWalletUpgradeTest is Base {
-    OKXSmartWalletEntryV2 public smartWalletV2Implementation;
+    SmartWalletEntryV2 public smartWalletV2Implementation;
     
     function setUp() public override {
         super.setUp();
         
         // Deploy V2 implementation
-        smartWalletV2Implementation = new OKXSmartWalletEntryV2();
+        smartWalletV2Implementation = new SmartWalletEntryV2();
     }
     
     function test_upgrade_through_executeWithRelayer() public {
@@ -70,7 +70,7 @@ contract SmartWalletUpgradeTest is Base {
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, validatorData);
         
         // 5. Verify upgrade was successful
-        OKXSmartWalletEntryV2 upgradedWallet = OKXSmartWalletEntryV2(payable(_aliceWallet));
+        SmartWalletEntryV2 upgradedWallet = SmartWalletEntryV2(payable(_aliceWallet));
         assertEq(upgradedWallet.getVersion(), "v2");
         assertTrue(upgradedWallet.isUpgraded());
     }
@@ -164,7 +164,7 @@ contract SmartWalletUpgradeTest is Base {
     function test_upgrade_with_initialization_through_relayer() public {
         // Deploy V2 with initialization function
         bytes memory initData = abi.encodeWithSelector(
-            OKXSmartWalletEntryV2.getVersion.selector
+            SmartWalletEntryV2.getVersion.selector
         );
         
         Call[] memory upgradeCalls = new Call[](1);
@@ -190,7 +190,7 @@ contract SmartWalletUpgradeTest is Base {
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, validatorData);
         
         // Verify upgrade with initialization succeeded
-        OKXSmartWalletEntryV2 upgradedWallet = OKXSmartWalletEntryV2(payable(_aliceWallet));
+        SmartWalletEntryV2 upgradedWallet = SmartWalletEntryV2(payable(_aliceWallet));
         assertEq(upgradedWallet.getVersion(), "v2");
     }
     

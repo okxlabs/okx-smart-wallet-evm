@@ -1,6 +1,6 @@
 # Diagrams
 
-This folder contains visual diagrams for the OKX Smart Wallet system.
+This folder contains visual diagrams for the Smart Wallet system.
 
 ## Available Diagrams
 

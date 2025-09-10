@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import {OKXSmartWalletEntry} from "src/OKXSmartWalletEntry.sol";
+import {SmartWalletEntry} from "src/SmartWalletEntry.sol";
 import {IDeployFactory} from "../utils/IDeployFactory.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
 
@@ -12,16 +12,16 @@ library DeployInitHelper {
     )
         internal
         returns (
-            OKXSmartWalletEntry smartWalletImpl,
+            SmartWalletEntry smartWalletImpl,
             SmartWalletFactory factoryImpl
         )
     {
         // deploy SmartWallet
         address payable smartWalletAddr = deployFactory.deploy(
-            type(OKXSmartWalletEntry).creationCode,
+            type(SmartWalletEntry).creationCode,
             deployFactorySalt
         );
-        smartWalletImpl = OKXSmartWalletEntry(smartWalletAddr);
+        smartWalletImpl = SmartWalletEntry(smartWalletAddr);
 
         factoryImpl = SmartWalletFactory(
             deployFactory.deploy(

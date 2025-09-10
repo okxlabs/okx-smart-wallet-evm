@@ -25,7 +25,7 @@ abstract contract ERC712 is EIP712 {
         override
         returns (string memory name, string memory version)
     {
-        return ("OKX.SmartWallet", "1.0.0");
+        return ("SmartWallet", "1.0.0");
     }
 
     /// @dev Returns if `_domainNameAndVersion()` may change

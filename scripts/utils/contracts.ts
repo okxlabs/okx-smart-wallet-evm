@@ -1,6 +1,6 @@
 /**
- * Contract instance helper functions for okx-smart-wallet
- * Adapted from SmartAccount project to work with OKX architecture
+ * Contract instance helper functions for smart-wallet
+ * Adapted from SmartAccount project to work with Smart Wallet architecture
  */
 
 import { ethers } from "ethers";

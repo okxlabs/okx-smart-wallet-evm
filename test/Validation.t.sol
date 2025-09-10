@@ -12,7 +12,7 @@ import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 import {Static} from "src/libraries/Static.sol";
 import {ERC712} from "src/ERC712.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
-import {OKXSmartWalletEntry} from "src/OKXSmartWalletEntry.sol";
+import {SmartWalletEntry} from "src/SmartWalletEntry.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
 
 contract ValidationTest is Base {
@@ -368,7 +368,7 @@ contract ValidationTest is Base {
         // This simulates a third party deploying our open-sourced contracts
 
         // Deploy a new SmartWallet implementation
-        OKXSmartWalletEntry independentImplementation = new OKXSmartWalletEntry();
+        SmartWalletEntry independentImplementation = new SmartWalletEntry();
 
         // Deploy a new Factory (constructor disables initializers)
         SmartWalletFactory independentFactory = new SmartWalletFactory(
