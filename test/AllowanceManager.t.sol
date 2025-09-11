@@ -10,6 +10,7 @@ import {Call, BatchedCall} from "../src/Types.sol";
 import {Static} from "../src/libraries/Static.sol";
 import {BatchedCallLib} from "../src/libraries/BatchedCallLib.sol";
 import {ERC712} from "../src/ERC712.sol";
+import {console} from "forge-std/console.sol";
 
 // Contract that rejects ETH transfers
 contract ETHRejectingContract {
@@ -362,9 +363,15 @@ contract AllowanceManagerTest is Base {
         uint256 allowanceAmount = 1 ether;
         uint256 transferAmount = 2 ether;
 
+        // Should fail since there is no allowance set
+        assertEq(aliceSmartWallet.nativeAllowance(spender), 0);
+        vm.expectRevert(IAllowanceManager.NativeAllowanceExceeded.selector);
+        _transferFromNativeCallAsSpender(recipient, transferAmount);
+
         // Set up insufficient allowance through execute
         _approveNative(spender, allowanceAmount);
 
+        assertEq(aliceSmartWallet.nativeAllowance(spender), allowanceAmount);
         vm.expectRevert(IAllowanceManager.NativeAllowanceExceeded.selector);
         _transferFromNativeCallAsSpender(recipient, transferAmount);
     }
@@ -480,9 +487,18 @@ contract AllowanceManagerTest is Base {
         uint256 allowanceAmount = 100 * 10 ** 18;
         uint256 transferAmount = 200 * 10 ** 18;
 
+        // Should fail since there is no allowance set
+        assertEq(aliceSmartWallet.tokenAllowance(address(mockToken), spender), 0);
+        vm.expectRevert(IAllowanceManager.TokenAllowanceExceeded.selector);
+        _transferFromTokenCallAsSpender(
+            address(mockToken),
+            recipient,
+            transferAmount
+        );
         // Set up insufficient allowance through execute
         _approveToken(address(mockToken), spender, allowanceAmount);
 
+        assertEq(aliceSmartWallet.tokenAllowance(address(mockToken), spender), allowanceAmount);
         vm.expectRevert(IAllowanceManager.TokenAllowanceExceeded.selector);
         _transferFromTokenCallAsSpender(
             address(mockToken),
