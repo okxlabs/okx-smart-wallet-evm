@@ -245,13 +245,13 @@ fi
 
 if [ -z "$PASSKEY_PUB_X" ]; then
     # Corresponding public key X coordinate for the private key above
-    export PASSKEY_PUB_X="0x65a2fa44daad46eab0278703edb6c4dcf5e30b8a9aec09fdc71a56f52aa392e4"
+    export PASSKEY_PUB_X="0x1c05286fe694493eae33312f2d2e0d0abeda8db76238b7a204be1fb87f54ce42"
     echo -e "${YELLOW}📝 Using default PASSKEY_PUB_X${NC}"
 fi
 
 if [ -z "$PASSKEY_PUB_Y" ]; then
     # Corresponding public key Y coordinate for the private key above
-    export PASSKEY_PUB_Y="0x4a7a9e4604aa36898209997288e902ac544a555e4b5e0a9efef2b59233f3f437"
+    export PASSKEY_PUB_Y="0x28fef61ef4ac300f631657635c28e59bfb2fe71bce1634c81c65642042f6dc4d"
     echo -e "${YELLOW}📝 Using default PASSKEY_PUB_Y${NC}"
 fi
 
