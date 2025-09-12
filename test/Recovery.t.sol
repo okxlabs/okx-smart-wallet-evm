@@ -113,7 +113,7 @@ contract RecoveryTest is Base {
         );
     }
 
-    function test_RecoverySigner_as_initial_owner() public {
+    function test_RecoverySigner_AsInitialOwner_Success() public {
         // Use existing _aliceWallet account and add RecoverySigner as owner
         recoveredAccount = _aliceWallet;
 
@@ -143,7 +143,7 @@ contract RecoveryTest is Base {
         );
     }
 
-    function test_addOwner_interface_compatibility() public {
+    function test_AddOwner_InterfaceCompatibility_Success() public {
         // Use existing _aliceWallet account and add RecoverySigner as owner
         recoveredAccount = _aliceWallet;
 
@@ -195,7 +195,7 @@ contract RecoveryTest is Base {
         assertTrue(isAdmin, "New owner should have admin privileges");
     }
 
-    function test_recovery_full_flow() public {
+    function test_Recovery_FullFlow_Success() public {
         // Use existing _aliceWallet account and add RecoverySigner as owner
         recoveredAccount = _aliceWallet;
 
@@ -261,7 +261,7 @@ contract RecoveryTest is Base {
         );
     }
 
-    function test_recovery_requires_RecoverySigner_ownership() public {
+    function test_RevertWhen_Recover_RequiresRecoverySignerOwnership() public {
         // Create account WITHOUT RecoverySigner as owner
         recoveredAccount = _deployAccountSingleOwner(
             keccak256(abi.encodePacked(_alice)),
@@ -297,7 +297,7 @@ contract RecoveryTest is Base {
         recoverySigner.recover(recoveryData, signatures);
     }
 
-    function test_recovery_settings_match_expected() public {
+    function test_Recovery_SettingsMatchExpected_Success() public {
         // Create an account first
         recoveredAccount = _deployAccountSingleOwner(
             keccak256(abi.encodePacked(_alice)),
@@ -343,7 +343,7 @@ contract RecoveryTest is Base {
         );
     }
 
-    function test_multiple_accounts_recovery() public {
+    function test_MultipleAccounts_Recovery_Success() public {
         // Create multiple accounts with RecoverySigner as owner
         address[] memory accounts = new address[](3);
 
@@ -394,7 +394,7 @@ contract RecoveryTest is Base {
         }
     }
 
-    function test_recovery_timestamp_management() public {
+    function test_Recovery_TimestampManagement_Success() public {
         // Use existing _aliceWallet account and add RecoverySigner as owner
         recoveredAccount = _aliceWallet;
 

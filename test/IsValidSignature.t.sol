@@ -6,7 +6,7 @@ import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {Static} from "src/libraries/Static.sol";
 import {PasskeyValidator} from "./validators/PasskeyValidator.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
-import {HelperLib} from "script/utils/Helper.sol";
+import {HelperLib} from "script/utils/Helper.s.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
 import {InitialOwner} from "src/Types.sol";
@@ -48,7 +48,10 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_fails_with_exactly_32_bytes() public view {
+    function test_IsValidSignature_Exactly32Bytes_ReturnsInvalidValue()
+        public
+        view
+    {
         bytes32 hash = keccak256("test");
         // Create signature with exactly 32 bytes (should be treated as invalid)
         bytes memory signature = new bytes(32);
@@ -62,7 +65,10 @@ contract IsValidSignatureTest is Base {
 
     // ===== Boundary Condition and Exception Tests =====
 
-    function test_isValidSignature_fails_with_empty_signature() public view {
+    function test_IsValidSignature_EmptySignature_ReturnsInvalidValue()
+        public
+        view
+    {
         bytes32 hash = keccak256("test");
         bytes memory signature = new bytes(0);
 
@@ -77,7 +83,10 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_fails_with_1_byte_signature() public view {
+    function test_IsValidSignature_1ByteSignature_ReturnsInvalidValue()
+        public
+        view
+    {
         bytes32 hash = keccak256("test");
         bytes memory signature = new bytes(1);
         signature[0] = 0x01;
@@ -93,7 +102,10 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_fails_with_15_byte_signature() public view {
+    function test_IsValidSignature_15ByteSignature_ReturnsInvalidValue()
+        public
+        view
+    {
         bytes32 hash = keccak256("test");
         bytes memory signature = new bytes(15);
         // Fill with some data
@@ -112,7 +124,10 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_fails_with_31_byte_signature() public view {
+    function test_IsValidSignature_31ByteSignature_ReturnsInvalidValue()
+        public
+        view
+    {
         bytes32 hash = keccak256("test");
         bytes memory signature = new bytes(31);
         // Fill with some data
@@ -131,7 +146,10 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_fails_with_33_byte_signature() public view {
+    function test_IsValidSignature_33ByteSignature_ReturnsInvalidValue()
+        public
+        view
+    {
         bytes32 hash = keccak256("test");
         bytes memory signature = new bytes(33);
 
@@ -154,7 +172,10 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_fails_with_64_byte_signature() public view {
+    function test_IsValidSignature_64ByteSignature_ReturnsInvalidValue()
+        public
+        view
+    {
         bytes32 hash = keccak256("test");
         bytes memory signature = new bytes(64);
 
@@ -179,7 +200,10 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_fails_with_66_byte_signature() public view {
+    function test_IsValidSignature_66ByteSignature_ReturnsInvalidValue()
+        public
+        view
+    {
         bytes32 hash = keccak256("test");
         bytes memory signature = new bytes(66);
 
@@ -206,7 +230,10 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_handles_very_long_signature() public view {
+    function test_IsValidSignature_VeryLongSignature_ReturnsInvalidValue()
+        public
+        view
+    {
         bytes32 hash = keccak256("test");
 
         // Create a very long signature (1KB)
@@ -234,7 +261,7 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_fails_with_malformed_65_byte_signature()
+    function test_IsValidSignature_Malformed65ByteSignature_ReturnsInvalidValue()
         public
         view
     {
@@ -258,7 +285,10 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_fails_with_zero_hash() public view {
+    function test_IsValidSignature_WithZeroHashAndValidSignature_ReturnsMagicValue()
+        public
+        view
+    {
         bytes32 zeroHash = bytes32(0);
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
         uint48 validUntil = 0; // No expiry
@@ -284,7 +314,10 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_fails_with_max_hash() public view {
+    function test_IsValidSignature_WithMaxHashAndValidSignature_ReturnsMagicValue()
+        public
+        view
+    {
         bytes32 maxHash = bytes32(type(uint256).max);
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
         uint48 validUntil = 0; // No expiry
@@ -310,7 +343,10 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_with_repeated_bytes_signature() public view {
+    function test_IsValidSignature_RepeatedBytesSignature_ReturnsInvalidValue()
+        public
+        view
+    {
         bytes32 hash = keccak256("test");
 
         // Create signature with repeated bytes pattern
@@ -339,7 +375,10 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_with_all_zero_signature() public view {
+    function test_IsValidSignature_AllZeroSignature_ReturnsInvalidValue()
+        public
+        view
+    {
         bytes32 hash = keccak256("test");
 
         // Create signature with all zeros
@@ -357,7 +396,10 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_with_all_max_signature() public view {
+    function test_IsValidSignature_AllMaxSignature_ReturnsInvalidValue()
+        public
+        view
+    {
         bytes32 hash = keccak256("test");
 
         // Create signature with all 0xFF bytes
@@ -377,7 +419,7 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_fails_with_65_byte_wrong_signer()
+    function test_IsValidSignature_65ByteWrongSigner_ReturnsInvalidValue()
         public
         view
     {
@@ -403,7 +445,7 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_fails_with_invalid_65_byte_signature_format()
+    function test_IsValidSignature_Invalid65ByteSignatureFormat_ReturnsInvalidValue()
         public
         view
     {
@@ -431,7 +473,7 @@ contract IsValidSignatureTest is Base {
 
     // ===== Built-in ECDSA Validator =====
 
-    function test_isValidSignature_fails_with_builtin_ecdsa_validator_wrong_keyHash()
+    function test_IsValidSignature_BuiltinEcdsaValidatorWrongKeyHash_ReturnsInvalidValue()
         public
         view
     {
@@ -448,7 +490,7 @@ contract IsValidSignatureTest is Base {
         assertEq(result, bytes4(0xffffffff));
     }
 
-    function test_isValidSignature_fails_with_builtin_ecdsa_validator_expired()
+    function test_IsValidSignature_BuiltinEcdsaValidatorExpired_ReturnsInvalidValue()
         public
     {
         // Add validator using _bob to avoid EIP-7702 fallback collision
@@ -497,7 +539,7 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_with_builtin_ecdsa_validator_different_hash_values()
+    function test_IsValidSignature_BuiltinEcdsaValidatorDifferentHashValues_ReturnsMagicValue()
         public
         view
     {
@@ -555,7 +597,7 @@ contract IsValidSignatureTest is Base {
 
     // ===== Built-in Passkey Validator =====
 
-    function test_isValidSignature_succeeds_with_builtin_passkey_validator()
+    function test_IsValidSignature_BuiltinPasskeyValidator_ReturnsInvalidValue()
         public
     {
         // Use different passkey coordinates to avoid conflict with existing validator
@@ -617,7 +659,7 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_fails_with_builtin_passkey_validator_wrong_keyHash()
+    function test_IsValidSignature_BuiltinPasskeyValidatorWrongKeyHash_ReturnsInvalidValue()
         public
         view
     {
@@ -657,7 +699,7 @@ contract IsValidSignatureTest is Base {
         assertEq(result, bytes4(0xffffffff), "Wrong keyHash should fail");
     }
 
-    function test_isValidSignature_fails_with_builtin_passkey_validator_expired()
+    function test_IsValidSignature_BuiltinPasskeyValidatorExpired_ReturnsInvalidValue()
         public
     {
         // Add passkey validator with expiry
@@ -730,7 +772,7 @@ contract IsValidSignatureTest is Base {
 
     // ===== Custom Validator Tests =====
 
-    function test_isValidSignature_succeeds_with_custom_ecdsa_validator()
+    function test_IsValidSignature_CustomEcdsaValidator_ReturnsMagicValue()
         public
         view
     {
@@ -762,7 +804,7 @@ contract IsValidSignatureTest is Base {
         assertEq(result, bytes4(0x1626ba7e));
     }
 
-    function test_isValidSignature_succeeds_with_custom_passkey_validator()
+    function test_IsValidSignature_CustomPasskeyValidator_ReturnsInvalidValue()
         public
         view
     {
@@ -806,7 +848,7 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_fails_with_custom_validator_wrong_signature()
+    function test_IsValidSignature_CustomValidatorWrongSignature_ReturnsInvalidValue()
         public
         view
     {
@@ -849,7 +891,7 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_fails_with_custom_validator_different_hash()
+    function test_IsValidSignature_CustomValidatorDifferentHash_ReturnsInvalidValue()
         public
         view
     {
@@ -892,7 +934,7 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_fails_with_custom_validator_malformed_data()
+    function test_IsValidSignature_CustomValidatorMalformedData_ReturnsInvalidValue()
         public
         view
     {
@@ -922,7 +964,7 @@ contract IsValidSignatureTest is Base {
         );
     }
 
-    function test_isValidSignature_with_custom_validator_different_hash_values()
+    function test_IsValidSignature_CustomValidatorDifferentHashValues_ReturnsInvalidValue()
         public
         view
     {
@@ -1030,7 +1072,9 @@ contract IsValidSignatureTest is Base {
     }
 
     /// @notice Test EIP-7702 scenario where wallet signs for itself
-    function test_isValidSignature_succeeds_with_wallet_self_signing() public {
+    function test_IsValidSignature_WalletSelfSigning_ReturnsMagicValue()
+        public
+    {
         // Create a new EOA that will become a smart wallet
         uint256 eoaPrivateKey = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef;
         address eoaAddress = vm.addr(eoaPrivateKey);
@@ -1076,7 +1120,7 @@ contract IsValidSignatureTest is Base {
     }
 
     /// @notice Test that 65-byte signature fails when signer is not the wallet itself
-    function test_isValidSignature_fails_with_65_byte_non_wallet_signer()
+    function test_IsValidSignature_65ByteNonWalletSigner_ReturnsInvalidValue()
         public
         view
     {

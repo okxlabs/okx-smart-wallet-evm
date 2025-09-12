@@ -10,7 +10,7 @@ import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
-import {HelperLib} from "../utils/Helper.sol";
+import {HelperLib} from "../utils/Helper.s.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
 import {Static} from "src/libraries/Static.sol";
 

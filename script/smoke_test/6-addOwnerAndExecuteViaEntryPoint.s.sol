@@ -6,7 +6,7 @@ import {SmartWallet} from "src/SmartWallet.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
-import {HelperLib} from "../utils/Helper.sol";
+import {HelperLib} from "../utils/Helper.s.sol";
 import {EntryPoint} from "account-abstraction/core/EntryPoint.sol";
 import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";

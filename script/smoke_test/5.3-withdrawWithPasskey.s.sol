@@ -8,7 +8,7 @@ import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
-import {HelperLib} from "script/utils/Helper.sol";
+import {HelperLib} from "script/utils/Helper.s.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";

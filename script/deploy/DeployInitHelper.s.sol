@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {SmartWalletEntry} from "src/SmartWalletEntry.sol";
-import {IDeployFactory} from "../utils/IDeployFactory.sol";
+import {IDeployFactory} from "../utils/IDeployFactory.s.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
 
 library DeployInitHelper {

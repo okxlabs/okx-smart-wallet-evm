@@ -2,8 +2,8 @@
 pragma solidity ^0.8.23;
 
 import {Script, console} from "lib/forge-std/src/Script.sol";
-import {DeployInitHelper} from "./DeployInitHelper.sol";
-import {IDeployFactory} from "../utils/IDeployFactory.sol";
+import {DeployInitHelper} from "./DeployInitHelper.s.sol";
+import {IDeployFactory} from "../utils/IDeployFactory.s.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
 

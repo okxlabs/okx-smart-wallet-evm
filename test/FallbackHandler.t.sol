@@ -8,14 +8,14 @@ import {IERC1155Receiver} from "@openzeppelin/contracts/token/ERC1155/IERC1155Re
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 
 contract FallbackHandlerTest is Base {
-    function test_receive_accepts_ether() public {
+    function test_Receive_AcceptsEther_Success() public {
         uint256 initialBalance = _aliceWallet.balance;
         (bool success, ) = payable(_aliceWallet).call{value: 1 ether}("");
         assertTrue(success);
         assertEq(_aliceWallet.balance, initialBalance + 1 ether);
     }
 
-    function test_fallback_reverts_for_invalid_selector() public {
+    function test_RevertWhen_Fallback_InvalidSelector() public {
         // Test case 1: completely invalid selector
         bytes memory invalidData = abi.encodeWithSelector(
             bytes4(keccak256("invalidFunction()")),
@@ -25,7 +25,7 @@ contract FallbackHandlerTest is Base {
         assert(!success);
     }
 
-    function test_fallback_handles_erc721_receive() public {
+    function test_Fallback_HandlesErc721Receive_Success() public {
         // Create calldata for onERC721Received
         bytes memory data = abi.encodeWithSelector(
             0x150b7a02, // onERC721Received selector
@@ -43,7 +43,7 @@ contract FallbackHandlerTest is Base {
         assertEq(bytes4(returnData), bytes4(0x150b7a02));
     }
 
-    function test_fallback_handles_erc1155_receive() public {
+    function test_Fallback_HandlesErc1155Receive_Success() public {
         // Create calldata for onERC1155Received
         bytes memory data = abi.encodeWithSelector(
             0xf23a6e61, // onERC1155Received selector
@@ -62,7 +62,7 @@ contract FallbackHandlerTest is Base {
         assertEq(bytes4(returnData), bytes4(0xf23a6e61));
     }
 
-    function test_fallback_handles_erc1155_batch_receive() public {
+    function test_Fallback_HandlesErc1155BatchReceive_Success() public {
         // Create arrays for batch transfer
         uint256[] memory ids = new uint256[](2);
         uint256[] memory amounts = new uint256[](2);
@@ -89,7 +89,10 @@ contract FallbackHandlerTest is Base {
         assertEq(bytes4(returnData), bytes4(0xbc197c81));
     }
 
-    function test_supports_token_receive_interfaces() public view {
+    function test_SupportsInterface_TokenReceiveInterfaces_Success()
+        public
+        view
+    {
         assertEq(
             IERC165(_aliceWallet).supportsInterface(
                 type(IERC721Receiver).interfaceId

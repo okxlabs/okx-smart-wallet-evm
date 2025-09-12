@@ -8,7 +8,7 @@ import {ECDSAValidator} from "./validators/ECDSAValidator.sol";
 import {PasskeyValidator} from "./validators/PasskeyValidator.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
-import {HelperLib} from "script/utils/Helper.sol";
+import {HelperLib} from "script/utils/Helper.s.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 import {Static} from "src/libraries/Static.sol";
@@ -71,7 +71,7 @@ contract ValidateUserOpTest is Base {
         passkeyValidator = new PasskeyValidator();
     }
 
-    function test_entryPoint_returns_correct_address() public view {
+    function test_EntryPoint_ReturnsCorrectAddress() public view {
         // Test that the entryPoint function returns the correct address
         address expectedEntryPoint = 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
         address actualEntryPoint = ERC4337Account(_aliceWallet).entryPoint();
@@ -104,7 +104,7 @@ contract ValidateUserOpTest is Base {
         uint256 missingAccountFunds;
     }
 
-    function test_handleOps_complete_flow() external {
+    function test_HandleOps_CompleteFlow_Success() external {
         // Test the complete ERC-4337 flow: handleOps -> validateUserOp -> executeUserOp
 
         // Create a new account with alice as owner
@@ -200,7 +200,7 @@ contract ValidateUserOpTest is Base {
         assertEq(accountNonce, 1, "Account nonce should be incremented");
     }
 
-    function test_handleOps_with_chainless_nonce() external {
+    function test_HandleOps_WithChainlessNonce_Success() external {
         // Test handleOps with chainless nonce for cross-chain operations
 
         // Create a new account
@@ -277,7 +277,7 @@ contract ValidateUserOpTest is Base {
         );
     }
 
-    function test_handleOps_with_expired_validUntil_fails() external {
+    function test_RevertWhen_HandleOps_WithExpiredValidUntil() external {
         // Test that EntryPoint rejects UserOperation when validUntil has expired
 
         // Setup account with initial balance
@@ -348,7 +348,7 @@ contract ValidateUserOpTest is Base {
         );
     }
 
-    function test_handleOps_with_future_validUntil_succeeds() external {
+    function test_HandleOps_WithFutureValidUntil_Success() external {
         // Test that EntryPoint accepts UserOperation when validUntil is in the future
 
         // Setup account with initial balance
@@ -415,7 +415,7 @@ contract ValidateUserOpTest is Base {
         );
     }
 
-    function test_validateUserOp_with_eoa_signer() external {
+    function test_ValidateUserOp_WithEoaSigner_Success() external {
         vm.prank(_alice);
 
         address account = _deployAccountSingleOwner(
@@ -491,7 +491,7 @@ contract ValidateUserOpTest is Base {
         );
     }
 
-    function test_validateUserOp_with_eoa_signer_and_chain_less_nonce()
+    function test_ValidateUserOp_WithEoaSignerAndChainlessNonce_Success()
         external
     {
         bytes32 _bobKeyHash = keccak256(abi.encodePacked(_bob));
@@ -548,7 +548,7 @@ contract ValidateUserOpTest is Base {
         );
     }
 
-    function test_uopHash_error_validateUserOp_with_eoa_signer_and_chain_less_nonce()
+    function test_ValidateUserOp_WithEoaSignerAndChainlessNonce_UopHashError_ReturnsSigValidationFailed()
         external
     {
         bytes32 _bobKeyHash = keccak256(abi.encodePacked(_bob));
@@ -601,7 +601,7 @@ contract ValidateUserOpTest is Base {
         );
     }
 
-    function test_calldata_error_validateUserOp_with_eoa_signer_and_chain_less_nonce()
+    function test_ValidateUserOp_WithEoaSignerAndChainlessNonce_CalldataError_ReturnsSigValidationFailed()
         external
     {
         TestTemps memory t;
@@ -647,7 +647,7 @@ contract ValidateUserOpTest is Base {
         );
     }
 
-    function test_validateUserOp_with_ecdsa_validator() external {
+    function test_ValidateUserOp_WithEcdsaValidator_Success() external {
         // Create account with ECDSA validator
         address account = _deployAccountSingleOwner(
             _aliceWalletKeyHash,
@@ -708,7 +708,7 @@ contract ValidateUserOpTest is Base {
         );
     }
 
-    function test_validateUserOp_with_passkey_validator() external {
+    function test_ValidateUserOp_WithPasskeyValidator_Success() external {
         // Create account with Passkey validator
         bytes32 passkeyHash = keccak256(
             abi.encodePacked(_passkeyPubX, _passkeyPubY)
@@ -800,7 +800,7 @@ contract ValidateUserOpTest is Base {
         );
     }
 
-    function test_validateUserOp_onlyEntryPoint_modifier() external {
+    function test_ValidateUserOp_OnlyEntryPointModifier_Success() external {
         // Create account
         address account = _deployAccountSingleOwner(
             _aliceWalletKeyHash,
@@ -861,7 +861,9 @@ contract ValidateUserOpTest is Base {
         assertEq(result, 0, "Should succeed when called from EntryPoint");
     }
 
-    function test_validateUserOp_signature_validation_edge_cases() external {
+    function test_ValidateUserOp_SignatureValidationEdgeCases_Success()
+        external
+    {
         address account = _deployAccountSingleOwner(
             _aliceWalletKeyHash,
             address(ecdsaValidator),
@@ -948,7 +950,7 @@ contract ValidateUserOpTest is Base {
     }
 
     // Test canSkipChainIdValidation logic in validateUserOp context
-    function test_validateUserOp_allows_chainless_nonce_for_addOwner()
+    function test_ValidateUserOp_AllowsChainlessNonceForAddOwner_Success()
         external
     {
         // Create addOwner call
@@ -990,7 +992,7 @@ contract ValidateUserOpTest is Base {
         );
     }
 
-    function test_validateUserOp_doesnt_allow_chainless_nonce_for_updateOwner()
+    function test_ValidateUserOp_DoesntAllowChainlessNonceForUpdateOwner_ReturnsSigValidationFailed()
         external
     {
         // Create account with ECDSA validator
@@ -1045,7 +1047,7 @@ contract ValidateUserOpTest is Base {
         );
     }
 
-    function test_validateUserOp_doesnt_allow_chainless_nonce_for_removeOwner()
+    function test_ValidateUserOp_DoesNotAllowChainlessNonceForRemoveOwner_ReturnsSigValidationFailed()
         external
     {
         // Create account with ECDSA validator
@@ -1096,7 +1098,7 @@ contract ValidateUserOpTest is Base {
         );
     }
 
-    function test_validateUserOp_rejects_chainless_nonce_for_unsupported_selector()
+    function test_ValidateUserOp_RejectsChainlessNonceForUnsupportedSelector_ReturnsSigValidationFailed()
         external
     {
         // Create account with ECDSA validator
@@ -1137,7 +1139,7 @@ contract ValidateUserOpTest is Base {
         );
     }
 
-    function test_validateUserOp_comprehensive_chainless_nonce_coverage()
+    function test_ValidateUserOp_ComprehensiveChainlessNonceCoverage_Success()
         external
     {
         // Create account with ECDSA validator
@@ -1191,7 +1193,7 @@ contract ValidateUserOpTest is Base {
 
     // ============ ChainId Replay Protection Tests ============
 
-    function test_validateUserOp_with_chainId_prevents_replay_across_chains()
+    function test_ValidateUserOp_WithChainId_PreventsReplayAcrossChains_Success()
         external
     {
         // Test that normal mode (with chainId) prevents replay attacks across chains
@@ -1260,7 +1262,7 @@ contract ValidateUserOpTest is Base {
         );
     }
 
-    function test_validateUserOp_chainless_mode_allows_replay_across_chains()
+    function test_ValidateUserOp_ChainlessMode_AllowsReplayAcrossChains_Success()
         external
     {
         // Test that chainless mode allows the same signature across different chains

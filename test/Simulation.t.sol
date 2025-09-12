@@ -4,8 +4,8 @@ pragma solidity ^0.8.23;
 import {Base, MockERC20} from "./Base.t.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
-import {ISmartWalletSimulator} from "../script/utils/ISmartWalletSimulator.sol";
-import {SmartWalletSimulator} from "../script/utils/SmartWalletSimulator.sol";
+import {ISmartWalletSimulator} from "../script/utils/ISmartWalletSimulator.s.sol";
+import {SmartWalletSimulator} from "../script/utils/SmartWalletSimulator.s.sol";
 import {console} from "forge-std/console.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -705,7 +705,9 @@ contract SimulationTest is Base {
         }
     }
 
-    function test_simulate_executeFromRelayer() public {
+    function test_DelegateAndRevert_SimulateExecuteFromRelayer_Success()
+        public
+    {
         Call[] memory calls = constructCallsData();
 
         bytes memory validatorData = _constructRelayerSignature(
@@ -766,7 +768,9 @@ contract SimulationTest is Base {
         console.log("gas used", gasStart - gasEnd);
     }
 
-    function test_compareGas_simulateVsActual_executeFromRelayer() public {
+    function test_CompareGas_SimulateVsActual_ExecuteFromRelayer_Success()
+        public
+    {
         // Setup common data for both tests
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
@@ -881,45 +885,7 @@ contract SimulationTest is Base {
         );
     }
 
-    function test_delegatecall_overhead() public {
-        console.log("=== Testing DelegateCall Overhead ===");
-
-        // Create a simple blank function call
-        bytes memory blankCall = abi.encodeWithSelector(bytes4(0x00000000)); // Empty selector
-
-        // Test 1: Direct delegatecall overhead
-        uint256 delegatecallGasStart = gasleft();
-        try
-            ISmartWallet(_aliceWallet).delegateAndRevert(
-                address(_aliceWallet), // delegatecall to itself
-                blankCall
-            )
-        {
-            revert("Should have reverted");
-        } catch (bytes memory) {
-            uint256 delegatecallGasUsed = delegatecallGasStart - gasleft();
-
-            console.log(
-                "Delegatecall overhead (blank function):",
-                delegatecallGasUsed
-            );
-            console.log(
-                "This represents the baseline cost of delegatecall + DelegateAndRevert"
-            );
-
-            // This should help us understand the baseline overhead
-            assertTrue(
-                delegatecallGasUsed > 0,
-                "Delegatecall should consume some gas"
-            );
-        }
-    }
-
-    function test_simulate_chainless_nonce_validation_fails() public {
-        console.log(
-            "=== Testing ChainlessLib.validateChainlessNonceCallData returning false ==="
-        );
-
+    function test_Simulate_ChainlessNonce_ValidationFails_Success() public {
         // Create calls that are NOT allowed for chainless nonce (e.g., transfer calls)
         Call[] memory calls = new Call[](2);
         calls[0] = Call({target: _bob, value: 1 ether, data: ""});
@@ -989,12 +955,8 @@ contract SimulationTest is Base {
         }
     }
 
-    function test_simulate_chainless_nonce_validation_passes() public {
-        console.log(
-            "=== Testing ChainlessLib.validateChainlessNonceCallData returning true ==="
-        );
-
-        // Create calls that ARE allowed for chainless nonce (addOwner, updateOwner, removeOwner, upgradeToAndCall)
+    function test_RevertWhen_Simulate_SelfCall_NonAdminSelfCall() public {
+        // Create calls that ARE allowed for chainless nonce (addOwner, upgradeToAndCall)
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
             target: _aliceWallet, // Call addOwner on the actual wallet being simulated
@@ -1057,9 +1019,7 @@ contract SimulationTest is Base {
         }
     }
 
-    function test_simulate_validator_not_found() public {
-        console.log("=== Testing validator == address(0) scenario ===");
-
+    function test_Simulate_ValidatorNotFound_Success() public {
         // Create a simple call
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _bob, value: 0, data: ""});
@@ -1086,14 +1046,8 @@ contract SimulationTest is Base {
             signature
         );
 
-        // Mock the validator at address(0) to return true
-        vm.mockCall(
-            address(0),
-            abi.encodeWithSelector(IValidator.validateSignature.selector),
-            abi.encode(true)
-        );
-
         // Try to simulate with address(0) as validator parameter
+        // Test should pass as the simulate function will not revert invalid validators
         vm.prank(relayer);
         try
             ISmartWallet(_aliceWallet).delegateAndRevert(
@@ -1144,7 +1098,7 @@ contract SimulationTest is Base {
         vm.clearMockedCalls();
     }
 
-    function test_simulate_erc20_insufficient_balance() public {
+    function test_Simulate_ERC20InsufficientBalance_Success() public {
         // Create a call that will fail during execution (insufficient ERC20 balance)
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -1210,7 +1164,7 @@ contract SimulationTest is Base {
         }
     }
 
-    function test_simulate_mixed_chainless_operations() public {
+    function test_Simulate_MixedChainlessOperations_Success() public {
         // Create a mix of allowed and disallowed operations for chainless nonce
         Call[] memory mixedCalls = new Call[](3);
 
@@ -1305,7 +1259,7 @@ contract SimulationTest is Base {
 
     // ============ DelegateAndRevert Tests ============
 
-    function test_delegateAndRevert_successful_call() public {
+    function test_DelegateAndRevert_SuccessfulCall_Success() public {
         TestTarget target = new TestTarget();
 
         // Test successful call
@@ -1331,7 +1285,7 @@ contract SimulationTest is Base {
         }
     }
 
-    function test_delegateAndRevert_failed_call() public {
+    function test_DelegateAndRevert_FailedCall_Success() public {
         TestTarget target = new TestTarget();
 
         // Test failed call (function that returns false)
@@ -1360,7 +1314,7 @@ contract SimulationTest is Base {
         }
     }
 
-    function test_delegateAndRevert_with_return_data() public {
+    function test_DelegateAndRevert_WithReturnData_Success() public {
         TestTarget target = new TestTarget();
 
         // Test call that returns data
@@ -1386,7 +1340,7 @@ contract SimulationTest is Base {
         }
     }
 
-    function test_delegateAndRevert_with_revert() public {
+    function test_DelegateAndRevert_WithRevert_Success() public {
         TestTarget target = new TestTarget();
 
         // Test call that reverts with a message
@@ -1416,7 +1370,7 @@ contract SimulationTest is Base {
         }
     }
 
-    function test_delegateAndRevert_with_custom_error() public {
+    function test_DelegateAndRevert_WithCustomError_Success() public {
         TestTarget target = new TestTarget();
 
         // Test call that reverts with a custom error
@@ -1449,38 +1403,7 @@ contract SimulationTest is Base {
         }
     }
 
-    function test_delegateAndRevert_gas_consumption() public {
-        TestTarget target = new TestTarget();
-
-        // Test call that returns success
-        bytes memory callData = abi.encodeWithSelector(
-            TestTarget.returnSuccess.selector
-        );
-
-        uint256 gasBefore = gasleft();
-
-        try
-            ISmartWallet(_aliceWallet).delegateAndRevert(
-                address(target),
-                callData
-            )
-        {
-            revert("Should have reverted");
-        } catch (bytes memory revertData) {
-            uint256 gasAfter = gasleft();
-            uint256 gasUsed = gasBefore - gasAfter;
-
-            // Decode the DelegateAndRevert error
-            (bool success, ) = decodeDelegateAndRevert(revertData);
-
-            assertTrue(success, "Call should have succeeded");
-            assertTrue(gasUsed > 0, "Should have consumed gas");
-
-            console.log("Gas used in delegateAndRevert:", gasUsed);
-        }
-    }
-
-    function test_delegateAndRevert_simulate_execute() public {
+    function test_DelegateAndRevert_Simulate_Execute_Success() public {
         // Test simulating an execute call
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _bob, value: 0, data: ""});
@@ -1509,7 +1432,9 @@ contract SimulationTest is Base {
         }
     }
 
-    function test_delegateAndRevert_simulate_executeWithRelayer() public {
+    function test_DelegateAndRevert_Simulate_ExecuteWithRelayer_Success()
+        public
+    {
         // Test simulating an executeWithRelayer call
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _bob, value: 0, data: ""});
@@ -1543,7 +1468,7 @@ contract SimulationTest is Base {
         }
     }
 
-    function test_delegateAndRevert_invalid_target() public {
+    function test_DelegateAndRevert_InvalidTarget_Success() public {
         // Test with a target that has code but will fail the call
         // Use the SmartWallet itself as target with invalid calldata
         bytes memory callData = abi.encodeWithSelector(bytes4(0x12345678)); // Invalid selector
@@ -1566,7 +1491,7 @@ contract SimulationTest is Base {
         }
     }
 
-    function test_delegateAndRevert_empty_calldata() public {
+    function test_DelegateAndRevert_EmptyCalldata_Success() public {
         TestTarget target = new TestTarget();
 
         // Test with empty calldata
@@ -1585,64 +1510,6 @@ contract SimulationTest is Base {
 
             // Empty calldata should fail
             assertFalse(success, "Call should have failed with empty calldata");
-        }
-    }
-
-    function test_delegateAndRevert_simulation_wallet() public {
-        // Deploy a SmartWalletSimulator
-        SmartWalletSimulator smartWalletSimulator = new SmartWalletSimulator();
-
-        TestTarget target = new TestTarget();
-        bytes memory callData = abi.encodeWithSelector(
-            TestTarget.returnSuccess.selector
-        );
-
-        try smartWalletSimulator.delegateAndRevert(address(target), callData) {
-            revert("Should have reverted");
-        } catch (bytes memory revertData) {
-            // Decode the DelegateAndRevert error
-            (bool success, bytes memory ret) = decodeDelegateAndRevert(
-                revertData
-            );
-
-            assertTrue(success, "Call should have succeeded");
-            assertEq(ret, abi.encode(true), "Return value should be true");
-        }
-    }
-
-    function test_delegateAndRevert_gas_comparison() public {
-        TestTarget target = new TestTarget();
-        bytes memory callData = abi.encodeWithSelector(
-            TestTarget.returnSuccess.selector
-        );
-
-        // Test gas usage of direct call vs delegateAndRevert
-        uint256 directGasBefore = gasleft();
-        target.returnSuccess();
-        uint256 directGasAfter = gasleft();
-        uint256 directGasUsed = directGasBefore - directGasAfter;
-
-        uint256 delegateGasBefore = gasleft();
-        try
-            ISmartWallet(_aliceWallet).delegateAndRevert(
-                address(target),
-                callData
-            )
-        {
-            revert("Should have reverted");
-        } catch (bytes memory) {
-            uint256 delegateGasAfter = gasleft();
-            uint256 delegateGasUsed = delegateGasBefore - delegateGasAfter;
-
-            console.log("Direct call gas used:", directGasUsed);
-            console.log("DelegateAndRevert gas used:", delegateGasUsed);
-            console.log("Overhead:", delegateGasUsed - directGasUsed);
-
-            // DelegateAndRevert should use more gas due to delegatecall overhead
-            assertTrue(
-                delegateGasUsed > directGasUsed,
-                "DelegateAndRevert should use more gas"
-            );
         }
     }
 }

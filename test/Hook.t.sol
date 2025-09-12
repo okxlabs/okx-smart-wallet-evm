@@ -216,7 +216,7 @@ contract HookTest is Base {
 
     // ============ Tests for Direct Execute (EOA as msg.sender) ============
 
-    function test_ExecuteDirect_WithoutHook() public {
+    function test_ExecuteDirect_WithoutHook_Success() public {
         // Execute without any hook set using direct execute
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -265,7 +265,7 @@ contract HookTest is Base {
         assertEq(mockToken.balanceOf(_bob), 50 ether);
     }
 
-    function test_ExecuteDirect_WithMockHook_Revert_InvalidFunctionCall()
+    function test_RevertWhen_ExecuteDirect_WithMockHook_InvalidFunctionCall()
         public
     {
         // Set up hook for Alice using direct execute
@@ -288,7 +288,7 @@ contract HookTest is Base {
         ISmartWallet(_aliceWallet).execute(calls);
     }
 
-    function test_ExecuteDirect_WithMockHook_Revert_ExceedsLimit() public {
+    function test_RevertWhen_ExecuteDirect_WithMockHook_ExceedsLimit() public {
         // Set up hook for Alice using direct execute
         _setHookForOwnerDirect(aliceKeyHash, address(mockHook), 0);
 
@@ -309,7 +309,7 @@ contract HookTest is Base {
         ISmartWallet(_aliceWallet).execute(calls);
     }
 
-    function test_ExecuteDirect_WithHook_StatePersistence() public {
+    function test_ExecuteDirect_WithHook_StatePersistence_Success() public {
         // Set up hook for Alice using direct execute
         _setHookForOwnerDirect(aliceKeyHash, address(mockHook), 0);
 
@@ -347,7 +347,7 @@ contract HookTest is Base {
         assertEq(mockToken.balanceOf(_bob), 75 ether);
     }
 
-    function test_ExecuteDirect_WithHook_Expiration() public {
+    function test_ExecuteDirect_WithHook_Expiration_Success() public {
         // Set up hook for Alice with expiration using direct execute
         _setHookForOwnerDirect(
             aliceKeyHash,
@@ -400,7 +400,7 @@ contract HookTest is Base {
 
     // ============ Tests for ExecuteWithRelayer (Smart Wallet as msg.sender) ============
 
-    function test_ExecuteWithRelayer_WithoutHook() public {
+    function test_ExecuteWithRelayer_WithoutHook_Success() public {
         // Execute without any hook set
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -476,7 +476,9 @@ contract HookTest is Base {
         assertEq(mockToken.balanceOf(_bob), 50 ether);
     }
 
-    function test_ExecuteWithRelayer_WithMockHook_ExceedsLimit() public {
+    function test_RevertWhen_ExecuteWithRelayer_WithMockHook_ExceedsLimit()
+        public
+    {
         // Set up hook for Alice
         _setHookForOwnerWithRelayer(aliceKeyHash, address(mockHook), 0);
 
@@ -513,7 +515,9 @@ contract HookTest is Base {
         );
     }
 
-    function test_ExecuteWithRelayer_WithMockHook_InvalidToken() public {
+    function test_ExecuteWithRelayer_WithMockHook_InvalidToken_Success()
+        public
+    {
         // Set up hook for Alice
         _setHookForOwnerWithRelayer(aliceKeyHash, address(mockHook), 0);
 
@@ -557,7 +561,9 @@ contract HookTest is Base {
         assertEq(otherToken.balanceOf(_bob), 50 ether);
     }
 
-    function test_ExecuteWithRelayer_WithMockHook_InvalidOperation() public {
+    function test_RevertWhen_ExecuteWithRelayer_WithMockHook_InvalidOperation()
+        public
+    {
         // Set up hook for Alice
         _setHookForOwnerWithRelayer(aliceKeyHash, address(mockHook), 0);
 
@@ -594,7 +600,9 @@ contract HookTest is Base {
         );
     }
 
-    function test_ExecuteWithRelayer_WithMockHook_InvalidRecipient() public {
+    function test_RevertWhen_ExecuteWithRelayer_WithMockHook_InvalidRecipient()
+        public
+    {
         // Set up hook for Alice
         _setHookForOwnerWithRelayer(aliceKeyHash, address(mockHook), 0);
 
@@ -631,7 +639,9 @@ contract HookTest is Base {
         );
     }
 
-    function test_ExecuteWithRelayer_WithMockHook_BalanceMismatch() public {
+    function test_RevertWhen_ExecuteWithRelayer_WithMockHook_BalanceMismatch()
+        public
+    {
         // Set up hook for Alice
         _setHookForOwnerWithRelayer(aliceKeyHash, address(mockHook), 0);
 
@@ -674,7 +684,9 @@ contract HookTest is Base {
 
     // ============ Tests for Different Hook Types ============
 
-    function test_ExecuteWithRelayer_WithRevertingHook_PreCheck() public {
+    function test_RevertWhen_ExecuteWithRelayer_WithRevertingHook_PreCheck()
+        public
+    {
         RevertingHook revertingHook = new RevertingHook();
         _setHookForOwnerWithRelayer(aliceKeyHash, address(revertingHook), 0);
 
@@ -735,7 +747,9 @@ contract HookTest is Base {
         assertEq(_bob.balance, 2 ether);
     }
 
-    function test_ExecuteWithRelayer_WithCallCountHook_TooManyCalls() public {
+    function test_RevertWhen_ExecuteWithRelayer_WithCallCountHook_TooManyCalls()
+        public
+    {
         CallCountHook callCountHook = new CallCountHook();
         _setHookForOwnerWithRelayer(aliceKeyHash, address(callCountHook), 0);
 
@@ -766,7 +780,7 @@ contract HookTest is Base {
         );
     }
 
-    function test_ExecuteWithRelayer_WithGasTrackingHook() public {
+    function test_ExecuteWithRelayer_WithGasTrackingHook_Success() public {
         GasTrackingHook gasTrackingHook = new GasTrackingHook();
         _setHookForOwnerWithRelayer(aliceKeyHash, address(gasTrackingHook), 0);
 
@@ -800,7 +814,7 @@ contract HookTest is Base {
 
     // ============ Tests for Hook with Expiration ============
 
-    function test_ExecuteWithRelayer_WithExpiredHook() public {
+    function test_RevertWhen_ExecuteWithRelayer_WithExpiredHook() public {
         // Set up hook with expiration in the past
         _setHookForOwnerWithRelayer(
             aliceKeyHash,
@@ -841,7 +855,7 @@ contract HookTest is Base {
         );
     }
 
-    function test_ExecuteWithRelayer_WithFutureExpiration() public {
+    function test_RevertWhen_ExecuteWithRelayer_WithFutureExpiration() public {
         // Set up hook with expiration in the future
         _setHookForOwnerWithRelayer(
             aliceKeyHash,
@@ -884,7 +898,7 @@ contract HookTest is Base {
 
     // ============ Tests for Multiple Calls ============
 
-    function test_ExecuteWithRelayer_WithHook_MultipleCalls() public {
+    function test_ExecuteWithRelayer_WithHook_MultipleCalls_Success() public {
         _setHookForOwnerWithRelayer(aliceKeyHash, address(mockHook), 0);
 
         Call[] memory calls = new Call[](2);
@@ -931,7 +945,7 @@ contract HookTest is Base {
         assertEq(mockToken.balanceOf(_bob), 70 ether);
     }
 
-    function test_ExecuteWithRelayer_WithHook_MultipleCallsExceedsLimit()
+    function test_RevertWhen_ExecuteWithRelayer_WithHook_MultipleCallsExceedsLimit()
         public
     {
         _setHookForOwnerWithRelayer(aliceKeyHash, address(mockHook), 0);
@@ -980,7 +994,9 @@ contract HookTest is Base {
 
     // ============ Tests for Non-Admin Self Calls ============
 
-    function test_ExecuteWithRelayer_WithHook_NonAdminSelfCall() public {
+    function test_RevertWhen_ExecuteWithRelayer_WithHook_NonAdminSelfCall()
+        public
+    {
         // Set up hook without admin privileges
         uint256 settings = IOwnerManager(_aliceWallet).packSettings(
             false,
@@ -1026,7 +1042,7 @@ contract HookTest is Base {
         );
     }
 
-    function test_ExecuteWithRelayer_WithHook_AdminSelfCall() public {
+    function test_ExecuteWithRelayer_WithHook_AdminSelfCall_Success() public {
         // Set up hook with admin privileges
         _setHookForOwnerWithRelayer(aliceKeyHash, address(mockHook), 0);
 
@@ -1064,7 +1080,7 @@ contract HookTest is Base {
 
     // ============ Tests for Empty Calls ============
 
-    function test_ExecuteWithRelayer_WithHook_EmptyCalls() public {
+    function test_ExecuteWithRelayer_WithHook_EmptyCalls_Success() public {
         _setHookForOwnerWithRelayer(aliceKeyHash, address(mockHook), 0);
 
         Call[] memory calls = new Call[](0);
@@ -1095,7 +1111,9 @@ contract HookTest is Base {
 
     // ============ Tests for Non-Token Calls ============
 
-    function test_ExecuteWithRelayer_WithHook_NonTokenCalls() public {
+    function test_RevertWhen_ExecuteWithRelayer_WithHook_NonTokenCalls()
+        public
+    {
         _setHookForOwnerWithRelayer(aliceKeyHash, address(mockHook), 0);
 
         Call[] memory calls = new Call[](1);
@@ -1125,7 +1143,9 @@ contract HookTest is Base {
 
     // ============ Tests for Hook State Persistence ============
 
-    function test_ExecuteWithRelayer_WithHook_StatePersistence() public {
+    function test_ExecuteWithRelayer_WithHook_StatePersistence_Success()
+        public
+    {
         _setHookForOwnerWithRelayer(aliceKeyHash, address(mockHook), 0);
 
         // First call should succeed
@@ -1196,7 +1216,7 @@ contract HookTest is Base {
         assertEq(mockToken.balanceOf(_bob), 80 ether);
     }
 
-    function test_ExecuteWithRelayer_WithHook_ProperSetup() public {
+    function test_ExecuteWithRelayer_WithHook_ProperSetup_Success() public {
         // Use the contract's own functions to set up the hook
         // First, we need to add the hook through the contract's addOwner function
 
@@ -1280,7 +1300,7 @@ contract HookTest is Base {
 
     // ============ Debug Tests ============
 
-    function test_DebugHookSetup() public {
+    function test_DebugHookSetup_Success() public {
         // Set up hook for Alice
         _setHookForOwnerWithRelayer(aliceKeyHash, address(mockHook), 0);
 

@@ -12,7 +12,7 @@ import {PasskeyValidator} from "./validators/PasskeyValidator.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {ERC712} from "src/ERC712.sol";
-import {HelperLib} from "script/utils/Helper.sol";
+import {HelperLib} from "script/utils/Helper.s.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {Static} from "src/libraries/Static.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
@@ -79,18 +79,18 @@ contract PasskeyValidatorTest is Base {
         vm.deal(builtinWallet, 10 ether);
     }
 
-    function test_passkeyValidator_deployment() public view {
+    function test_PasskeyValidator_Deployment() public view {
         assertEq(address(passkeyValidator).code.length > 0, true);
     }
 
-    function test_passkeyValidator_added_to_wallet() public view {
+    function test_PasskeyValidator_AddedToWallet() public view {
         address validator = IOwnerManager(_aliceWallet).ownerValidators(
             testKeyHash
         );
         assertEq(validator, address(passkeyValidator));
     }
 
-    function test_webauthn_signature_directly() public view {
+    function test_Webauthn_SignatureDirectly() public view {
         (, , bytes32 messageHash) = HelperLib.getPasskeyMessageHash(
             SIGNED_MESSAGE_HASH
         );
@@ -111,7 +111,7 @@ contract PasskeyValidatorTest is Base {
         assertTrue(isValid, "WebAuthn signature should be valid");
     }
 
-    function test_real_passkey_signature_validates() public view {
+    function test_RealPasskey_SignatureValidates() public view {
         (, , bytes32 messageHash) = HelperLib.getPasskeyMessageHash(
             SIGNED_MESSAGE_HASH
         );
@@ -145,7 +145,7 @@ contract PasskeyValidatorTest is Base {
         assertEq(isValid, true, "Real Passkey signature should validate");
     }
 
-    function test_get_real_typed_data_hash() public view {
+    function test_GetReal_TypedDataHash() public view {
         // Create test calls
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
@@ -163,7 +163,7 @@ contract PasskeyValidatorTest is Base {
         console.logBytes32(realTypedDataHash);
     }
 
-    function test_executeWithRelayer_with_mock_passkey() public view {
+    function test_ExecuteWithRelayer_WithMockPasskey() public view {
         // Create test calls
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
@@ -202,7 +202,7 @@ contract PasskeyValidatorTest is Base {
         // This test validates the data structure and encoding
     }
 
-    function test_real_passkey_wrong_challenge_fails() public view {
+    function test_RealPasskey_WrongChallenge_ReturnsFalse() public view {
         // Use a different message hash than what was actually signed
         bytes32 wrongMessageHash = keccak256("wrong message");
 
@@ -238,7 +238,10 @@ contract PasskeyValidatorTest is Base {
         );
     }
 
-    function test_validateSignature_rejects_wrong_pubkey() public view {
+    function test_ValidateSignature_RejectsWrongPubkey_ReturnsFalse()
+        public
+        view
+    {
         // Use wrong public key coordinates
         uint256 wrongX = 0x1111111111111111111111111111111111111111111111111111111111111111;
         uint256 wrongY = 0x2222222222222222222222222222222222222222222222222222222222222222;
@@ -273,7 +276,10 @@ contract PasskeyValidatorTest is Base {
 
     // ===== Merkle Proof Tests =====
 
-    function test_validateSignature_with_merkle_proof_single() public view {
+    function test_ValidateSignature_WithMerkleProofSingle_ReturnsTrue()
+        public
+        view
+    {
         // Correct Merkle proof usage for Passkey validation
         // Step 1: Create multiple message hashes (leaves of Merkle tree)
         bytes32[] memory leaves = new bytes32[](3);
@@ -344,7 +350,7 @@ contract PasskeyValidatorTest is Base {
         console.log("Proofs provided:", proofs.length);
     }
 
-    function test_merkle_proof_concept_demonstration() public pure {
+    function test_MerkleProof_ConceptDemonstration() public pure {
         // This test demonstrates the Merkle proof concept without signature complexities
         console.log("=== Merkle Proof Concept Demo ===");
 
@@ -393,7 +399,7 @@ contract PasskeyValidatorTest is Base {
         );
     }
 
-    function test_merkle_proof_processing_detection() public view {
+    function test_MerkleProof_ProcessingDetection() public view {
         // Test the MerkleProofProcessor's dynamic detection
         PasskeyValidatorLib.PasskeyPubKey
             memory passkeyPubKey = PasskeyValidatorLib.PasskeyPubKey({
@@ -422,7 +428,10 @@ contract PasskeyValidatorTest is Base {
         console.log("Long data length:", longData.length);
     }
 
-    function test_validateSignature_short_validatorData_fails() public view {
+    function test_ValidateSignature_ShortValidatorData_ReturnsFalse()
+        public
+        view
+    {
         // Create validatorData that is shorter than PASSKEY_PUBKEY_LENGTH (64 bytes)
         // The function expects at least 64 bytes for the PasskeyPubKey struct
 
@@ -452,7 +461,7 @@ contract PasskeyValidatorTest is Base {
         );
     }
 
-    function test_executeWithRelayer_short_validatorData_fails() public {
+    function test_RevertWhen_ExecuteWithRelayer_ShortValidatorData() public {
         // Create valid calls
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
@@ -498,7 +507,9 @@ contract PasskeyValidatorTest is Base {
         );
     }
 
-    function test_executeWithRelayer_incomplete_webauthn_data_fails() public {
+    function test_RevertWhen_ExecuteWithRelayer_IncompleteWebauthnData()
+        public
+    {
         // Create valid calls
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
@@ -552,7 +563,7 @@ contract PasskeyValidatorTest is Base {
     /**
      * @dev Verify built-in validator setup is correct
      */
-    function test_builtin_validator_setup() public view {
+    function test_BuiltinValidator_Setup() public view {
         address validator = IOwnerManager(builtinWallet).ownerValidators(
             builtinKeyHash
         );
@@ -576,7 +587,7 @@ contract PasskeyValidatorTest is Base {
      * @dev Test successful execution with built-in Passkey validator via executeWithRelayer
      * This covers the _validateSignature path with Static.PASSKEY_VALIDATOR_ADDRESS
      */
-    function test_builtin_executeWithRelayer_success() public {
+    function test_BuiltinExecuteWithRelayer_Success() public {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
@@ -611,7 +622,9 @@ contract PasskeyValidatorTest is Base {
     /**
      * @dev Test failure with invalid signature for built-in Passkey validator
      */
-    function test_builtin_executeWithRelayer_invalid_signature() public {
+    function test_RevertWhen_BuiltinExecuteWithRelayer_InvalidSignature()
+        public
+    {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
@@ -653,7 +666,7 @@ contract PasskeyValidatorTest is Base {
     /**
      * @dev Test EIP-1271 signature validation with built-in Passkey validator
      */
-    function test_builtin_isValidSignature_success() public view {
+    function test_BuiltinIsValidSignature_Success() public view {
         bytes32 hash = keccak256("test message");
 
         // Note: Using validUntil = 0 for built-in validator compatibility
@@ -678,7 +691,7 @@ contract PasskeyValidatorTest is Base {
     /**
      * @dev Test UserOperation validation with built-in Passkey validator
      */
-    function test_builtin_validateUserOp_success() public {
+    function test_BuiltinValidateUserOp_Success() public {
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
             keyHash: builtinKeyHash,
@@ -742,7 +755,7 @@ contract PasskeyValidatorTest is Base {
     /**
      * @dev Test built-in Passkey validator with insufficient signature data
      */
-    function test_builtin_insufficient_data() public {
+    function test_RevertWhen_Builtin_InsufficientData() public {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,

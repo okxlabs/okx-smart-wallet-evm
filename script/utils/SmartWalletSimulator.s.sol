@@ -5,7 +5,7 @@ import {SmartWallet} from "../../src/SmartWallet.sol";
 import {BatchedCall} from "../../src/Types.sol";
 import {Static} from "../../src/libraries/Static.sol";
 import {ChainlessLib} from "../../src/libraries/ChainlessLib.sol";
-import {ISmartWalletSimulator} from "./ISmartWalletSimulator.sol";
+import {ISmartWalletSimulator} from "./ISmartWalletSimulator.s.sol";
 import {BatchedCallLib} from "../../src/libraries/BatchedCallLib.sol";
 import {DecodeLib} from "../../src/libraries/DecodeLib.sol";
 

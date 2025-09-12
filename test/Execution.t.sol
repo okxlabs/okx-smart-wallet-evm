@@ -65,13 +65,13 @@ contract ExecutionTest is Base {
         );
     }
 
-    function test_execute_succeeds_for_owner() public {
+    function test_Execute_ByOwner_Success() public {
         vm.prank(_alice);
         Call[] memory calls = constructCallsData();
         ISmartWallet(_aliceWallet).execute(calls);
     }
 
-    function test_execute_reverts_for_non_owner() public {
+    function test_RevertWhen_Execute_ByNonOwner() public {
         vm.prank(_bob);
         Call[] memory calls = constructCallsData();
         vm.expectRevert(
@@ -80,7 +80,7 @@ contract ExecutionTest is Base {
         ISmartWallet(_aliceWallet).execute(calls);
     }
 
-    function test_execute_reverts_on_failed_call() public {
+    function test_RevertWhen_Execute_FailedCall() public {
         vm.prank(_alice);
         Call[] memory calls = new Call[](2);
         calls[0] = Call({target: _bob, value: 1 ether, data: ""});
@@ -89,7 +89,7 @@ contract ExecutionTest is Base {
         ISmartWallet(_aliceWallet).execute(calls);
     }
 
-    function test_execute_succeeds_for_added_owner() public {
+    function test_Execute_ByAddedOwner_Success() public {
         // Add Charlie as an owner to the wallet
         bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
         _addOwnerToAccount(
@@ -109,7 +109,7 @@ contract ExecutionTest is Base {
         assertEq(_bob.balance, 1 ether);
     }
 
-    function test_execute_reverts_for_unregistered_keyHash() public {
+    function test_RevertWhen_Execute_ByUnregisteredKeyHash() public {
         // Dave is not registered as an owner
         (address dave, ) = makeAddrAndKey("dave");
 
@@ -121,7 +121,7 @@ contract ExecutionTest is Base {
         ISmartWallet(_aliceWallet).execute(calls);
     }
 
-    function test_execute_with_empty_calls_array() public {
+    function test_Execute_WithEmptyCallsArray_Success() public {
         // Test that execute succeeds with empty calls array (no operations)
         Call[] memory emptyCalls = new Call[](0);
 
@@ -133,7 +133,7 @@ contract ExecutionTest is Base {
         assertEq(_bob.balance, 0 ether);
     }
 
-    function test_executeWithRelayer_with_empty_calls_array() public {
+    function test_ExecuteWithRelayer_WithEmptyCallsArray_Success() public {
         // Test that executeWithRelayer succeeds with empty calls array
         Call[] memory emptyCalls = new Call[](0);
         BatchedCall memory batchedCall = BatchedCall({
@@ -161,7 +161,7 @@ contract ExecutionTest is Base {
         assertEq(_bob.balance, 0 ether);
     }
 
-    function test_keyHash_consistency_and_validation() public {
+    function test_KeyHash_ConsistencyAndValidation_Success() public {
         // Test that keyHash generation is consistent across the system
         address testAddress = _charlie;
         bytes32 keyHash = keccak256(abi.encodePacked(testAddress));
@@ -196,7 +196,7 @@ contract ExecutionTest is Base {
         ISmartWallet(_aliceWallet).execute(calls);
     }
 
-    function test_executeFromRelayer_succeeds_as_relayer() public {
+    function test_ExecuteFromRelayer_AsRelayer_Success() public {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
         bytes memory validatorData = _constructRelayerSignature(
@@ -228,7 +228,9 @@ contract ExecutionTest is Base {
         assertEq(address(_bob).balance, 1 ether);
     }
 
-    function test_executeFromRelayer_initialization_on_first_time() public {
+    function test_ExecuteFromRelayer_InitializationOnFirstTime_Success()
+        public
+    {
         // Create charlie's wallet using factory
         address charlieWallet = _deployAccountSingleOwner(
             keccak256(abi.encodePacked(_charlie)),
@@ -264,7 +266,7 @@ contract ExecutionTest is Base {
         assertEq(address(_bob).balance, 1 ether);
     }
 
-    function test_executeFromRelayer_reverts_on_failed_payment() public {
+    function test_RevertWhen_ExecuteFromRelayer_FailedPayment() public {
         assertEq(mockToken2.balanceOf(_aliceWallet), 0);
         vm.prank(_alice);
         Call[] memory calls = new Call[](2);
@@ -293,7 +295,7 @@ contract ExecutionTest is Base {
         );
     }
 
-    function test_executeFromRelayer_succeeds_on_payment() public {
+    function test_ExecuteFromRelayer_OnPayment_Success() public {
         Call[] memory calls = new Call[](2);
         // Include payment to relayer as part of the batch
         calls[0] = constructErc20TransferCall(
@@ -330,7 +332,7 @@ contract ExecutionTest is Base {
 
     // This test is no longer valid as executeFromRelayer now reverts on any failed call
     // The batch execution is atomic - all succeed or all fail
-    function test_executeFromRelayer_reverts_on_any_failed_call() public {
+    function test_RevertWhen_ExecuteFromRelayer_AnyFailedCall() public {
         vm.prank(_alice);
         Call[] memory calls = new Call[](2);
         calls[0] = Call({target: _bob, value: 1 ether, data: ""});
@@ -356,7 +358,7 @@ contract ExecutionTest is Base {
         assertEq(address(_bob).balance, 0);
     }
 
-    function test_executeFromRelayer_succeeds_on_free_gas_mode() public {
+    function test_ExecuteFromRelayer_OnFreeGasMode_Success() public {
         Call[] memory calls = new Call[](1);
         // calls[0] = Call({target: _bob, value: 1 ether, data: ""});
         calls[0] = constructErc20TransferCall(
@@ -393,7 +395,7 @@ contract ExecutionTest is Base {
 
     // ============ Complex Execution Tests ============
 
-    function test_mixed_eth_erc20_contract_calls() public {
+    function test_MixedEthErc20ContractCalls_Success() public {
         // Complex mixed scenario:
         // 1. Transfer ETH to bob
         // 2. Transfer ERC20 tokens to charlie
@@ -484,7 +486,7 @@ contract ExecutionTest is Base {
         emit LargeOperationCompleted(5, gasUsed);
     }
 
-    function test_large_batch_operation_gas_limits() public {
+    function test_LargeBatchOperationGasLimits_Success() public {
         // Create 150 calls (>100 limit mentioned in requirements)
         uint256 callCount = 150;
         Call[] memory largeBatch = new Call[](callCount);
@@ -535,7 +537,7 @@ contract ExecutionTest is Base {
         }
     }
 
-    function test_call_to_nonexistent_contract() public {
+    function test_CallToNonexistentContract_Success() public {
         // Use an address that has no code (simulating a destroyed or non-existent contract)
         address nonExistentContract = address(0xdead);
 
@@ -568,7 +570,7 @@ contract ExecutionTest is Base {
         );
     }
 
-    function test_gas_efficiency_comparison() public {
+    function test_GasEfficiencyComparison_Success() public {
         // Ensure wallet has enough balance for both tests
         vm.deal(_aliceWallet, 30 ether);
 
@@ -642,7 +644,7 @@ contract ExecutionTest is Base {
         emit LargeOperationCompleted(10, multipleCallsGas);
     }
 
-    function test_executeWithRelayer_wrapping_self_execute() public {
+    function test_ExecuteWithRelayer_WrappingSelfExecute_Success() public {
         // Test that executeWithRelayer can wrap a self-call to the wallet's own execute function
         // This creates a nested execution scenario: executeWithRelayer -> execute
 
@@ -705,7 +707,7 @@ contract ExecutionTest is Base {
         );
     }
 
-    function test_execute_calling_executeWithRelayer() public {
+    function test_Execute_CallingExecuteWithRelayer_Success() public {
         // Test the reverse scenario: execute calls executeWithRelayer
         // This creates a nested execution: execute -> executeWithRelayer
 
@@ -766,7 +768,7 @@ contract ExecutionTest is Base {
         );
     }
 
-    function test_executeWithRelayer_non_admin_self_execute_reverts() public {
+    function test_RevertWhen_ExecuteWithRelayer_NonAdminSelfExecute() public {
         // Add Bob as a non-admin owner to the wallet
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         uint256 bobSettings = 0; // Non-admin settings
@@ -843,7 +845,7 @@ contract ExecutionTest is Base {
         );
     }
 
-    function test_execute_truncates_large_revert_data() public {
+    function test_RevertWhen_Execute_TruncatesLargeRevertData() public {
         // Create a call that will revert with >256 bytes
         Call[] memory calls = new Call[](1);
         calls[0] = Call({

@@ -9,7 +9,7 @@ import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {Static} from "src/libraries/Static.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
-import {HelperLib} from "../utils/Helper.sol";
+import {HelperLib} from "../utils/Helper.s.sol";
 
 /// @title CreateAccountWithAddOwner
 /// @notice Creates a SmartWallet with initial Passkey owner and immediately adds a random EOA owner using Merkle proof

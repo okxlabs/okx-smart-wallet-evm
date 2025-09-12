@@ -21,7 +21,7 @@ contract ValidationTest is Base {
         super.setUp();
     }
 
-    function test_executeFromRelayer_reverts_for_invalid_signature() public {
+    function test_RevertWhen_ExecuteFromRelayer_InvalidSignature() public {
         Call[] memory calls = constructCallsData();
 
         bytes32 hash = _getValidationTypedHash(_aliceWallet, calls);
@@ -51,7 +51,7 @@ contract ValidationTest is Base {
         assertEq(address(_bob).balance, 0 ether);
     }
 
-    function test_executeFromRelayer_reverts_for_invalid_keyHash() public {
+    function test_RevertWhen_ExecuteFromRelayer_InvalidKeyHash() public {
         Call[] memory calls = constructCallsData();
 
         // Use a keyHash that doesn't exist (bob's keyHash, but bob is not a validator)
@@ -80,7 +80,7 @@ contract ValidationTest is Base {
         assertEq(address(_bob).balance, 0 ether);
     }
 
-    function test_executeFromRelayer_reverts_for_removed_validator() public {
+    function test_RevertWhen_ExecuteFromRelayer_RemovedValidator() public {
         Call[] memory calls = constructCallsData();
 
         // Use _bob instead of _aliceWallet to avoid EIP-7702 fallback collision
@@ -119,7 +119,7 @@ contract ValidationTest is Base {
         assertEq(address(_bob).balance, 0 ether);
     }
 
-    function test_executeFromRelayer_emits_nonce_consumed() public {
+    function test_ExecuteFromRelayer_EmitsNonceConsumed() public {
         vm.prank(_alice);
         uint256 nonce = _getNonce(_aliceWallet);
         Call[] memory calls = constructCallsData();
@@ -156,7 +156,7 @@ contract ValidationTest is Base {
         assertEq(address(_bob).balance, 1 ether);
     }
 
-    function test_nonce_unchanged_after_invalid_signature_revert() public {
+    function test_Nonce_UnchangedAfterInvalidSignatureRevert_Success() public {
         // Get initial nonce
         uint192 nonceKey = uint192(
             uint256(keccak256(abi.encodePacked(_alice))) >> 64
@@ -200,7 +200,10 @@ contract ValidationTest is Base {
         );
     }
 
-    function test_isValidSignature_fails_with_invalid_signer() public view {
+    function test_IsValidSignature_WithInvalidSigner_ReturnsInvalidValue()
+        public
+        view
+    {
         bytes32 hash = keccak256("test");
 
         // Wrong signer
@@ -211,10 +214,13 @@ contract ValidationTest is Base {
             hash,
             signature
         );
-        assertEq(result, bytes4(0xffffffff));
+        assertEq(result, Static.INVALID_VALUE);
     }
 
-    function test_isValidSignature_signature_length_boundaries() public view {
+    function test_IsValidSignature_SignatureLengthBoundaries_ReturnsInvalidValue()
+        public
+        view
+    {
         bytes32 hash = keccak256("test");
 
         // Test empty signature
@@ -223,7 +229,7 @@ contract ValidationTest is Base {
             hash,
             emptySignature
         );
-        assertEq(result, bytes4(0xffffffff));
+        assertEq(result, Static.INVALID_VALUE);
 
         // Test oversized signature (100 bytes)
         bytes memory oversizedSignature = bytes(new bytes(100));
@@ -231,10 +237,10 @@ contract ValidationTest is Base {
             hash,
             oversizedSignature
         );
-        assertEq(result, bytes4(0xffffffff));
+        assertEq(result, Static.INVALID_VALUE);
     }
 
-    function test_execute_reverts_for_expired_owner() public {
+    function test_RevertWhen_Execute_ExpiredOwner() public {
         // Add Bob as owner with 1 day expiration
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         uint40 expiry = uint40(block.timestamp + 1 days);
@@ -269,7 +275,7 @@ contract ValidationTest is Base {
         ISmartWallet(_aliceWallet).execute(calls);
     }
 
-    function test_execute_allows_non_expired_owner() public {
+    function test_Execute_AllowsNonExpiredOwner_Success() public {
         // Add Bob as owner with 7 days expiration
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         uint40 expiry = uint40(block.timestamp + 7 days);
@@ -299,7 +305,7 @@ contract ValidationTest is Base {
         assertEq(address(_bob).balance, 1 ether);
     }
 
-    function test_executeWithRelayer_reverts_for_expired_batchedCall() public {
+    function test_RevertWhen_ExecuteWithRelayer_ExpiredBatchedCall() public {
         // Create a BatchedCall with expiry validation
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
@@ -341,7 +347,9 @@ contract ValidationTest is Base {
         );
     }
 
-    function test_executeWithRelayer_allows_zero_expiry_batchedCall() public {
+    function test_ExecuteWithRelayer_AllowsZeroExpiryBatchedCall_Success()
+        public
+    {
         // Create a BatchedCall with expiry = 0 (never expires)
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
@@ -369,7 +377,7 @@ contract ValidationTest is Base {
         assertEq(address(_bob).balance, 1 ether);
     }
 
-    function test_signature_replay_protection_across_independent_deployments()
+    function test_SignatureReplayProtection_AcrossIndependentDeployments_Success()
         public
     {
         // Deploy a completely independent SmartWallet and Factory
@@ -457,7 +465,7 @@ contract ValidationTest is Base {
         assertEq(_bob.balance, 2 ether);
     }
 
-    function test_signature_replay_protection_across_different_wallets()
+    function test_SignatureReplayProtection_AcrossDifferentWallets_Success()
         public
     {
         // Deploy a second SmartWallet with the same bytecode but different address
@@ -532,7 +540,9 @@ contract ValidationTest is Base {
         assertEq(_bob.balance, 2 ether);
     }
 
-    function test_isValidSignature_fails_for_removed_validator() public {
+    function test_IsValidSignature_ForRemovedValidator_ReturnsInvalidValue()
+        public
+    {
         // Add validator using _bob to avoid EIP-7702 fallback collision
         // (In test environment, address(this) == _aliceWallet due to setCode)
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
@@ -556,10 +566,13 @@ contract ValidationTest is Base {
             hash,
             signature
         );
-        assertEq(result, bytes4(0xffffffff));
+        assertEq(result, Static.INVALID_VALUE);
     }
 
-    function test_isValidSignature_fails_with_short_signature() public view {
+    function test_IsValidSignature_WithShortSignature_ReturnsInvalidValue()
+        public
+        view
+    {
         bytes32 hash = keccak256("test");
 
         // signature shorter than 20 bytes
@@ -570,10 +583,10 @@ contract ValidationTest is Base {
             hash,
             signature
         );
-        assertEq(result, bytes4(0xffffffff));
+        assertEq(result, Static.INVALID_VALUE);
     }
 
-    function test_isValidSignature_fails_with_longer_than_85_bytes_signature()
+    function test_IsValidSignature_WithLongerThan85BytesSignature_ReturnsInvalidValue()
         public
         view
     {
@@ -587,10 +600,10 @@ contract ValidationTest is Base {
             hash,
             signature
         );
-        assertEq(result, bytes4(0xffffffff));
+        assertEq(result, Static.INVALID_VALUE);
     }
 
-    function test_isValidSignature_succeeds_with_default_validator()
+    function test_IsValidSignature_WithDefaultValidator_ReturnsMagicValue()
         public
         view
     {
@@ -613,10 +626,10 @@ contract ValidationTest is Base {
             hash,
             signature
         );
-        assertEq(result, bytes4(0x1626ba7e));
+        assertEq(result, Static.MAGIC_VALUE);
     }
 
-    function test_isValidSignature_succeeds_with_valid_validator_signer()
+    function test_IsValidSignature_WithValidValidatorSigner_ReturnsMagicValue()
         public
         view
     {
@@ -635,10 +648,10 @@ contract ValidationTest is Base {
             hash,
             signature
         );
-        assertEq(result, bytes4(0x1626ba7e));
+        assertEq(result, Static.MAGIC_VALUE);
     }
 
-    function test_isValidSignature_for_premit() public view {
+    function test_IsValidSignature_ForPermit_ReturnsMagicValue() public view {
         bytes32 hash = keccak256("721 struct data");
         uint48 validUntil = 0; // No expiry
 
@@ -667,7 +680,7 @@ contract ValidationTest is Base {
             hash,
             validatorData
         );
-        assertEq(result, bytes4(0x1626ba7e));
+        assertEq(result, Static.MAGIC_VALUE);
     }
 
     function _signDigest(
@@ -715,7 +728,7 @@ contract ValidationTest is Base {
     }
 
     // Test chain ID validation skip logic in executeWithRelayer context
-    function test_executeWithRelayer_allows_chainless_nonce_for_addOwner()
+    function test_ExecuteWithRelayer_AllowsChainlessNonceForAddOwner_Success()
         public
     {
         // Create addOwner call
@@ -766,7 +779,7 @@ contract ValidationTest is Base {
         );
     }
 
-    function test_executeWithRelayer_doesnt_allow_chainless_nonce_for_updateOwner()
+    function test_RevertWhen_ExecuteWithRelayer_DoesNotAllowChainlessNonceForUpdateOwner()
         public
     {
         // First add an owner to update
@@ -830,7 +843,7 @@ contract ValidationTest is Base {
         );
     }
 
-    function test_executeWithRelayer_doesnt_allow_chainless_nonce_for_removeOwner()
+    function test_RevertWhen_ExecuteWithRelayer_DoesNotAllowChainlessNonceForRemoveOwner()
         public
     {
         // First add an owner to remove
@@ -887,7 +900,7 @@ contract ValidationTest is Base {
         );
     }
 
-    function test_executeWithRelayer_rejects_chainless_nonce_for_unsupported_selector()
+    function test_RevertWhen_ExecuteWithRelayer_RejectsChainlessNonceForUnsupportedSelector()
         public
     {
         // Create a regular execute call (not supported for chainless nonce)
@@ -922,7 +935,7 @@ contract ValidationTest is Base {
         );
     }
 
-    function test_executeWithRelayer_doesnt_allow_mixed_calls_with_supported_selectors()
+    function test_RevertWhen_ExecuteWithRelayer_DoesNotAllowMixedCallsWithSupportedSelectors()
         public
     {
         // Create multiple calls mixing supported and unsupported selectors
@@ -988,7 +1001,7 @@ contract ValidationTest is Base {
     }
 
     // Test upgradeToAndCall selector support
-    function test_executeWithRelayer_allows_chainless_nonce_for_upgradeToAndCall()
+    function test_ExecuteWithRelayer_AllowsChainlessNonceForUpgradeToAndCall_Success()
         public
     {
         // Create a mock upgrade call (we don't need a real implementation for this test)
@@ -1040,7 +1053,7 @@ contract ValidationTest is Base {
     }
 
     // Test that chainless nonce is rejected when mixed with unsupported operations
-    function test_executeWithRelayer_comprehensive_chainless_nonce_coverage()
+    function test_RevertWhen_ExecuteWithRelayer_ComprehensiveChainlessNonceCoverage()
         public
     {
         // Test that mixing supported and unsupported selectors fails

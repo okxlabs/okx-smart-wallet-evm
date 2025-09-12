@@ -692,7 +692,7 @@ SmartWallet (abstract)
 
 ### SmartWalletSimulator
 
-**Location**: `scripts/utils/SmartWalletSimulator.sol` (not a core contract)
+**Location**: `scripts/utils/SmartWalletSimulator.s.sol` (not a core contract)
 
 **Purpose**: A utility contract for gas estimation and simulation that reverts with detailed gas metrics without executing transactions.
 

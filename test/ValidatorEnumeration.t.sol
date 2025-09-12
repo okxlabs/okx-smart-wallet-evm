@@ -17,7 +17,7 @@ contract ValidatorEnumerationTest is Base {
         (_dave, _davePk) = makeAddrAndKey("dave");
     }
 
-    function test_validator_enumeration_functions() public {
+    function test_ValidatorEnumeration_Functions_Success() public {
         // Alice starts with 1 validator from initialization
         assertEq(IOwnerManager(_aliceWallet).ownerCount(), 1);
         assertTrue(
@@ -87,7 +87,7 @@ contract ValidatorEnumerationTest is Base {
         assertTrue(IOwnerManager(_aliceWallet).hasOwner(daveKeyHash));
     }
 
-    function test_ownerAt_reverts_on_out_of_bounds() public {
+    function test_RevertWhen_OwnerAt_OutOfBounds() public {
         // Alice already has one validator from initialization
         // This should work
         IOwnerManager(_aliceWallet).ownerAt(0);
@@ -97,7 +97,7 @@ contract ValidatorEnumerationTest is Base {
         IOwnerManager(_aliceWallet).ownerAt(1);
     }
 
-    function test_enumeration_with_validator_settings() public {
+    function test_ValidatorEnumeration_WithValidatorSettings_Success() public {
         // Add validators with different settings
         bytes32 keyHash1 = keccak256(abi.encodePacked(_charlie));
         bytes32 keyHash2 = keccak256(abi.encodePacked(_dave));

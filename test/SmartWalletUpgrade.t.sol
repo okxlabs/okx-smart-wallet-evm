@@ -39,7 +39,7 @@ contract SmartWalletUpgradeTest is Base {
         smartWalletV2Implementation = new SmartWalletEntryV2();
     }
     
-    function test_upgrade_through_executeWithRelayer() public {
+    function test_UpgradeToAndCall_ThroughExecuteWithRelayer_Success() public {
         // Simulate Passkey-only wallet upgrade through executeWithRelayer
         // Using ECDSA signature to simulate Passkey scenario (Foundry limitation)
         
@@ -75,7 +75,7 @@ contract SmartWalletUpgradeTest is Base {
         assertTrue(upgradedWallet.isUpgraded());
     }
     
-    function test_upgrade_preserves_owners_through_relayer() public {
+    function test_UpgradeToAndCall_PreservesOwnersThroughRelayer_Success() public {
         // Add an additional owner before upgrade
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         uint256 settings = OwnerManager(_aliceWallet).packSettings(true, 0, address(0));
@@ -110,7 +110,7 @@ contract SmartWalletUpgradeTest is Base {
         assertTrue(IOwnerManager(_aliceWallet).hasOwner(bobKeyHash));
     }
     
-    function test_upgrade_preserves_nonce_state_through_relayer() public {
+    function test_UpgradeToAndCall_PreservesNonceStateThroughRelayer_Success() public {
         // The default nonce key is 0 (not derived from keyHash)
         uint192 nonceKey = 0;
         
@@ -161,7 +161,7 @@ contract SmartWalletUpgradeTest is Base {
         assertEq(nonceAfter, 4);
     }
     
-    function test_upgrade_with_initialization_through_relayer() public {
+    function test_UpgradeToAndCall_WithInitializationThroughRelayer_Success() public {
         // Deploy V2 with initialization function
         bytes memory initData = abi.encodeWithSelector(
             SmartWalletEntryV2.getVersion.selector
@@ -194,7 +194,7 @@ contract SmartWalletUpgradeTest is Base {
         assertEq(upgradedWallet.getVersion(), "v2");
     }
     
-    function test_non_admin_owner_cannot_upgrade_through_relayer() public {
+    function test_RevertWhen_NonAdminOwner_UpgradeThroughRelayer() public {
         // Add bob as a non-admin owner
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(0));
@@ -230,7 +230,7 @@ contract SmartWalletUpgradeTest is Base {
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, validatorData);
     }
     
-    function test_upgrade_fails_with_invalid_signature() public {
+    function test_RevertWhen_Upgrade_WithInvalidSignature() public {
         Call[] memory upgradeCalls = new Call[](1);
         upgradeCalls[0] = Call({
             target: _aliceWallet,
@@ -260,7 +260,7 @@ contract SmartWalletUpgradeTest is Base {
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, invalidValidatorData);
     }
     
-    function test_direct_upgrade_call_fails() public {
+    function test_RevertWhen_DirectUpgradeCall_Fails_NotFromSelf() public {
         // Direct call from non-owner should fail with NotFromSelf
         vm.prank(_bob);
         vm.expectRevert(abi.encodeWithSelector(BaseAuthorization.NotFromSelf.selector));

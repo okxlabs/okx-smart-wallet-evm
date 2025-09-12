@@ -2,7 +2,7 @@
 pragma solidity ^0.8.12;
 
 import {Script, console} from "lib/forge-std/src/Script.sol";
-import {EIP2470} from "./EIP2470.sol";
+import {EIP2470} from "./EIP2470.s.sol";
 
 /// @title DeploySingletonFactory
 /// @notice Deploys the EIP-2470 Singleton Factory for deterministic contract deployment

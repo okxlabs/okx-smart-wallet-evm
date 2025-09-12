@@ -9,12 +9,12 @@ contract ERC7201Test is Base {
     }
 
     /// @notice Test the namespaceAndVersion function
-    function test_namespaceAndVersion() external view {
+    function test_NamespaceAndVersion_Success() external view {
         assertEq(_smartWallet.namespaceAndVersion(), "SmartWallet.1.0.0");
     }
 
     /// @notice Test the CUSTOM_STORAGE_ROOT function
-    function test_CUSTOM_STORAGE_ROOT() external view {
+    function test_CUSTOM_STORAGE_ROOT_Success() external view {
         assertEq(
             _smartWallet.CUSTOM_STORAGE_ROOT(),
             0xd2f25270280c292d8930a730093bb680163a837f93acc639d858c440b5c53800

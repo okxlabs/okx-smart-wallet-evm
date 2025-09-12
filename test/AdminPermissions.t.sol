@@ -57,7 +57,7 @@ contract AdminPermissionsTest is Base {
 
     // ============ Self-Call Restriction Tests ============
 
-    function test_non_admin_self_call_restriction() public {
+    function test_RevertWhen_AddOwner_ByNonAdmin_SelfCall() public {
         // Construct self-call (wallet calling itself)
         Call[] memory selfCalls = new Call[](1);
         selfCalls[0] = Call({
@@ -93,7 +93,7 @@ contract AdminPermissionsTest is Base {
         );
     }
 
-    function test_admin_self_call_allowed() public {
+    function test_AddOwner_ByAdmin_SelfCall_Success() public {
         // Construct self-call (wallet calling itself)
         Call[] memory selfCalls = new Call[](1);
         selfCalls[0] = Call({
@@ -133,7 +133,7 @@ contract AdminPermissionsTest is Base {
         );
     }
 
-    function test_non_admin_external_calls_allowed() public {
+    function test_Transfer_ByNonAdmin_ExternalCall_Success() public {
         // Construct external call (not self-call)
         Call[] memory externalCalls = constructCallsData(); // Transfers to _bob
 
@@ -170,7 +170,7 @@ contract AdminPermissionsTest is Base {
 
     // ============ Admin Privilege Tests ============
 
-    function test_admin_can_add_validators() public {
+    function test_AddOwner_ByAdmin_Success() public {
         bytes32 newValidatorKeyHash = keccak256("testValidator");
 
         Call[] memory addValidatorCalls = new Call[](1);
@@ -207,7 +207,7 @@ contract AdminPermissionsTest is Base {
         assertTrue(IOwnerManager(_aliceWallet).hasOwner(newValidatorKeyHash));
     }
 
-    function test_admin_can_remove_validators() public {
+    function test_RemoveOwner_ByAdmin_Success() public {
         bytes32 nonAdminKeyHash = keccak256(abi.encodePacked(nonAdminUser));
 
         // Admin removes non-admin validator
@@ -243,7 +243,7 @@ contract AdminPermissionsTest is Base {
         assertFalse(IOwnerManager(_aliceWallet).hasOwner(nonAdminKeyHash));
     }
 
-    function test_admin_can_update_validator_settings() public {
+    function test_UpdateOwner_ByAdmin_Success() public {
         bytes32 nonAdminKeyHash = keccak256(abi.encodePacked(nonAdminUser));
 
         // Admin updates non-admin validator to have expiry
@@ -296,7 +296,7 @@ contract AdminPermissionsTest is Base {
 
     // ============ Admin Rights Dynamic Changes ============
 
-    function test_admin_rights_revocation_affects_permissions() public {
+    function test_AddOwner_ByRevokedAdmin_SelfCall_Reverts() public {
         bytes32 adminKeyHash = keccak256(abi.encodePacked(adminUser));
 
         // First, revoke admin rights
@@ -365,7 +365,7 @@ contract AdminPermissionsTest is Base {
         );
     }
 
-    function test_admin_rights_elevation_grants_permissions() public {
+    function test_AddOwner_ByElevatedAdmin_SelfCall_Success() public {
         bytes32 nonAdminKeyHash = keccak256(abi.encodePacked(nonAdminUser));
 
         // Elevate non-admin to admin
@@ -440,7 +440,7 @@ contract AdminPermissionsTest is Base {
 
     // ============ Mixed Call Scenarios ============
 
-    function test_mixed_self_call_and_external_call_admin_only() public {
+    function test_MixedCalls_ByAdmin_Success() public {
         // Mix of self-call and external call
         Call[] memory mixedCalls = new Call[](2);
         mixedCalls[0] = Call({target: _bob, value: 0.5 ether, data: ""});
@@ -482,7 +482,7 @@ contract AdminPermissionsTest is Base {
         );
     }
 
-    function test_mixed_self_call_and_external_call_non_admin_fails() public {
+    function test_RevertWhen_MixedCalls_ByNonAdmin_SelfCall() public {
         // Mix of self-call and external call
         Call[] memory mixedCalls = new Call[](2);
         mixedCalls[0] = Call({target: _bob, value: 0.5 ether, data: ""});
@@ -529,7 +529,7 @@ contract AdminPermissionsTest is Base {
 
     // ============ Edge Cases ============
 
-    function test_admin_cannot_remove_last_admin() public {
+    function test_RemoveOwner_ByAdmin_LastAdmin_Success() public {
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
         bytes32 adminKeyHash = keccak256(abi.encodePacked(adminUser));
 

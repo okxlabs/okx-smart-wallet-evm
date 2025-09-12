@@ -359,7 +359,7 @@ contract AllowanceManagerTest is Base {
         );
     }
 
-    function test_TransferFromNative_InsufficientAllowance() public {
+    function test_RevertWhen_TransferFromNative_InsufficientAllowance() public {
         uint256 allowanceAmount = 1 ether;
         uint256 transferAmount = 2 ether;
 
@@ -483,7 +483,7 @@ contract AllowanceManagerTest is Base {
         );
     }
 
-    function test_TransferFromToken_InsufficientAllowance() public {
+    function test_RevertWhen_TransferFromToken_InsufficientAllowance() public {
         uint256 allowanceAmount = 100 * 10 ** 18;
         uint256 transferAmount = 200 * 10 ** 18;
 
@@ -544,7 +544,7 @@ contract AllowanceManagerTest is Base {
 
     // ============ Edge Cases and Integration Tests ============
 
-    function test_MultipleSpenders() public {
+    function test_MultipleSpenders_Success() public {
         address spender2 = makeAddr("spender2");
         uint256 amount1 = 50 * 10 ** 18;
         uint256 amount2 = 75 * 10 ** 18;
@@ -565,7 +565,7 @@ contract AllowanceManagerTest is Base {
         );
     }
 
-    function test_MultipleTokens() public {
+    function test_MultipleTokens_Success() public {
         // mockToken2 is already deployed in setUp()
         // Just mint tokens to wallet
         mockToken2.mint(address(aliceSmartWallet), 1000 * 10 ** 18);
@@ -589,7 +589,7 @@ contract AllowanceManagerTest is Base {
         );
     }
 
-    function test_OverwriteAllowances() public {
+    function test_OverwriteAllowances_Success() public {
         uint256 initialAmount = 100 * 10 ** 18;
         uint256 newAmount = 200 * 10 ** 18;
 
@@ -607,7 +607,7 @@ contract AllowanceManagerTest is Base {
 
     // ============ Unified Mapping Tests ============
 
-    function test_UnifiedMapping_NativeAndTokenIndependent() public {
+    function test_UnifiedMapping_NativeAndTokenIndependent_Success() public {
         uint256 nativeAmount = 5 ether;
         uint256 tokenAmount = 300 * 10 ** 18;
 
@@ -630,7 +630,7 @@ contract AllowanceManagerTest is Base {
         assertEq(aliceSmartWallet.nativeAllowance(spender), nativeAmount);
     }
 
-    function test_UnifiedMapping_DifferentSpenders() public {
+    function test_UnifiedMapping_DifferentSpenders_Success() public {
         address spender2 = makeAddr("spender2");
         uint256 nativeAmount1 = 3 ether;
         uint256 nativeAmount2 = 7 ether;
@@ -746,7 +746,7 @@ contract AllowanceManagerTest is Base {
 
     // ============ Transfer Failure Tests ============
 
-    function test_TransferFromNative_TransferNativeFailed() public {
+    function test_RevertWhen_TransferNativeFailed() public {
         uint256 allowanceAmount = 2 ether;
         uint256 transferAmount = 1 ether;
 
@@ -770,7 +770,7 @@ contract AllowanceManagerTest is Base {
         );
     }
 
-    function test_TransferFromToken_TokenTransferFailed() public {
+    function test_RevertWhen_TokenTransferFailed() public {
         uint256 allowanceAmount = 200 * 10 ** 18;
         uint256 transferAmount = 100 * 10 ** 18;
 
@@ -797,7 +797,7 @@ contract AllowanceManagerTest is Base {
         );
     }
 
-    function test_TransferFromToken_TokenTransferReverts() public {
+    function test_RevertWhen_TokenTransferReverts() public {
         uint256 allowanceAmount = 200 * 10 ** 18;
         uint256 transferAmount = 100 * 10 ** 18;
 
@@ -1084,7 +1084,7 @@ contract AllowanceManagerTest is Base {
         assertEq(aliceSmartWallet.nativeAllowance(recipient), 250 * 10 ** 18);
     }
 
-    function test_BatchApproveToken_UnauthorizedAccess() public {
+    function test_RevertWhen_BathApproveToken_UnauthorizedAccess() public {
         IAllowanceManager.ApprovalInfo[]
             memory approvals = new IAllowanceManager.ApprovalInfo[](1);
         approvals[0] = IAllowanceManager.ApprovalInfo(

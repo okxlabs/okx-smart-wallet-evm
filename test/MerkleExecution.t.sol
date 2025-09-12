@@ -246,7 +246,7 @@ contract MerkleExecutionTest is Base {
 
     // ============ POSITIVE TEST CASES ============
 
-    function test_executeWithMerkle_succeeds_with_valid_proof() public {
+    function test_ExecuteWithMerkle_WithValidProof_Success() public {
         // Create a valid BatchedCall that matches our first leaf
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _constructBatchedCall(
@@ -283,7 +283,7 @@ contract MerkleExecutionTest is Base {
 
     // ============ SECURITY TEST CASES ============
 
-    function test_executeWithMerkle_reverts_with_invalid_proof() public {
+    function test_RevertWhen_ExecuteWithMerkle_InvalidProof() public {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _constructBatchedCall(
             calls,
@@ -307,7 +307,7 @@ contract MerkleExecutionTest is Base {
         );
     }
 
-    function test_executeWithMerkle_reverts_with_wrong_root() public {
+    function test_RevertWhen_ExecuteWithMerkle_WrongRoot() public {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _constructBatchedCall(
             calls,
@@ -333,7 +333,7 @@ contract MerkleExecutionTest is Base {
         );
     }
 
-    function test_executeWithMerkle_reverts_with_invalid_validator() public {
+    function test_RevertWhen_ExecuteWithMerkle_InvalidValidator() public {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _constructBatchedCall(
             calls,
@@ -360,7 +360,7 @@ contract MerkleExecutionTest is Base {
         );
     }
 
-    function test_executeWithMerkle_reverts_with_invalid_nonce() public {
+    function test_RevertWhen_ExecuteWithMerkle_InvalidNonce() public {
         Call[] memory calls = constructCallsData();
 
         // Create BatchedCall with wrong nonce
@@ -390,7 +390,7 @@ contract MerkleExecutionTest is Base {
         );
     }
 
-    function test_executeWithMerkle_reverts_with_replay_attack() public {
+    function test_RevertWhen_ExecuteWithMerkle_ReplayAttack() public {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _constructBatchedCall(
             calls,
@@ -433,9 +433,7 @@ contract MerkleExecutionTest is Base {
         );
     }
 
-    function test_executeWithMerkle_reverts_with_manipulated_batchedCall()
-        public
-    {
+    function test_RevertWhen_ExecuteWithMerkle_ManipulatedBatchedCall() public {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _constructBatchedCall(
             calls,
@@ -468,7 +466,7 @@ contract MerkleExecutionTest is Base {
         );
     }
 
-    function test_executeWithMerkle_reverts_with_insufficient_signature_length()
+    function test_RevertWhen_ExecuteWithMerkle_InsufficientSignatureLength()
         public
     {
         Call[] memory calls = constructCallsData();
@@ -496,7 +494,7 @@ contract MerkleExecutionTest is Base {
 
     // ============ EDGE CASES ============
 
-    function test_executeWithMerkle_handles_large_proof_arrays() public {
+    function test_ExecuteWithMerkle_HandlesLargeProofArrays_Success() public {
         // Create a simple valid BatchedCall for testing
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _constructBatchedCall(

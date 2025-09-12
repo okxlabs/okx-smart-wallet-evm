@@ -35,13 +35,13 @@ contract NonceManagerTest is Test {
 
     // ============ Basic Functionality Tests ============
 
-    function test_getNonce_returns_zero_for_new_key() public view {
+    function test_GetNonce_ReturnsZeroForNewKey() public view {
         uint192 key = uint192(12345);
         uint64 nonce = nonceManager.getNonce(key);
         assertEq(nonce, 0);
     }
 
-    function test_getNonce_returns_current_value() public {
+    function test_GetNonce_ReturnsCurrentValue() public {
         uint192 key = uint192(1);
         uint256 packedNonce = (uint256(key) << 64) | uint256(0);
 
@@ -52,7 +52,7 @@ contract NonceManagerTest is Test {
         assertEq(nonceManager.getNonce(key), 1);
     }
 
-    function test_validateAndUpdateNonce_valid_nonce_returns_true() public {
+    function test_ValidateAndUpdateNonce_ValidNonce_ReturnsTrue() public {
         uint192 key = uint192(42);
         uint64 expectedNonce = 0;
         uint256 packedNonce = (uint256(key) << 64) | uint256(expectedNonce);
@@ -61,7 +61,7 @@ contract NonceManagerTest is Test {
         assertTrue(result);
     }
 
-    function test_validateAndUpdateNonce_invalid_nonce_returns_false() public {
+    function test_ValidateAndUpdateNonce_InvalidNonce_ReturnsFalse() public {
         uint192 key = uint192(42);
         uint64 wrongNonce = 1; // Expected is 0, but providing 1
         uint256 packedNonce = (uint256(key) << 64) | uint256(wrongNonce);
@@ -70,7 +70,7 @@ contract NonceManagerTest is Test {
         assertFalse(result);
     }
 
-    function test_validateAndUpdateNonce_increments_nonce() public {
+    function test_ValidateAndUpdateNonce_IncrementsNonce() public {
         uint192 key = uint192(123);
         uint256 packedNonce = (uint256(key) << 64) | uint256(0);
 
@@ -81,7 +81,7 @@ contract NonceManagerTest is Test {
         assertEq(nonceManager.getInternalNonce(key), 1);
     }
 
-    function test_validateAndUpdateNonce_emits_event() public {
+    function test_ValidateAndUpdateNonce_EmitsEvent() public {
         uint192 key = uint192(999);
         uint64 expectedNonce = 0;
         uint256 packedNonce = (uint256(key) << 64) | uint256(expectedNonce);
@@ -94,7 +94,7 @@ contract NonceManagerTest is Test {
 
     // ============ Multiple Nonce Key Tests ============
 
-    function test_different_keys_independent_nonces() public {
+    function test_DifferentKeys_IndependentNonces() public {
         uint192 key1 = uint192(100);
         uint192 key2 = uint192(200);
 
@@ -118,7 +118,7 @@ contract NonceManagerTest is Test {
         assertEq(nonceManager.getNonce(key2), 1);
     }
 
-    function test_parallel_nonce_management() public {
+    function test_ParallelNonce_Management() public {
         uint192[] memory keys = new uint192[](5);
         keys[0] = uint192(1);
         keys[1] = uint192(1000);
@@ -141,7 +141,7 @@ contract NonceManagerTest is Test {
 
     // ============ Boundary Value Tests ============
 
-    function test_nonce_key_boundaries() public {
+    function test_NonceKey_Boundaries() public {
         uint192 minKey = uint192(0);
         uint192 maxKey = type(uint192).max;
 
@@ -156,7 +156,7 @@ contract NonceManagerTest is Test {
         assertEq(nonceManager.getNonce(maxKey), 1);
     }
 
-    function test_nonce_overflow_behavior() public pure {
+    function test_Nonce_OverflowBehavior() public pure {
         uint192 key = uint192(42);
         key; // Intentionally unused - for documentation purposes
 
@@ -180,7 +180,7 @@ contract NonceManagerTest is Test {
 
     // ============ Packed Nonce Bit Operation Tests ============
 
-    function test_packed_nonce_key_extraction() public pure {
+    function test_PackedNonce_KeyExtraction() public pure {
         uint192 originalKey = uint192(
             0x123456789ABCDEF123456789ABCDEF123456789ABC
         );
@@ -198,7 +198,7 @@ contract NonceManagerTest is Test {
         assertEq(extractedNonce, originalNonce);
     }
 
-    function test_packed_nonce_edge_cases() public pure {
+    function test_PackedNonce_EdgeCases() public pure {
         // Test with key = 0, nonce = max
         uint192 key1 = uint192(0);
         uint64 nonce1 = type(uint64).max;
@@ -227,7 +227,7 @@ contract NonceManagerTest is Test {
 
     // ============ Sequential Nonce Tests ============
 
-    function test_sequential_nonce_validation() public {
+    function test_SequentialNonce_Validation() public {
         uint192 key = uint192(555);
 
         // Test sequential nonces 0 through 10
@@ -243,7 +243,7 @@ contract NonceManagerTest is Test {
         }
     }
 
-    function test_out_of_order_nonce_rejected() public {
+    function test_OutOfOrderNonce_Rejected() public {
         uint192 key = uint192(777);
 
         // Use nonce 0 successfully
@@ -267,7 +267,7 @@ contract NonceManagerTest is Test {
 
     // ============ Event Emission Tests ============
 
-    function test_event_emission_with_different_keys() public {
+    function test_EventEmission_WithDifferentKeys() public {
         uint192[] memory keys = new uint192[](3);
         keys[0] = uint192(1);
         keys[1] = uint192(2 ** 32);
@@ -283,7 +283,7 @@ contract NonceManagerTest is Test {
         }
     }
 
-    function test_always_emits_event_regardless_of_validation() public {
+    function test_AlwaysEmitsEvent_RegardlessOfValidation() public {
         uint192 key = uint192(888);
 
         // First call - valid nonce, should emit
@@ -303,7 +303,7 @@ contract NonceManagerTest is Test {
 
     // ============ Gas Optimization Tests ============
 
-    function test_gas_usage_validateAndUpdateNonce() public {
+    function test_GasUsage_ValidateAndUpdateNonce() public {
         uint192 key = uint192(12345);
         uint256 packedNonce = (uint256(key) << 64) | uint256(0);
 
@@ -319,7 +319,7 @@ contract NonceManagerTest is Test {
 
     // ============ Interface Compliance Tests ============
 
-    function test_implements_INonceManager() public {
+    function test_Implements_INonceManager() public {
         // Test that our contract properly implements the interface
         INonceManager interfaceReference = INonceManager(address(nonceManager));
 
@@ -335,7 +335,7 @@ contract NonceManagerTest is Test {
 
     // ============ Cross-Contract Usage Patterns ============
 
-    function test_multiple_contracts_independent_nonces() public {
+    function test_MultipleContracts_IndependentNonces() public {
         // Simulate scenario where multiple smart wallets use different nonce keys
         TestableNonceManager wallet1 = new TestableNonceManager();
         TestableNonceManager wallet2 = new TestableNonceManager();
@@ -353,7 +353,7 @@ contract NonceManagerTest is Test {
 
     // ============ Performance and Gas Tests ============
 
-    function test_gas_cost_comparison_different_keys() public {
+    function test_GasCost_ComparisonDifferentKeys() public {
         uint192 key1 = uint192(0);
         uint192 key2 = type(uint192).max;
 
@@ -378,7 +378,7 @@ contract NonceManagerTest is Test {
 
     // ============ Comprehensive Coverage Report ============
 
-    function test_comprehensive_nonce_manager_coverage() public {
+    function test_ComprehensiveNonceManager_Coverage() public {
         // This test ensures we've covered all critical paths
 
         // 1. Basic functionality ✓
