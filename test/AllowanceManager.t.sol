@@ -314,10 +314,8 @@ contract AllowanceManagerTest is Base {
 
         _approveNative(spender, amount);
 
-        assertEq(aliceSmartWallet.nativeAllowance(spender), amount);
-        // Verify it's stored in the unified mapping
         assertEq(
-            aliceSmartWallet.tokenAllowance(Static.NATIVE_ETH, spender),
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, spender),
             amount
         );
     }
@@ -349,11 +347,7 @@ contract AllowanceManagerTest is Base {
 
         assertEq(recipient.balance, initialBalance + transferAmount);
         assertEq(
-            aliceSmartWallet.nativeAllowance(spender),
-            allowanceAmount - transferAmount
-        );
-        assertEq(
-            aliceSmartWallet.tokenAllowance(Static.NATIVE_ETH, spender),
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, spender),
             allowanceAmount - transferAmount
         );
     }
@@ -363,14 +357,20 @@ contract AllowanceManagerTest is Base {
         uint256 transferAmount = 2 ether;
 
         // Should fail since there is no allowance set
-        assertEq(aliceSmartWallet.nativeAllowance(spender), 0);
+        assertEq(
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, spender),
+            0
+        );
         vm.expectRevert(IAllowanceManager.NativeAllowanceExceeded.selector);
         _transferFromNativeCallAsSpender(recipient, transferAmount);
 
         // Set up insufficient allowance through execute
         _approveNative(spender, allowanceAmount);
 
-        assertEq(aliceSmartWallet.nativeAllowance(spender), allowanceAmount);
+        assertEq(
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, spender),
+            allowanceAmount
+        );
         vm.expectRevert(IAllowanceManager.NativeAllowanceExceeded.selector);
         _transferFromNativeCallAsSpender(recipient, transferAmount);
     }
@@ -391,9 +391,8 @@ contract AllowanceManagerTest is Base {
 
         assertEq(recipient.balance, initialBalance + transferAmount);
         // Unlimited allowance should remain unchanged
-        assertEq(aliceSmartWallet.nativeAllowance(spender), type(uint256).max);
         assertEq(
-            aliceSmartWallet.tokenAllowance(Static.NATIVE_ETH, spender),
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, spender),
             type(uint256).max
         );
     }
@@ -443,7 +442,7 @@ contract AllowanceManagerTest is Base {
         _approveToken(address(mockToken), spender, amount);
 
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
             amount
         );
     }
@@ -477,7 +476,7 @@ contract AllowanceManagerTest is Base {
             initialBalance + transferAmount
         );
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
             allowanceAmount - transferAmount
         );
     }
@@ -488,7 +487,7 @@ contract AllowanceManagerTest is Base {
 
         // Should fail since there is no allowance set
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
             0
         );
         vm.expectRevert(IAllowanceManager.TokenAllowanceExceeded.selector);
@@ -501,7 +500,7 @@ contract AllowanceManagerTest is Base {
         _approveToken(address(mockToken), spender, allowanceAmount);
 
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
             allowanceAmount
         );
         vm.expectRevert(IAllowanceManager.TokenAllowanceExceeded.selector);
@@ -536,7 +535,7 @@ contract AllowanceManagerTest is Base {
         );
         // Unlimited allowance should remain unchanged
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
             type(uint256).max
         );
     }
@@ -555,11 +554,11 @@ contract AllowanceManagerTest is Base {
 
         // Verify allowances are independent
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
             amount1
         );
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender2),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender2),
             amount2
         );
     }
@@ -579,11 +578,11 @@ contract AllowanceManagerTest is Base {
 
         // Verify allowances are independent
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
             amount1
         );
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken2), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken2), spender),
             amount2
         );
     }
@@ -599,7 +598,7 @@ contract AllowanceManagerTest is Base {
         _approveToken(address(mockToken), spender, newAmount);
 
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
             newAmount
         );
     }
@@ -617,16 +616,18 @@ contract AllowanceManagerTest is Base {
 
         // Verify they are stored independently in the unified mapping
         assertEq(
-            aliceSmartWallet.tokenAllowance(Static.NATIVE_ETH, spender),
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, spender),
             nativeAmount
         );
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
             tokenAmount
         );
 
-        // Verify the nativeAllowance function returns the correct value
-        assertEq(aliceSmartWallet.nativeAllowance(spender), nativeAmount);
+        assertEq(
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, spender),
+            nativeAmount
+        );
     }
 
     function test_UnifiedMapping_DifferentSpenders_Success() public {
@@ -645,19 +646,19 @@ contract AllowanceManagerTest is Base {
 
         // Verify all allowances are stored correctly in the unified mapping
         assertEq(
-            aliceSmartWallet.tokenAllowance(Static.NATIVE_ETH, spender),
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, spender),
             nativeAmount1
         );
         assertEq(
-            aliceSmartWallet.tokenAllowance(Static.NATIVE_ETH, spender2),
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, spender2),
             nativeAmount2
         );
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
             tokenAmount1
         );
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender2),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender2),
             tokenAmount2
         );
     }
@@ -669,9 +670,8 @@ contract AllowanceManagerTest is Base {
 
         _approveNative(spender, amount);
 
-        assertEq(aliceSmartWallet.nativeAllowance(spender), amount);
         assertEq(
-            aliceSmartWallet.tokenAllowance(Static.NATIVE_ETH, spender),
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, spender),
             amount
         );
     }
@@ -682,7 +682,7 @@ contract AllowanceManagerTest is Base {
         _approveToken(address(mockToken), spender, amount);
 
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
             amount
         );
     }
@@ -710,7 +710,7 @@ contract AllowanceManagerTest is Base {
 
         if (allowanceAmount < type(uint256).max) {
             assertEq(
-                aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+                aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
                 allowanceAmount - transferAmount
             );
         }
@@ -733,11 +733,11 @@ contract AllowanceManagerTest is Base {
 
         if (allowanceAmount < type(uint256).max) {
             assertEq(
-                aliceSmartWallet.nativeAllowance(spender),
+                aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, spender),
                 allowanceAmount - transferAmount
             );
             assertEq(
-                aliceSmartWallet.tokenAllowance(Static.NATIVE_ETH, spender),
+                aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, spender),
                 allowanceAmount - transferAmount
             );
         }
@@ -762,9 +762,8 @@ contract AllowanceManagerTest is Base {
         );
 
         // Verify allowance was not consumed
-        assertEq(aliceSmartWallet.nativeAllowance(spender), allowanceAmount);
         assertEq(
-            aliceSmartWallet.tokenAllowance(Static.NATIVE_ETH, spender),
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, spender),
             allowanceAmount
         );
     }
@@ -791,7 +790,7 @@ contract AllowanceManagerTest is Base {
 
         // Verify allowance was not consumed
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(failingToken), spender),
+            aliceSmartWallet.getTokenAllowance(address(failingToken), spender),
             allowanceAmount
         );
     }
@@ -820,7 +819,10 @@ contract AllowanceManagerTest is Base {
 
         // Verify allowance was not consumed
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(revertingToken), spender),
+            aliceSmartWallet.getTokenAllowance(
+                address(revertingToken),
+                spender
+            ),
             allowanceAmount
         );
     }
@@ -840,10 +842,8 @@ contract AllowanceManagerTest is Base {
 
         _approveNativeWithRelayer(spender, amount);
 
-        assertEq(aliceSmartWallet.nativeAllowance(spender), amount);
-        // Verify it's stored in the unified mapping
         assertEq(
-            aliceSmartWallet.tokenAllowance(Static.NATIVE_ETH, spender),
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, spender),
             amount
         );
     }
@@ -862,7 +862,7 @@ contract AllowanceManagerTest is Base {
         _approveTokenWithRelayer(address(mockToken), spender, amount);
 
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
             amount
         );
     }
@@ -921,18 +921,21 @@ contract AllowanceManagerTest is Base {
 
         // Verify all allowances were set correctly
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
             100 * 10 ** 18
         );
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken2), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken2), spender),
             200 * 10 ** 18
         );
         assertEq(
-            aliceSmartWallet.tokenAllowance(Static.NATIVE_ETH, recipient),
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, recipient),
             1 ether
         );
-        assertEq(aliceSmartWallet.nativeAllowance(recipient), 1 ether);
+        assertEq(
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, recipient),
+            1 ether
+        );
     }
 
     function test_BatchApproveToken_WithRelayer() public {
@@ -975,14 +978,17 @@ contract AllowanceManagerTest is Base {
 
         // Verify all allowances were set correctly
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
             100 * 10 ** 18
         );
         assertEq(
-            aliceSmartWallet.tokenAllowance(Static.NATIVE_ETH, recipient),
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, recipient),
             2 ether
         );
-        assertEq(aliceSmartWallet.nativeAllowance(recipient), 2 ether);
+        assertEq(
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, recipient),
+            2 ether
+        );
     }
 
     function test_BatchApproveToken_EmptyArrays() public {
@@ -1024,7 +1030,7 @@ contract AllowanceManagerTest is Base {
         );
 
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
             100 * 10 ** 18
         );
     }
@@ -1073,14 +1079,17 @@ contract AllowanceManagerTest is Base {
 
         // Verify allowances were overwritten
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
             150 * 10 ** 18
         );
         assertEq(
-            aliceSmartWallet.tokenAllowance(Static.NATIVE_ETH, recipient),
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, recipient),
             250 * 10 ** 18
         );
-        assertEq(aliceSmartWallet.nativeAllowance(recipient), 250 * 10 ** 18);
+        assertEq(
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, recipient),
+            250 * 10 ** 18
+        );
     }
 
     function test_RevertWhen_BathApproveToken_UnauthorizedAccess() public {
@@ -1141,7 +1150,7 @@ contract AllowanceManagerTest is Base {
         // Verify all allowances were set correctly
         for (uint256 i = 0; i < amounts.length; i++) {
             assertEq(
-                aliceSmartWallet.tokenAllowance(
+                aliceSmartWallet.getTokenAllowance(
                     approvals[i].token,
                     approvals[i].spender
                 ),
@@ -1166,11 +1175,11 @@ contract AllowanceManagerTest is Base {
 
         // Verify allowances are independent
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
             amount1
         );
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender2),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender2),
             amount2
         );
     }
@@ -1190,11 +1199,11 @@ contract AllowanceManagerTest is Base {
 
         // Verify allowances are independent
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
             amount1
         );
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken2), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken2), spender),
             amount2
         );
     }
@@ -1212,16 +1221,18 @@ contract AllowanceManagerTest is Base {
 
         // Verify they are stored independently in the unified mapping
         assertEq(
-            aliceSmartWallet.tokenAllowance(Static.NATIVE_ETH, spender),
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, spender),
             nativeAmount
         );
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
             tokenAmount
         );
 
-        // Verify the nativeAllowance function returns the correct value
-        assertEq(aliceSmartWallet.nativeAllowance(spender), nativeAmount);
+        assertEq(
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, spender),
+            nativeAmount
+        );
     }
 
     function testFuzz_ApproveNative_WithRelayer(uint256 amount) public {
@@ -1229,9 +1240,8 @@ contract AllowanceManagerTest is Base {
 
         _approveNativeWithRelayer(spender, amount);
 
-        assertEq(aliceSmartWallet.nativeAllowance(spender), amount);
         assertEq(
-            aliceSmartWallet.tokenAllowance(Static.NATIVE_ETH, spender),
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, spender),
             amount
         );
     }
@@ -1242,7 +1252,7 @@ contract AllowanceManagerTest is Base {
         _approveTokenWithRelayer(address(mockToken), spender, amount);
 
         assertEq(
-            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
             amount
         );
     }

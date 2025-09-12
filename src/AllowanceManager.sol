@@ -16,7 +16,7 @@ abstract contract AllowanceManager is IAllowanceManager, BaseAuthorization {
     /// @notice Unified mapping of token => spender => allowance for both native ETH and ERC20 tokens
     /// @dev Native ETH is identified by Static.NATIVE_ETH address
     mapping(address token => mapping(address spender => uint256 allowance))
-        public tokenAllowance;
+        private tokenAllowance;
 
     /// @notice Batch approve multiple spenders for multiple tokens (native ETH and ERC20)
     /// @dev More readable and less error-prone using struct encapsulation
@@ -128,12 +128,14 @@ abstract contract AllowanceManager is IAllowanceManager, BaseAuthorization {
         IERC20(token).safeTransfer(recipient, amount);
     }
 
-    /// @notice Get the current persistent native ETH allowance
+    /// @notice Get the current token allowance (for both native ETH and ERC20 tokens)
+    /// @param token The token address (use Static.NATIVE_ETH for native ETH)
     /// @param spender The spender address
     /// @return allowance The current allowance
-    function nativeAllowance(
+    function getTokenAllowance(
+        address token,
         address spender
     ) external view returns (uint256 allowance) {
-        return tokenAllowance[Static.NATIVE_ETH][spender];
+        return tokenAllowance[token][spender];
     }
 }

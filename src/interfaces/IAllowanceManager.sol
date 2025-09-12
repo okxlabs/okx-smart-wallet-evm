@@ -86,18 +86,11 @@ interface IAllowanceManager {
         uint256 amount
     ) external returns (bool success);
 
-    /// @notice Get the current persistent native ETH allowance
+    /// @notice Get the current token allowance (for both native ETH and ERC20 tokens)
+    /// @param token The token address (use Static.NATIVE_ETH for native ETH)
     /// @param spender The spender address
     /// @return allowance The current allowance
-    function nativeAllowance(
-        address spender
-    ) external view returns (uint256 allowance);
-
-    /// @notice Get the current persistent token allowance
-    /// @param token The ERC20 token address
-    /// @param spender The spender address
-    /// @return allowance The current allowance
-    function tokenAllowance(
+    function getTokenAllowance(
         address token,
         address spender
     ) external view returns (uint256 allowance);
