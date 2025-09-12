@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import {IValidator} from "../interfaces/IValidator.sol";
-import {PasskeyValidatorLib} from "../libraries/PasskeyValidatorLib.sol";
+import {IValidator} from "../../src/interfaces/IValidator.sol";
+import {PasskeyValidatorLib} from "../../src/libraries/PasskeyValidatorLib.sol";
 
 /// @title PasskeyValidator
 /// @notice Validator contract for Passkey signatures using P256 verification

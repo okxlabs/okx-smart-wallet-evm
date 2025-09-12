@@ -535,4 +535,88 @@ contract MerkleExecutionTest is Base {
 
         assertEq(address(_bob).balance, 1 ether);
     }
+
+    function test_cross_chain_merkle_execution_single_signature() public {
+        uint256 bobInitBalance = address(_bob).balance;
+        uint256 charlieInitBalance = address(charlie).balance;
+
+        // Phase 1: Prepare Chain A Transaction
+        address walletA = _aliceWallet;
+        vm.deal(walletA, 10 ether);
+
+        Call[] memory callsA = new Call[](1);
+        callsA[0] = Call({target: _bob, value: 1 ether, data: ""});
+
+        BatchedCall memory batchA = BatchedCall({
+            calls: callsA,
+            nonce: _getNonce(walletA)
+        });
+
+        bytes32 leafA = _getExecuteWithRelayerHash(batchA, 0, walletA);
+
+        // Phase 2: Switch to Chain B (reuse existing contracts)
+        vm.chainId(42161);
+
+        address walletB = _aliceWallet;
+        vm.deal(walletB, 10 ether);
+
+        // After Chain A execution, nonce will be 1
+        uint256 nonceB = 1;
+
+        Call[] memory callsB = new Call[](1);
+        callsB[0] = Call({target: charlie, value: 2 ether, data: ""});
+
+        BatchedCall memory batchB = BatchedCall({calls: callsB, nonce: nonceB});
+
+        bytes32 leafB = _getExecuteWithRelayerHash(batchB, 0, walletB);
+
+        // Phase 3: Create and Sign Merkle Root
+        bytes32 root = _computeMerkleRoot(leafA, leafB);
+        bytes memory sig = _constructSignature(_alicePk, root);
+
+        // Phase 4: Execute on Chain A
+        vm.chainId(31337);
+        _executeWithMerkle(walletA, batchA, leafB, sig);
+        assertEq(address(_bob).balance, bobInitBalance + 1 ether);
+
+        // Phase 5: Execute on Chain B
+        vm.chainId(42161);
+        _executeWithMerkle(walletB, batchB, leafA, sig);
+        assertEq(address(charlie).balance, charlieInitBalance + 2 ether);
+
+        // Reset chain
+        vm.chainId(31337);
+    }
+
+    // Helper to compute sorted Merkle root
+    function _computeMerkleRoot(
+        bytes32 a,
+        bytes32 b
+    ) private pure returns (bytes32) {
+        return
+            a <= b
+                ? keccak256(abi.encodePacked(a, b))
+                : keccak256(abi.encodePacked(b, a));
+    }
+
+    // Helper to execute with Merkle proof
+    function _executeWithMerkle(
+        address wallet,
+        BatchedCall memory batch,
+        bytes32 proof,
+        bytes memory sig
+    ) private {
+        bytes32[] memory proofs = new bytes32[](1);
+        proofs[0] = proof;
+
+        bytes memory validatorData = abi.encodePacked(
+            keccak256(abi.encodePacked(_alice)),
+            uint48(0),
+            sig,
+            abi.encode(proofs)
+        );
+
+        vm.prank(relayer);
+        ISmartWallet(wallet).executeWithRelayer(batch, validatorData);
+    }
 }

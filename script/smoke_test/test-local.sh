@@ -32,7 +32,7 @@ if [ -f .env ]; then
 fi
 
 # Start anvil in the background with Prague hardfork for EIP-7702 support
-anvil --port 8545 --chain-id 31337 --hardfork prague --accounts 10 --balance 10000 > anvil.log 2>&1 &
+anvil --port 8545 --chain-id 31337 --accounts 10 --balance 10000 > anvil.log 2>&1 &
 ANVIL_PID=$!
 
 # Wait for anvil to start

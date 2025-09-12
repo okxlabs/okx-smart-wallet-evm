@@ -6,7 +6,7 @@ import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {IAllowanceManager} from "src/interfaces/IAllowanceManager.sol";
-import {ISmartWalletFactory} from "./ISmartWalletFactory.sol";
+import {ISmartWalletFactory} from "src/interfaces/ISmartWalletFactory.sol";
 
 /// @title EventTopics
 /// @notice A script for printing the event topics of all contract events

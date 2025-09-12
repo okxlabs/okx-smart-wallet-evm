@@ -2,7 +2,7 @@
 pragma solidity ^0.8.12;
 
 import {Script, console} from "lib/forge-std/src/Script.sol";
-import {ISmartWalletFactory} from "../utils/ISmartWalletFactory.sol";
+import {ISmartWalletFactory} from "src/interfaces/ISmartWalletFactory.sol";
 import {InitialOwner} from "src/Types.sol";
 import {Static} from "src/libraries/Static.sol";
 

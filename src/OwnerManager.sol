@@ -146,10 +146,10 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
 
     // Public View Functions
 
-    /// @notice Get the verified validator address for a given keyHash with EIP-7702 support
-    /// @dev Returns built-in ECDSA validator (address(1)) for self-signing when no validator installed
+    /// @notice Get the active validator address for a given `keyHash`
+    /// @dev Returns the configured validator address if present and not expired; otherwise returns address(0).
     /// @param keyHash The public key hash to look up
-    /// @return The validator address to use for validation
+    /// @return The validator address to use for validation (address(0) if none or expired)
     function getVerifiedValidator(
         bytes32 keyHash
     ) public view returns (address) {

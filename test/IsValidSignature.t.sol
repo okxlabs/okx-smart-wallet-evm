@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import {Base} from "./Base.t.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {Static} from "src/libraries/Static.sol";
-import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
+import {PasskeyValidator} from "./validators/PasskeyValidator.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {HelperLib} from "script/utils/Helper.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";

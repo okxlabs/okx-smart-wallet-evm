@@ -3,8 +3,8 @@ pragma solidity ^0.8.23;
 
 import {Base} from "./Base.t.sol";
 import {BaseAuthorization} from "src/BaseAuthorization.sol";
-import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
-import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
+import {ECDSAValidator} from "./validators/ECDSAValidator.sol";
+import {PasskeyValidator} from "./validators/PasskeyValidator.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {Static} from "src/libraries/Static.sol";

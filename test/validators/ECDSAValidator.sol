@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import {IValidator} from "../interfaces/IValidator.sol";
-import {ECDSAValidatorLib} from "../libraries/ECDSAValidatorLib.sol";
+import {IValidator} from "../../src/interfaces/IValidator.sol";
+import {ECDSAValidatorLib} from "../../src/libraries/ECDSAValidatorLib.sol";
 
 /// @title ECDSAValidator
 /// @notice Validator contract for ECDSA signature validation

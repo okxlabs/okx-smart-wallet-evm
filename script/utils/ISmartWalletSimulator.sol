@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import {BatchedCall} from "../Types.sol";
+import {BatchedCall} from "../../src/Types.sol";
 
 interface ISmartWalletSimulator {
     // ERRORS

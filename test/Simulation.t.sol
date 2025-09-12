@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import {Base, MockERC20} from "./Base.t.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
-import {ISmartWalletSimulator} from "src/interfaces/ISmartWalletSimulator.sol";
+import {ISmartWalletSimulator} from "../script/utils/ISmartWalletSimulator.sol";
 import {SmartWalletSimulator} from "../script/utils/SmartWalletSimulator.sol";
 import {console} from "forge-std/console.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
