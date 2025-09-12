@@ -488,7 +488,10 @@ contract AllowanceManagerTest is Base {
         uint256 transferAmount = 200 * 10 ** 18;
 
         // Should fail since there is no allowance set
-        assertEq(aliceSmartWallet.tokenAllowance(address(mockToken), spender), 0);
+        assertEq(
+            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            0
+        );
         vm.expectRevert(IAllowanceManager.TokenAllowanceExceeded.selector);
         _transferFromTokenCallAsSpender(
             address(mockToken),
@@ -498,7 +501,10 @@ contract AllowanceManagerTest is Base {
         // Set up insufficient allowance through execute
         _approveToken(address(mockToken), spender, allowanceAmount);
 
-        assertEq(aliceSmartWallet.tokenAllowance(address(mockToken), spender), allowanceAmount);
+        assertEq(
+            aliceSmartWallet.tokenAllowance(address(mockToken), spender),
+            allowanceAmount
+        );
         vm.expectRevert(IAllowanceManager.TokenAllowanceExceeded.selector);
         _transferFromTokenCallAsSpender(
             address(mockToken),

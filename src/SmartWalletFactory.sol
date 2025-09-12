@@ -31,9 +31,9 @@ contract SmartWalletFactory is ISmartWalletFactory {
 
         if (!alreadyDeployed) {
             ISmartWallet(instance).initialize(initialOwners);
+            emit AccountCreated(instance, IMPLEMENTATION, initialOwners, salt);
         }
 
-        emit AccountCreated(instance, IMPLEMENTATION, initialOwners, salt);
         account = instance;
     }
 
