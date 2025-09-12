@@ -2,7 +2,7 @@
 pragma solidity ^0.8.29;
 
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
+import {Call, BatchedCall, InitialOwner} from "../Types.sol";
 
 interface ISmartWallet is IERC165 {
     // ERRORS

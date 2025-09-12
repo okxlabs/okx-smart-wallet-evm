@@ -10,7 +10,6 @@ import {Call, BatchedCall} from "../src/Types.sol";
 import {Static} from "../src/libraries/Static.sol";
 import {BatchedCallLib} from "../src/libraries/BatchedCallLib.sol";
 import {ERC712} from "../src/ERC712.sol";
-import {console} from "forge-std/console.sol";
 
 // Contract that rejects ETH transfers
 contract ETHRejectingContract {

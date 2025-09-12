@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import {Call} from "src/Types.sol";
+import {Call} from "../Types.sol";
 
 interface IHook {
     /// @notice Called before execution of calls to perform pre-execution checks

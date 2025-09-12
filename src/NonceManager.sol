@@ -9,7 +9,7 @@ import {INonceManager} from "./interfaces/INonceManager.sol";
 abstract contract NonceManager is INonceManager {
     // State Variables
 
-    mapping(uint192 => uint64) public _nonces; // nonceKey => nonce value
+    mapping(uint192 => uint64) private _nonces; // nonceKey => nonce value
 
     // Nonce Management Functions
     /// @notice Validates the provided nonce matches the stored value and increments it
