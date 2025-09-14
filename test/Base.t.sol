@@ -26,6 +26,7 @@ import {Static} from "src/libraries/Static.sol";
 import {ERC4337Account} from "src/ERC4337Account.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {MessageSignLib} from "src/libraries/MessageSignLib.sol";
+import {SmartWalletSimulator} from "script/utils/SmartWalletSimulator.s.sol";
 
 // ============ Mock Contracts for Testing ============
 
@@ -94,6 +95,10 @@ contract Base is Test {
     uint256 internal _alicePk;
     address internal _bob;
     uint256 internal _bobPk;
+    address internal _charlie;
+    uint256 internal _charliePk;
+    address internal _dave;
+    uint256 internal _davePk;
     uint256 internal _passkeyPubX;
     uint256 internal _passkeyPubY;
     uint256 internal _passkeyPrivateKey;
@@ -106,6 +111,7 @@ contract Base is Test {
     uint256 internal relayerPk;
     Call[] internal relayerCalls;
     Call[] internal emptyRelayerCalls;
+    SmartWalletSimulator internal _simulator;
 
     event ExecuteSuccessEvent(
         bytes32 indexed intentHash,
@@ -116,6 +122,8 @@ contract Base is Test {
     function setUp() public virtual {
         (_alice, _alicePk) = makeAddrAndKey("alice");
         (_bob, _bobPk) = makeAddrAndKey("bob");
+        (_charlie, _charliePk) = makeAddrAndKey("charlie");
+        (_dave, _davePk) = makeAddrAndKey("dave");
         _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
 
         // Deploy EntryPoint and place it at the standard address
@@ -137,8 +145,8 @@ contract Base is Test {
         _ecdsaValidator = new ECDSAValidator();
         _passkeyValidator = new PasskeyValidator();
 
-        // Deploy SmartWallet and Factory using DeployInitHelper
-        (_smartWallet, _factory) = DeployInitHelper.deployContracts(
+        // Deploy SmartWallet, Factory, and Simulator using DeployInitHelper
+        (_smartWallet, _factory, _simulator) = DeployInitHelper.deployContracts(
             deployFactory,
             deployFactorySalt
         );

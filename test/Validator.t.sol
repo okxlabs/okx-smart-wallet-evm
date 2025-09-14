@@ -51,11 +51,6 @@ contract MockValidator is IValidator {
 }
 
 contract ValidatorTest is Base {
-    address internal _charlie;
-    uint256 internal _charliePk;
-    address internal _dave;
-    uint256 internal _davePk;
-
     // External validators for testing
     ECDSAValidator internal externalEcdsaValidator;
     PasskeyValidator internal externalPasskeyValidator;
@@ -67,8 +62,6 @@ contract ValidatorTest is Base {
     error FailedDeployment();
 
     function setUp() public override {
-        (_charlie, _charliePk) = makeAddrAndKey("charlie");
-        (_dave, _davePk) = makeAddrAndKey("dave");
         super.setUp();
 
         // Deploy external validator contracts

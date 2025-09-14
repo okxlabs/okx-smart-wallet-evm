@@ -6,17 +6,6 @@ import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
 
 contract ValidatorEnumerationTest is Base {
-    address internal _charlie;
-    uint256 internal _charliePk;
-    address internal _dave;
-    uint256 internal _davePk;
-
-    function setUp() public override {
-        super.setUp();
-        (_charlie, _charliePk) = makeAddrAndKey("charlie");
-        (_dave, _davePk) = makeAddrAndKey("dave");
-    }
-
     function test_ValidatorEnumeration_Functions_Success() public {
         // Alice starts with 1 validator from initialization
         assertEq(IOwnerManager(_aliceWallet).ownerCount(), 1);

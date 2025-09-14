@@ -12,8 +12,6 @@ import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 contract ExecutionTest is Base {
     MockERC20 mockToken;
     MockERC20 mockToken2;
-    address internal _charlie;
-    uint256 internal _charliePk;
 
     // Complex execution test contracts
     MockComplexContract internal complexContract;
@@ -33,7 +31,6 @@ contract ExecutionTest is Base {
     function setUp() public override {
         super.setUp();
 
-        (_charlie, _charliePk) = makeAddrAndKey("charlie");
         (user, userPk) = makeAddrAndKey("user");
 
         vm.prank(_aliceWallet);

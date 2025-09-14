@@ -6,6 +6,7 @@ import {DeployInitHelper} from "./DeployInitHelper.s.sol";
 import {IDeployFactory} from "../utils/IDeployFactory.s.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
+import {SmartWalletSimulator} from "../utils/SmartWalletSimulator.s.sol";
 
 /// @title DeployInit
 /// @notice A script for deploying, initializing, and setting the access controls
@@ -28,7 +29,8 @@ contract DeployInit is Script {
         // Deploy the contracts using DeployInitHelper
         (
             SmartWallet smartWallet_,
-            SmartWalletFactory factory_
+            SmartWalletFactory factory_,
+            SmartWalletSimulator simulator_
         ) = DeployInitHelper.deployContracts(deployFactory, deployFactorySalt);
 
         vm.stopBroadcast();
@@ -43,6 +45,7 @@ contract DeployInit is Script {
         console.log("Deployer:", deployOwner);
         console.log("SmartWallet Implementation address:", address(smartWallet_));
         console.log("SmartWalletFactory address:", address(factory_));
+        console.log("SmartWalletSimulator address:", address(simulator_));
         console.log("DeployInit script completed successfully");
     }
 }
