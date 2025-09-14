@@ -1,11 +1,11 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
 library MessageSignLib {
     /// @dev The type hash of the message
     bytes32 private constant MESSAGE_TYPEHASH =
         keccak256(
-            "OKXSmartWalletMessage(bytes32 hash,uint48 validUntil,address walletImpl)"
+            "SmartWalletMessage(bytes32 hash,uint48 validUntil,address walletImpl)"
         );
 
     /// @dev Hash the message

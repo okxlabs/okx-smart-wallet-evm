@@ -1,9 +1,8 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
 import {Base} from "./Base.t.sol";
 import {Static} from "src/libraries/Static.sol";
-import {Errors} from "src/libraries/Errors.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
@@ -50,7 +49,7 @@ contract ChainlessExecutionTest is Base {
      * @notice Test hashTypedData and hashTypedDataSansChainId produce different results
      * @dev Ensures chain ID affects hash computation as expected
      */
-    function test_hash_functions_produce_different_results() external view {
+    function test_HashFunctionsProduceDifferentResults_Success() external view {
         bytes32 structHash = keccak256("test_struct_hash");
 
         bytes32 hashWithChainId = SmartWallet(payable(testAccount))
@@ -69,7 +68,9 @@ contract ChainlessExecutionTest is Base {
      * @notice Test that hashTypedDataSansChainId is consistent across different chain IDs
      * @dev Simulates cross-chain scenarios by changing chain ID
      */
-    function test_hashTypedDataSansChainId_consistent_across_chains() external {
+    function test_HashTypedDataSansChainId_ConsistentAcrossChains_Success()
+        external
+    {
         bytes32 structHash = keccak256("test_struct_hash");
 
         // Get hash on current chain
@@ -95,7 +96,10 @@ contract ChainlessExecutionTest is Base {
      * @notice Test getUserOpHashWithoutChainId consistency
      * @dev Ensures UserOperation hashes are chain-agnostic when using chainless mode
      */
-    function test_getUserOpHashWithoutChainId_consistency() external view {
+    function test_GetUserOpHashWithoutChainId_Consistency_Success()
+        external
+        view
+    {
         PackedUserOperation memory userOp = _createChainlessAddOwnerUserOp();
 
         // getUserOpHashWithoutChainId should work with the userOp
@@ -120,7 +124,7 @@ contract ChainlessExecutionTest is Base {
      * @notice Test chainless UserOperation with actual execution flow
      * @dev This complements ValidateUserOp.t.sol by testing the full execution, not just validation
      */
-    function test_chainless_userOp_full_execution_flow() external {
+    function test_ChainlessUserOp_FullExecutionFlow_Success() external {
         // Create comprehensive test with multiple operations
         bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(_bob));
         Call[] memory calls = new Call[](1);
@@ -191,7 +195,7 @@ contract ChainlessExecutionTest is Base {
     /**
      * @notice Test chainless BatchedCall execution for addOwner
      */
-    function test_chainless_batchedCall_addOwner_success() external {
+    function test_ChainlessBatchedCall_AddOwner_Success() external {
         BatchedCall memory batchedCall = _createChainlessAddOwnerBatchedCall();
 
         bytes memory validatorData = _constructRelayerSignature(
@@ -217,7 +221,7 @@ contract ChainlessExecutionTest is Base {
     /**
      * @notice Test chainless BatchedCall fails when target is not self
      */
-    function test_chainless_batchedCall_fails_for_non_self_target() external {
+    function test_RevertWhen_ChainlessBatchedCall_NonSelfTarget() external {
         // Create a call with allowed selector but wrong target (not self)
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -237,7 +241,7 @@ contract ChainlessExecutionTest is Base {
         });
 
         bytes memory validatorData = _constructRelayerSignature(
-            address(_smartWallet),
+            testAccount, // Use testAccount which has alice as owner
             _alice,
             _alicePk,
             batchedCall,
@@ -247,17 +251,20 @@ contract ChainlessExecutionTest is Base {
         // Should revert because target is not self
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidNonceKey.selector,
+                ISmartWallet.InvalidNonceKey.selector,
                 Static.CHAIN_LESS_NONCE_KEY
             )
         );
-        _smartWallet.executeWithRelayer(batchedCall, validatorData);
+        SmartWallet(payable(testAccount)).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
     }
 
     /**
      * @notice Test chainless BatchedCall execution fails for unsupported selector
      */
-    function test_chainless_batchedCall_fails_for_unsupported_selector()
+    function test_RevertWhen_ChainlessBatchedCall_UnsupportedSelector()
         external
     {
         BatchedCall memory batchedCall = _createChainlessTransferBatchedCall();
@@ -273,7 +280,7 @@ contract ChainlessExecutionTest is Base {
         // Should revert with InvalidNonceKey
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidNonceKey.selector,
+                ISmartWallet.InvalidNonceKey.selector,
                 Static.CHAIN_LESS_NONCE_KEY
             )
         );
@@ -286,7 +293,7 @@ contract ChainlessExecutionTest is Base {
     /**
      * @notice Test chainless BatchedCall with mixed selectors (should fail)
      */
-    function test_chainless_batchedCall_mixed_selectors_fails() external {
+    function test_RevertWhen_ChainlessBatchedCall_MixedSelectors() external {
         Call[] memory calls = new Call[](2);
         calls[0] = Call({
             target: testAccount,
@@ -316,7 +323,7 @@ contract ChainlessExecutionTest is Base {
         // Should revert because second call is not chainless-compatible
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidNonceKey.selector,
+                ISmartWallet.InvalidNonceKey.selector,
                 Static.CHAIN_LESS_NONCE_KEY
             )
         );
@@ -329,7 +336,7 @@ contract ChainlessExecutionTest is Base {
     /**
      * @notice Test chainless execution with short calldata fails
      */
-    function test_chainless_execution_short_calldata_fails() external {
+    function test_RevertWhen_ChainlessExecution_ShortCalldata() external {
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
             target: testAccount,
@@ -352,7 +359,7 @@ contract ChainlessExecutionTest is Base {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidNonceKey.selector,
+                ISmartWallet.InvalidNonceKey.selector,
                 Static.CHAIN_LESS_NONCE_KEY
             )
         );
@@ -369,7 +376,7 @@ contract ChainlessExecutionTest is Base {
     /**
      * @notice Test that signature created on one chain works on another
      */
-    function test_cross_chain_signature_compatibility() external {
+    function test_CrossChainSignature_Compatibility_Success() external {
         BatchedCall memory batchedCall = _createChainlessAddOwnerBatchedCall();
 
         // Create signature on "Ethereum mainnet" (chainId 1)

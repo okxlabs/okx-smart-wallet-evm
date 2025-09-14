@@ -1,9 +1,8 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
 import {Base} from "./Base.t.sol";
 import {Call, BatchedCall} from "src/Types.sol";
-import {Errors} from "src/libraries/Errors.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 
 contract MerkleExecutionTest is Base {
@@ -247,7 +246,7 @@ contract MerkleExecutionTest is Base {
 
     // ============ POSITIVE TEST CASES ============
 
-    function test_executeWithMerkle_succeeds_with_valid_proof() public {
+    function test_ExecuteWithMerkle_WithValidProof_Success() public {
         // Create a valid BatchedCall that matches our first leaf
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _constructBatchedCall(
@@ -284,7 +283,7 @@ contract MerkleExecutionTest is Base {
 
     // ============ SECURITY TEST CASES ============
 
-    function test_executeWithMerkle_reverts_with_invalid_proof() public {
+    function test_RevertWhen_ExecuteWithMerkle_InvalidProof() public {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _constructBatchedCall(
             calls,
@@ -300,7 +299,7 @@ contract MerkleExecutionTest is Base {
 
         vm.prank(_bob);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+            abi.encodeWithSelector(ISmartWallet.InvalidSignature.selector)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
@@ -308,7 +307,7 @@ contract MerkleExecutionTest is Base {
         );
     }
 
-    function test_executeWithMerkle_reverts_with_wrong_root() public {
+    function test_RevertWhen_ExecuteWithMerkle_WrongRoot() public {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _constructBatchedCall(
             calls,
@@ -326,7 +325,7 @@ contract MerkleExecutionTest is Base {
 
         vm.prank(_bob);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+            abi.encodeWithSelector(ISmartWallet.InvalidSignature.selector)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
@@ -334,7 +333,7 @@ contract MerkleExecutionTest is Base {
         );
     }
 
-    function test_executeWithMerkle_reverts_with_invalid_validator() public {
+    function test_RevertWhen_ExecuteWithMerkle_InvalidValidator() public {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _constructBatchedCall(
             calls,
@@ -351,7 +350,7 @@ contract MerkleExecutionTest is Base {
         vm.prank(_bob);
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidKeyHash.selector,
+                ISmartWallet.InvalidKeyHash.selector,
                 keccak256(abi.encodePacked(eve))
             )
         );
@@ -361,7 +360,7 @@ contract MerkleExecutionTest is Base {
         );
     }
 
-    function test_executeWithMerkle_reverts_with_invalid_nonce() public {
+    function test_RevertWhen_ExecuteWithMerkle_InvalidNonce() public {
         Call[] memory calls = constructCallsData();
 
         // Create BatchedCall with wrong nonce
@@ -383,7 +382,7 @@ contract MerkleExecutionTest is Base {
 
         vm.prank(_bob);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidNonce.selector, nonce)
+            abi.encodeWithSelector(ISmartWallet.InvalidNonce.selector, nonce)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             invalidNonceBatchedCall,
@@ -391,7 +390,7 @@ contract MerkleExecutionTest is Base {
         );
     }
 
-    function test_executeWithMerkle_reverts_with_replay_attack() public {
+    function test_RevertWhen_ExecuteWithMerkle_ReplayAttack() public {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _constructBatchedCall(
             calls,
@@ -424,7 +423,7 @@ contract MerkleExecutionTest is Base {
         vm.prank(_bob);
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidNonce.selector,
+                ISmartWallet.InvalidNonce.selector,
                 batchedCall.nonce
             )
         );
@@ -434,9 +433,7 @@ contract MerkleExecutionTest is Base {
         );
     }
 
-    function test_executeWithMerkle_reverts_with_manipulated_batchedCall()
-        public
-    {
+    function test_RevertWhen_ExecuteWithMerkle_ManipulatedBatchedCall() public {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _constructBatchedCall(
             calls,
@@ -461,7 +458,7 @@ contract MerkleExecutionTest is Base {
 
         vm.prank(_bob);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+            abi.encodeWithSelector(ISmartWallet.InvalidSignature.selector)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             manipulatedBatchedCall,
@@ -469,7 +466,7 @@ contract MerkleExecutionTest is Base {
         );
     }
 
-    function test_executeWithMerkle_reverts_with_insufficient_signature_length()
+    function test_RevertWhen_ExecuteWithMerkle_InsufficientSignatureLength()
         public
     {
         Call[] memory calls = constructCallsData();
@@ -487,7 +484,7 @@ contract MerkleExecutionTest is Base {
 
         vm.prank(_bob);
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidSignature.selector)
+            abi.encodeWithSelector(ISmartWallet.InvalidSignature.selector)
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
@@ -497,7 +494,7 @@ contract MerkleExecutionTest is Base {
 
     // ============ EDGE CASES ============
 
-    function test_executeWithMerkle_handles_large_proof_arrays() public {
+    function test_ExecuteWithMerkle_HandlesLargeProofArrays_Success() public {
         // Create a simple valid BatchedCall for testing
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = _constructBatchedCall(
@@ -535,5 +532,89 @@ contract MerkleExecutionTest is Base {
         vm.stopPrank();
 
         assertEq(address(_bob).balance, 1 ether);
+    }
+
+    function test_cross_chain_merkle_execution_single_signature() public {
+        uint256 bobInitBalance = address(_bob).balance;
+        uint256 charlieInitBalance = address(charlie).balance;
+
+        // Phase 1: Prepare Chain A Transaction
+        address walletA = _aliceWallet;
+        vm.deal(walletA, 10 ether);
+
+        Call[] memory callsA = new Call[](1);
+        callsA[0] = Call({target: _bob, value: 1 ether, data: ""});
+
+        BatchedCall memory batchA = BatchedCall({
+            calls: callsA,
+            nonce: _getNonce(walletA)
+        });
+
+        bytes32 leafA = _getExecuteWithRelayerHash(batchA, 0, walletA);
+
+        // Phase 2: Switch to Chain B (reuse existing contracts)
+        vm.chainId(42161);
+
+        address walletB = _aliceWallet;
+        vm.deal(walletB, 10 ether);
+
+        // After Chain A execution, nonce will be 1
+        uint256 nonceB = 1;
+
+        Call[] memory callsB = new Call[](1);
+        callsB[0] = Call({target: charlie, value: 2 ether, data: ""});
+
+        BatchedCall memory batchB = BatchedCall({calls: callsB, nonce: nonceB});
+
+        bytes32 leafB = _getExecuteWithRelayerHash(batchB, 0, walletB);
+
+        // Phase 3: Create and Sign Merkle Root
+        bytes32 root = _computeMerkleRoot(leafA, leafB);
+        bytes memory sig = _constructSignature(_alicePk, root);
+
+        // Phase 4: Execute on Chain A
+        vm.chainId(31337);
+        _executeWithMerkle(walletA, batchA, leafB, sig);
+        assertEq(address(_bob).balance, bobInitBalance + 1 ether);
+
+        // Phase 5: Execute on Chain B
+        vm.chainId(42161);
+        _executeWithMerkle(walletB, batchB, leafA, sig);
+        assertEq(address(charlie).balance, charlieInitBalance + 2 ether);
+
+        // Reset chain
+        vm.chainId(31337);
+    }
+
+    // Helper to compute sorted Merkle root
+    function _computeMerkleRoot(
+        bytes32 a,
+        bytes32 b
+    ) private pure returns (bytes32) {
+        return
+            a <= b
+                ? keccak256(abi.encodePacked(a, b))
+                : keccak256(abi.encodePacked(b, a));
+    }
+
+    // Helper to execute with Merkle proof
+    function _executeWithMerkle(
+        address wallet,
+        BatchedCall memory batch,
+        bytes32 proof,
+        bytes memory sig
+    ) private {
+        bytes32[] memory proofs = new bytes32[](1);
+        proofs[0] = proof;
+
+        bytes memory validatorData = abi.encodePacked(
+            keccak256(abi.encodePacked(_alice)),
+            uint48(0),
+            sig,
+            abi.encode(proofs)
+        );
+
+        vm.prank(relayer);
+        ISmartWallet(wallet).executeWithRelayer(batch, validatorData);
     }
 }

@@ -1,20 +1,17 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
 import {Base, MockComplexContract, MockRevertingContract, MockERC20} from "./Base.t.sol";
-import {Errors} from "src/libraries/Errors.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {console} from "forge-std/console.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
-import {Call, BatchedCall} from "src/Types.sol";
+import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 
 contract ExecutionTest is Base {
     MockERC20 mockToken;
     MockERC20 mockToken2;
-    address internal _charlie;
-    uint256 internal _charliePk;
 
     // Complex execution test contracts
     MockComplexContract internal complexContract;
@@ -34,7 +31,6 @@ contract ExecutionTest is Base {
     function setUp() public override {
         super.setUp();
 
-        (_charlie, _charliePk) = makeAddrAndKey("charlie");
         (user, userPk) = makeAddrAndKey("user");
 
         vm.prank(_aliceWallet);
@@ -66,22 +62,22 @@ contract ExecutionTest is Base {
         );
     }
 
-    function test_execute_succeeds_for_owner() public {
+    function test_Execute_ByOwner_Success() public {
         vm.prank(_alice);
         Call[] memory calls = constructCallsData();
         ISmartWallet(_aliceWallet).execute(calls);
     }
 
-    function test_execute_reverts_for_non_owner() public {
+    function test_RevertWhen_Execute_ByNonOwner() public {
         vm.prank(_bob);
         Call[] memory calls = constructCallsData();
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidCaller.selector, _bob)
+            abi.encodeWithSelector(ISmartWallet.InvalidCaller.selector, _bob)
         );
         ISmartWallet(_aliceWallet).execute(calls);
     }
 
-    function test_execute_reverts_on_failed_call() public {
+    function test_RevertWhen_Execute_FailedCall() public {
         vm.prank(_alice);
         Call[] memory calls = new Call[](2);
         calls[0] = Call({target: _bob, value: 1 ether, data: ""});
@@ -90,7 +86,7 @@ contract ExecutionTest is Base {
         ISmartWallet(_aliceWallet).execute(calls);
     }
 
-    function test_execute_succeeds_for_added_owner() public {
+    function test_Execute_ByAddedOwner_Success() public {
         // Add Charlie as an owner to the wallet
         bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
         _addOwnerToAccount(
@@ -110,19 +106,19 @@ contract ExecutionTest is Base {
         assertEq(_bob.balance, 1 ether);
     }
 
-    function test_execute_reverts_for_unregistered_keyHash() public {
+    function test_RevertWhen_Execute_ByUnregisteredKeyHash() public {
         // Dave is not registered as an owner
         (address dave, ) = makeAddrAndKey("dave");
 
         vm.prank(dave);
         Call[] memory calls = constructCallsData();
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidCaller.selector, dave)
+            abi.encodeWithSelector(ISmartWallet.InvalidCaller.selector, dave)
         );
         ISmartWallet(_aliceWallet).execute(calls);
     }
 
-    function test_execute_with_empty_calls_array() public {
+    function test_Execute_WithEmptyCallsArray_Success() public {
         // Test that execute succeeds with empty calls array (no operations)
         Call[] memory emptyCalls = new Call[](0);
 
@@ -134,7 +130,7 @@ contract ExecutionTest is Base {
         assertEq(_bob.balance, 0 ether);
     }
 
-    function test_executeWithRelayer_with_empty_calls_array() public {
+    function test_ExecuteWithRelayer_WithEmptyCallsArray_Success() public {
         // Test that executeWithRelayer succeeds with empty calls array
         Call[] memory emptyCalls = new Call[](0);
         BatchedCall memory batchedCall = BatchedCall({
@@ -162,7 +158,7 @@ contract ExecutionTest is Base {
         assertEq(_bob.balance, 0 ether);
     }
 
-    function test_keyHash_consistency_and_validation() public {
+    function test_KeyHash_ConsistencyAndValidation_Success() public {
         // Test that keyHash generation is consistent across the system
         address testAddress = _charlie;
         bytes32 keyHash = keccak256(abi.encodePacked(testAddress));
@@ -174,7 +170,10 @@ contract ExecutionTest is Base {
         vm.prank(_charlie);
         Call[] memory calls = constructCallsData();
         vm.expectRevert(
-            abi.encodeWithSelector(Errors.InvalidCaller.selector, _charlie)
+            abi.encodeWithSelector(
+                ISmartWallet.InvalidCaller.selector,
+                _charlie
+            )
         );
         ISmartWallet(_aliceWallet).execute(calls);
 
@@ -194,7 +193,7 @@ contract ExecutionTest is Base {
         ISmartWallet(_aliceWallet).execute(calls);
     }
 
-    function test_executeFromRelayer_succeeds_as_relayer() public {
+    function test_ExecuteFromRelayer_AsRelayer_Success() public {
         Call[] memory calls = constructCallsData();
         BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
         bytes memory validatorData = _constructRelayerSignature(
@@ -226,7 +225,9 @@ contract ExecutionTest is Base {
         assertEq(address(_bob).balance, 1 ether);
     }
 
-    function test_executeFromRelayer_initialization_on_first_time() public {
+    function test_ExecuteFromRelayer_InitializationOnFirstTime_Success()
+        public
+    {
         // Create charlie's wallet using factory
         address charlieWallet = _deployAccountSingleOwner(
             keccak256(abi.encodePacked(_charlie)),
@@ -262,7 +263,7 @@ contract ExecutionTest is Base {
         assertEq(address(_bob).balance, 1 ether);
     }
 
-    function test_executeFromRelayer_reverts_on_failed_payment() public {
+    function test_RevertWhen_ExecuteFromRelayer_FailedPayment() public {
         assertEq(mockToken2.balanceOf(_aliceWallet), 0);
         vm.prank(_alice);
         Call[] memory calls = new Call[](2);
@@ -291,7 +292,7 @@ contract ExecutionTest is Base {
         );
     }
 
-    function test_executeFromRelayer_succeeds_on_payment() public {
+    function test_ExecuteFromRelayer_OnPayment_Success() public {
         Call[] memory calls = new Call[](2);
         // Include payment to relayer as part of the batch
         calls[0] = constructErc20TransferCall(
@@ -328,7 +329,7 @@ contract ExecutionTest is Base {
 
     // This test is no longer valid as executeFromRelayer now reverts on any failed call
     // The batch execution is atomic - all succeed or all fail
-    function test_executeFromRelayer_reverts_on_any_failed_call() public {
+    function test_RevertWhen_ExecuteFromRelayer_AnyFailedCall() public {
         vm.prank(_alice);
         Call[] memory calls = new Call[](2);
         calls[0] = Call({target: _bob, value: 1 ether, data: ""});
@@ -354,7 +355,7 @@ contract ExecutionTest is Base {
         assertEq(address(_bob).balance, 0);
     }
 
-    function test_executeFromRelayer_succeeds_on_free_gas_mode() public {
+    function test_ExecuteFromRelayer_OnFreeGasMode_Success() public {
         Call[] memory calls = new Call[](1);
         // calls[0] = Call({target: _bob, value: 1 ether, data: ""});
         calls[0] = constructErc20TransferCall(
@@ -391,7 +392,7 @@ contract ExecutionTest is Base {
 
     // ============ Complex Execution Tests ============
 
-    function test_mixed_eth_erc20_contract_calls() public {
+    function test_MixedEthErc20ContractCalls_Success() public {
         // Complex mixed scenario:
         // 1. Transfer ETH to bob
         // 2. Transfer ERC20 tokens to charlie
@@ -482,7 +483,7 @@ contract ExecutionTest is Base {
         emit LargeOperationCompleted(5, gasUsed);
     }
 
-    function test_large_batch_operation_gas_limits() public {
+    function test_LargeBatchOperationGasLimits_Success() public {
         // Create 150 calls (>100 limit mentioned in requirements)
         uint256 callCount = 150;
         Call[] memory largeBatch = new Call[](callCount);
@@ -533,7 +534,7 @@ contract ExecutionTest is Base {
         }
     }
 
-    function test_call_to_nonexistent_contract() public {
+    function test_CallToNonexistentContract_Success() public {
         // Use an address that has no code (simulating a destroyed or non-existent contract)
         address nonExistentContract = address(0xdead);
 
@@ -566,7 +567,7 @@ contract ExecutionTest is Base {
         );
     }
 
-    function test_gas_efficiency_comparison() public {
+    function test_GasEfficiencyComparison_Success() public {
         // Ensure wallet has enough balance for both tests
         vm.deal(_aliceWallet, 30 ether);
 
@@ -640,7 +641,7 @@ contract ExecutionTest is Base {
         emit LargeOperationCompleted(10, multipleCallsGas);
     }
 
-    function test_executeWithRelayer_wrapping_self_execute() public {
+    function test_ExecuteWithRelayer_WrappingSelfExecute_Success() public {
         // Test that executeWithRelayer can wrap a self-call to the wallet's own execute function
         // This creates a nested execution scenario: executeWithRelayer -> execute
 
@@ -703,7 +704,7 @@ contract ExecutionTest is Base {
         );
     }
 
-    function test_execute_calling_executeWithRelayer() public {
+    function test_Execute_CallingExecuteWithRelayer_Success() public {
         // Test the reverse scenario: execute calls executeWithRelayer
         // This creates a nested execution: execute -> executeWithRelayer
 
@@ -764,7 +765,7 @@ contract ExecutionTest is Base {
         );
     }
 
-    function test_executeWithRelayer_non_admin_self_execute_reverts() public {
+    function test_RevertWhen_ExecuteWithRelayer_NonAdminSelfExecute() public {
         // Add Bob as a non-admin owner to the wallet
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         uint256 bobSettings = 0; // Non-admin settings
@@ -822,7 +823,7 @@ contract ExecutionTest is Base {
 
         // Attempt to execute through relayer should revert with NonAdminSelfCall
         vm.prank(_charlie); // Charlie acts as relayer
-        vm.expectRevert(Errors.NonAdminSelfCall.selector);
+        vm.expectRevert(ISmartWallet.NonAdminSelfCall.selector);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
@@ -841,7 +842,7 @@ contract ExecutionTest is Base {
         );
     }
 
-    function test_execute_truncates_large_revert_data() public {
+    function test_RevertWhen_Execute_TruncatesLargeRevertData() public {
         // Create a call that will revert with >256 bytes
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -860,5 +861,197 @@ contract ExecutionTest is Base {
         // The important thing is that this code path is exercised
         vm.expectRevert();
         ISmartWallet(_aliceWallet).execute(calls);
+    }
+
+    // ============ EIP-7702 Execution Tests ============
+
+    function test_Execute_EIP7702AfterSetCodeWithSelfAsOwner() public {
+        console.log(
+            "Testing EIP-7702: EOA with wallet code can execute as self-owner"
+        );
+
+        // Create a new EOA that will become a smart wallet
+        (address eoaWallet, ) = makeAddrAndKey("eoaWallet");
+        vm.deal(eoaWallet, 10 ether);
+
+        // Step 1: Set wallet code to EOA (simulating EIP-7702 delegation)
+        _setCodeToEoa(address(_smartWallet), eoaWallet);
+        console.log("Set wallet code to EOA address:", eoaWallet);
+
+        // Step 2: Initialize the wallet with the EOA itself as owner
+        // This simulates the EIP-7702 scenario where EOA = wallet
+        bytes32 eoaKeyHash = keccak256(abi.encodePacked(eoaWallet));
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: eoaKeyHash,
+            validator: address(_ecdsaValidator)
+        });
+
+        vm.prank(eoaWallet);
+        ISmartWallet(eoaWallet).initialize(initialOwners);
+        console.log("Initialized wallet with EOA as owner");
+
+        // Step 3: Test that EOA can execute calls directly
+        // In EIP-7702, the EOA address == wallet address
+        // So when calling from eoaWallet, msg.sender == address(this)
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _bob, value: 1 ether, data: ""});
+
+        uint256 bobBalanceBefore = _bob.balance;
+
+        // The EOA (now a wallet) executes the call
+        vm.prank(eoaWallet);
+        ISmartWallet(eoaWallet).execute(calls);
+
+        // Verify the transfer succeeded
+        assertEq(
+            _bob.balance - bobBalanceBefore,
+            1 ether,
+            "Transfer should succeed"
+        );
+        console.log("Successfully executed transfer from EIP-7702 wallet");
+    }
+
+    function test_Execute_EIP7702AddOwnerAsSelf() public {
+        console.log("Testing EIP-7702: EOA with wallet code can add owners");
+
+        // Create a new EOA that will become a smart wallet
+        (address eoaWallet, ) = makeAddrAndKey("eoaWallet");
+        vm.deal(eoaWallet, 10 ether);
+
+        // Step 1: Set wallet code to EOA
+        _setCodeToEoa(address(_smartWallet), eoaWallet);
+
+        // Step 2: Initialize with EOA as owner (admin)
+        bytes32 eoaKeyHash = keccak256(abi.encodePacked(eoaWallet));
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: eoaKeyHash,
+            validator: address(_ecdsaValidator)
+        });
+
+        vm.prank(eoaWallet);
+        ISmartWallet(eoaWallet).initialize(initialOwners);
+
+        // Verify EOA is admin
+        (, , , bool isAdmin, ) = IOwnerManager(eoaWallet).getOwnerSettings(
+            eoaKeyHash
+        );
+        assertTrue(isAdmin, "EOA should be admin");
+
+        // Step 3: EOA adds a new owner through execute
+        bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(_charlie));
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: eoaWallet, // Self-call to add owner
+            value: 0,
+            data: abi.encodeWithSelector(
+                IOwnerManager.addOwner.selector,
+                newOwnerKeyHash,
+                address(_ecdsaValidator),
+                0 // Non-admin settings
+            )
+        });
+
+        // Execute the addOwner call
+        vm.prank(eoaWallet);
+        ISmartWallet(eoaWallet).execute(calls);
+
+        // Verify the new owner was added
+        (address validator, , , , ) = IOwnerManager(eoaWallet).getOwnerSettings(
+            newOwnerKeyHash
+        );
+        assertEq(
+            validator,
+            address(_ecdsaValidator),
+            "New owner should be added"
+        );
+        console.log("Successfully added new owner from EIP-7702 wallet");
+    }
+
+    function test_Execute_EIP7702WithDifferentOwner() public {
+        console.log(
+            "Testing EIP-7702: Different owner can execute on EIP-7702 wallet"
+        );
+
+        // Create a new EOA that will become a smart wallet
+        (address eoaWallet, ) = makeAddrAndKey("eoaWallet");
+        vm.deal(eoaWallet, 10 ether);
+
+        // Step 1: Set wallet code to EOA
+        _setCodeToEoa(address(_smartWallet), eoaWallet);
+
+        // Step 2: Initialize with Alice as owner (not the EOA itself)
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        InitialOwner[] memory initialOwners = new InitialOwner[](1);
+        initialOwners[0] = InitialOwner({
+            keyHash: aliceKeyHash,
+            validator: address(_ecdsaValidator)
+        });
+
+        vm.prank(eoaWallet);
+        ISmartWallet(eoaWallet).initialize(initialOwners);
+        console.log("Initialized EIP-7702 wallet with Alice as owner");
+
+        // Step 3: Alice can execute on the EIP-7702 wallet
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _bob, value: 0.5 ether, data: ""});
+
+        uint256 bobBalanceBefore = _bob.balance;
+
+        // Alice executes on the EIP-7702 wallet
+        vm.prank(_alice);
+        ISmartWallet(eoaWallet).execute(calls);
+
+        assertEq(
+            _bob.balance - bobBalanceBefore,
+            0.5 ether,
+            "Transfer should succeed"
+        );
+        console.log("Alice successfully executed on EIP-7702 wallet");
+
+        // Step 4: EOA itself CAN STILL execute due to self-call bypass
+        // Even though EOA is not an owner, msg.sender == address(this) allows execution
+        vm.prank(eoaWallet);
+        ISmartWallet(eoaWallet).execute(calls);
+
+        assertEq(
+            _bob.balance - bobBalanceBefore,
+            1 ether,
+            "EOA self-call should succeed"
+        );
+        console.log(
+            "EOA can still execute due to self-call bypass (msg.sender == address(this))"
+        );
+    }
+
+    function test_Execute_EIP7702OnlyOwnerSelfCallBypass() public {
+        console.log("Testing EIP-7702: onlyOwner modifier allows self-calls");
+
+        // Create a new EOA that will become a smart wallet
+        (address eoaWallet, ) = makeAddrAndKey("eoaWallet");
+        vm.deal(eoaWallet, 10 ether);
+
+        // Step 1: Set wallet code to EOA
+        _setCodeToEoa(address(_smartWallet), eoaWallet);
+
+        // Step 2: Initialize with empty owners (no owners at all)
+        InitialOwner[] memory emptyOwners = new InitialOwner[](0);
+        vm.prank(eoaWallet);
+        ISmartWallet(eoaWallet).initialize(emptyOwners);
+        console.log("Initialized with no owners");
+
+        // Step 3: Even with no owners, wallet can call itself
+        // This is because onlyOwner allows msg.sender == address(this)
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _bob, value: 0.25 ether, data: ""});
+
+        // Make the call from the wallet to itself
+        // This simulates internal execution where msg.sender == address(this)
+        vm.prank(eoaWallet);
+        ISmartWallet(eoaWallet).execute(calls);
+
+        assertEq(_bob.balance, 0.25 ether, "Self-call should succeed");
+        console.log("Self-call succeeded even with no registered owners");
     }
 }

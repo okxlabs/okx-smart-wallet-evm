@@ -1,16 +1,15 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 import {UserOperationLib} from "account-abstraction/core/UserOperationLib.sol";
 import {IERC4337Account} from "./interfaces/IERC4337Account.sol";
-import {Errors} from "./libraries/Errors.sol";
 
 abstract contract ERC4337Account is IERC4337Account {
     using UserOperationLib for PackedUserOperation;
     /// @notice Modifier to ensure the caller is the EntryPoint
     modifier onlyEntryPoint() {
-        if (msg.sender != entryPoint()) revert Errors.NotEntryPoint();
+        if (msg.sender != entryPoint()) revert IERC4337Account.NotEntryPoint();
         _;
     }
 
@@ -32,8 +31,8 @@ abstract contract ERC4337Account is IERC4337Account {
             (bool success, ) = payable(msg.sender).call{
                 value: missingAccountFunds
             }("");
-            // Ignore failure (its EntryPoint's job to verify, not account.)
-            success; // Explicitly unused
+            // EntryPoint handles verification of payment success
+            success; // Suppress unused variable warning
         }
     }
 

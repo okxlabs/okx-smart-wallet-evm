@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
 import {Test} from "forge-std/Test.sol";
@@ -6,13 +6,13 @@ import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
-import {OKXSmartWalletEntry} from "src/OKXSmartWalletEntry.sol";
-import {ECDSAValidator} from "src/validator/ECDSAValidator.sol";
-import {PasskeyValidator} from "src/validator/PasskeyValidator.sol";
+import {SmartWalletEntry} from "src/SmartWalletEntry.sol";
+import {ECDSAValidator} from "./validators/ECDSAValidator.sol";
+import {PasskeyValidator} from "./validators/PasskeyValidator.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
-import {DeployInitHelper} from "scripts/deploy/DeployInitHelper.sol";
-import {IDeployFactory} from "scripts/utils/IDeployFactory.sol";
-import {EIP2470} from "scripts/deploy/EIP2470.sol";
+import {DeployInitHelper} from "script/deploy/DeployInitHelper.s.sol";
+import {IDeployFactory} from "script/utils/IDeployFactory.s.sol";
+import {EIP2470} from "script/deploy/EIP2470.s.sol";
 import {IERC20, ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {ERC712} from "src/ERC712.sol";
@@ -26,7 +26,7 @@ import {Static} from "src/libraries/Static.sol";
 import {ERC4337Account} from "src/ERC4337Account.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {MessageSignLib} from "src/libraries/MessageSignLib.sol";
-import {SmartWalletSimulator} from "scripts/utils/SmartWalletSimulator.sol";
+import {SmartWalletSimulator} from "script/utils/SmartWalletSimulator.s.sol";
 
 // ============ Mock Contracts for Testing ============
 
@@ -95,12 +95,16 @@ contract Base is Test {
     uint256 internal _alicePk;
     address internal _bob;
     uint256 internal _bobPk;
+    address internal _charlie;
+    uint256 internal _charliePk;
+    address internal _dave;
+    uint256 internal _davePk;
     uint256 internal _passkeyPubX;
     uint256 internal _passkeyPubY;
     uint256 internal _passkeyPrivateKey;
     ECDSAValidator internal _ecdsaValidator; // Shared validator instance
     PasskeyValidator internal _passkeyValidator;
-    OKXSmartWalletEntry internal _smartWallet;
+    SmartWalletEntry internal _smartWallet;
     SmartWalletFactory internal _factory;
     IDeployFactory public deployFactory;
     address internal relayer;
@@ -118,6 +122,8 @@ contract Base is Test {
     function setUp() public virtual {
         (_alice, _alicePk) = makeAddrAndKey("alice");
         (_bob, _bobPk) = makeAddrAndKey("bob");
+        (_charlie, _charliePk) = makeAddrAndKey("charlie");
+        (_dave, _davePk) = makeAddrAndKey("dave");
         _aliceWalletKeyHash = keccak256(abi.encodePacked(_alice));
 
         // Deploy EntryPoint and place it at the standard address
@@ -685,8 +691,10 @@ contract Base is Test {
         address wallet,
         bytes32 keyHash
     ) internal view returns (bool) {
-        uint256 settings = IOwnerManager(wallet).ownerSettings(keyHash);
-        return settings != 0 && IOwnerManager(wallet).isAdmin(settings);
+        (, , , bool adminStatus, ) = IOwnerManager(wallet).getOwnerSettings(
+            keyHash
+        );
+        return adminStatus;
     }
 
     // Helper function to test validateUserOp from EntryPoint's perspective
@@ -731,9 +739,10 @@ contract Base is Test {
         address wallet,
         bytes32 keyHash
     ) internal view returns (bool) {
-        uint256 settings = IOwnerManager(wallet).ownerSettings(keyHash);
-        return
-            settings != 0 && IOwnerManager(wallet).isSettingsExpired(settings);
+        (, , , , bool expired) = IOwnerManager(wallet).getOwnerSettings(
+            keyHash
+        );
+        return expired;
     }
 
     // Helper function for tests to get signer expiration
@@ -741,9 +750,10 @@ contract Base is Test {
         address wallet,
         bytes32 keyHash
     ) internal view returns (uint40) {
-        uint256 settings = IOwnerManager(wallet).ownerSettings(keyHash);
-        return
-            settings != 0 ? IOwnerManager(wallet).getExpiration(settings) : 0;
+        (, , uint40 expiration, , ) = IOwnerManager(wallet).getOwnerSettings(
+            keyHash
+        );
+        return expiration;
     }
     // Helper function to call removeValidator through execute
     function _executeRemoveValidator(address wallet, bytes32 keyHash) internal {

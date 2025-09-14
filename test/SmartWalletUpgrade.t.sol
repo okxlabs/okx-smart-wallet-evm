@@ -1,20 +1,20 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
 import {Base} from "./Base.t.sol";
+import {BaseAuthorization} from "src/BaseAuthorization.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
-import {Errors} from "src/libraries/Errors.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 
-// OKXSmartWalletEntryV2 - Upgraded version for testing
-// Cannot inherit from OKXSmartWalletEntry directly due to custom storage layout
+// SmartWalletEntryV2 - Upgraded version for testing
+// Cannot inherit from SmartWalletEntry directly due to custom storage layout
 // Instead, inherit from SmartWallet and define the same storage layout
-contract OKXSmartWalletEntryV2 is SmartWallet layout at 0x02a90b95e07536939d6b1617e9cf25c8d725ec1c5c4c03ccc00770cd202e6e00 {
+contract SmartWalletEntryV2 is SmartWallet layout at 0xd2f25270280c292d8930a730093bb680163a837f93acc639d858c440b5c53800 {
     // New state variable (append only to maintain storage layout)
     string public constant VERSION = "v2";
     
@@ -30,16 +30,16 @@ contract OKXSmartWalletEntryV2 is SmartWallet layout at 0x02a90b95e07536939d6b16
 }
 
 contract SmartWalletUpgradeTest is Base {
-    OKXSmartWalletEntryV2 public smartWalletV2Implementation;
+    SmartWalletEntryV2 public smartWalletV2Implementation;
     
     function setUp() public override {
         super.setUp();
         
         // Deploy V2 implementation
-        smartWalletV2Implementation = new OKXSmartWalletEntryV2();
+        smartWalletV2Implementation = new SmartWalletEntryV2();
     }
     
-    function test_upgrade_through_executeWithRelayer() public {
+    function test_UpgradeToAndCall_ThroughExecuteWithRelayer_Success() public {
         // Simulate Passkey-only wallet upgrade through executeWithRelayer
         // Using ECDSA signature to simulate Passkey scenario (Foundry limitation)
         
@@ -70,12 +70,12 @@ contract SmartWalletUpgradeTest is Base {
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, validatorData);
         
         // 5. Verify upgrade was successful
-        OKXSmartWalletEntryV2 upgradedWallet = OKXSmartWalletEntryV2(payable(_aliceWallet));
+        SmartWalletEntryV2 upgradedWallet = SmartWalletEntryV2(payable(_aliceWallet));
         assertEq(upgradedWallet.getVersion(), "v2");
         assertTrue(upgradedWallet.isUpgraded());
     }
     
-    function test_upgrade_preserves_owners_through_relayer() public {
+    function test_UpgradeToAndCall_PreservesOwnersThroughRelayer_Success() public {
         // Add an additional owner before upgrade
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         uint256 settings = OwnerManager(_aliceWallet).packSettings(true, 0, address(0));
@@ -110,7 +110,7 @@ contract SmartWalletUpgradeTest is Base {
         assertTrue(IOwnerManager(_aliceWallet).hasOwner(bobKeyHash));
     }
     
-    function test_upgrade_preserves_nonce_state_through_relayer() public {
+    function test_UpgradeToAndCall_PreservesNonceStateThroughRelayer_Success() public {
         // The default nonce key is 0 (not derived from keyHash)
         uint192 nonceKey = 0;
         
@@ -161,10 +161,10 @@ contract SmartWalletUpgradeTest is Base {
         assertEq(nonceAfter, 4);
     }
     
-    function test_upgrade_with_initialization_through_relayer() public {
+    function test_UpgradeToAndCall_WithInitializationThroughRelayer_Success() public {
         // Deploy V2 with initialization function
         bytes memory initData = abi.encodeWithSelector(
-            OKXSmartWalletEntryV2.getVersion.selector
+            SmartWalletEntryV2.getVersion.selector
         );
         
         Call[] memory upgradeCalls = new Call[](1);
@@ -190,11 +190,11 @@ contract SmartWalletUpgradeTest is Base {
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, validatorData);
         
         // Verify upgrade with initialization succeeded
-        OKXSmartWalletEntryV2 upgradedWallet = OKXSmartWalletEntryV2(payable(_aliceWallet));
+        SmartWalletEntryV2 upgradedWallet = SmartWalletEntryV2(payable(_aliceWallet));
         assertEq(upgradedWallet.getVersion(), "v2");
     }
     
-    function test_non_admin_owner_cannot_upgrade_through_relayer() public {
+    function test_RevertWhen_NonAdminOwner_UpgradeThroughRelayer() public {
         // Add bob as a non-admin owner
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(0));
@@ -226,11 +226,11 @@ contract SmartWalletUpgradeTest is Base {
         
         // Should fail because non-admin cannot make self-calls
         vm.prank(makeAddr("relayer"));
-        vm.expectRevert(abi.encodeWithSelector(Errors.NonAdminSelfCall.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISmartWallet.NonAdminSelfCall.selector));
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, validatorData);
     }
     
-    function test_upgrade_fails_with_invalid_signature() public {
+    function test_RevertWhen_Upgrade_WithInvalidSignature() public {
         Call[] memory upgradeCalls = new Call[](1);
         upgradeCalls[0] = Call({
             target: _aliceWallet,
@@ -256,14 +256,14 @@ contract SmartWalletUpgradeTest is Base {
         
         // Should revert with InvalidSignature
         vm.prank(_alice);
-        vm.expectRevert(abi.encodeWithSelector(Errors.InvalidSignature.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISmartWallet.InvalidSignature.selector));
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, invalidValidatorData);
     }
     
-    function test_direct_upgrade_call_fails() public {
+    function test_RevertWhen_DirectUpgradeCall_Fails_NotFromSelf() public {
         // Direct call from non-owner should fail with NotFromSelf
         vm.prank(_bob);
-        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        vm.expectRevert(abi.encodeWithSelector(BaseAuthorization.NotFromSelf.selector));
         UUPSUpgradeable(_aliceWallet).upgradeToAndCall(
             address(smartWalletV2Implementation),
             ""
@@ -271,7 +271,7 @@ contract SmartWalletUpgradeTest is Base {
         
         // Direct call from EOA owner also fails with NotFromSelf
         vm.prank(_alice);
-        vm.expectRevert(abi.encodeWithSelector(Errors.NotFromSelf.selector));
+        vm.expectRevert(abi.encodeWithSelector(BaseAuthorization.NotFromSelf.selector));
         UUPSUpgradeable(_aliceWallet).upgradeToAndCall(
             address(smartWalletV2Implementation),
             ""

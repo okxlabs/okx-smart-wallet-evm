@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
 /// @title IAllowanceManager
@@ -40,23 +40,14 @@ interface IAllowanceManager {
         uint256 newAllowance
     );
 
-    /// @notice Error thrown when sender is incorrect
-    error IncorrectSender();
-
     /// @notice Error thrown when native ETH transfer fails
     error TransferNativeFailed();
 
     /// @notice Error thrown when native ETH allowance is exceeded
     error NativeAllowanceExceeded();
 
-    /// @notice Error thrown when token transfer fails
-    error TokenTransferFailed();
-
     /// @notice Error thrown when token allowance is exceeded
     error TokenAllowanceExceeded();
-
-    /// @notice Error thrown when batch operation arrays have mismatched lengths
-    error BatchLengthMismatch();
 
     /// @notice Error thrown when attempting to use native ETH in token transfer function
     error InvalidTokenForTransfer();
@@ -95,18 +86,11 @@ interface IAllowanceManager {
         uint256 amount
     ) external returns (bool success);
 
-    /// @notice Get the current persistent native ETH allowance
+    /// @notice Get the current token allowance (for both native ETH and ERC20 tokens)
+    /// @param token The token address (use Static.NATIVE_ETH for native ETH)
     /// @param spender The spender address
     /// @return allowance The current allowance
-    function nativeAllowance(
-        address spender
-    ) external view returns (uint256 allowance);
-
-    /// @notice Get the current persistent token allowance
-    /// @param token The ERC20 token address
-    /// @param spender The spender address
-    /// @return allowance The current allowance
-    function tokenAllowance(
+    function getTokenAllowance(
         address token,
         address spender
     ) external view returns (uint256 allowance);

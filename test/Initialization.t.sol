@@ -1,8 +1,7 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
 import {Base} from "./Base.t.sol";
-import {Errors} from "src/libraries/Errors.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {InitialOwner} from "src/Types.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
@@ -13,7 +12,7 @@ contract InitializationTest is Base {
         super.setUp();
     }
 
-    function test_initialize_reverts_when_called_twice() public {
+    function test_RevertWhen_Initialize_CalledTwice() public {
         // Set up bob with wallet code
         _setCodeToEoa(address(_smartWallet), _bob);
 
@@ -30,7 +29,7 @@ contract InitializationTest is Base {
         ISmartWallet(_bob).initialize(emptyOwners);
     }
 
-    function test_initialize_properly_sets_storage() public {
+    function test_Initialize_ProperlySetsStorage_Success() public {
         // Start tracking storage access
         vm.record();
 
@@ -53,7 +52,7 @@ contract InitializationTest is Base {
         );
     }
 
-    function test_initialize_sets_initial_owners_correctly() public {
+    function test_Initialize_SetsInitialOwnersCorrectly_Success() public {
         _setCodeToEoa(address(_smartWallet), _bob);
 
         vm.prank(_bob);
@@ -74,17 +73,41 @@ contract InitializationTest is Base {
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
 
-        assertEq(
-            IOwnerManager(_bob).ownerValidators(aliceKeyHash),
-            address(_ecdsaValidator)
+        (address aliceValidator, , , , ) = IOwnerManager(_bob).getOwnerSettings(
+            aliceKeyHash
         );
-        assertEq(
-            IOwnerManager(_bob).ownerValidators(bobKeyHash),
-            address(_ecdsaValidator)
+        assertEq(aliceValidator, address(_ecdsaValidator));
+        (address bobValidator, , , , ) = IOwnerManager(_bob).getOwnerSettings(
+            bobKeyHash
         );
+        assertEq(bobValidator, address(_ecdsaValidator));
     }
 
-    function test_initialize_reverts_with_zero_validator() public {
+    function test_Initialize_EmitsWalletInitializedEvent_Success() public {
+        _setCodeToEoa(address(_smartWallet), _bob);
+
+        // Create initial owners
+        bytes32[] memory keyHashes = new bytes32[](2);
+        keyHashes[0] = keccak256(abi.encodePacked(_alice));
+        keyHashes[1] = keccak256(abi.encodePacked(_bob));
+        address[] memory validators = new address[](2);
+        validators[0] = address(_ecdsaValidator);
+        validators[1] = address(_ecdsaValidator);
+        InitialOwner[] memory initialOwners = _createOwners(
+            keyHashes,
+            validators
+        );
+
+        // Expect the WalletInitialized event (no parameters)
+        vm.expectEmit(_bob);
+        emit ISmartWallet.WalletInitialized();
+
+        // Initialize the wallet
+        vm.prank(_bob);
+        ISmartWallet(_bob).initialize(initialOwners);
+    }
+
+    function test_RevertWhen_Initialize_ZeroValidator() public {
         _setCodeToEoa(address(_smartWallet), _bob);
 
         vm.prank(_bob);
@@ -95,14 +118,14 @@ contract InitializationTest is Base {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.InvalidValidatorImpl.selector,
+                IOwnerManager.InvalidValidatorImpl.selector,
                 address(0)
             )
         );
         ISmartWallet(_bob).initialize(initialOwners);
     }
 
-    function test_storage_returns_correct_owner() public {
+    function test_Storage_ReturnsCorrectOwner_Success() public {
         // Start tracking storage access
         vm.record();
 
@@ -118,7 +141,7 @@ contract InitializationTest is Base {
         // The wallet _bob is its own owner by design
     }
 
-    function test_implementation_cannot_be_initialized() public {
+    function test_RevertWhen_Implementation_CannotBeInitialized() public {
         // Attempt to call initialize directly on the implementation
         InitialOwner[] memory initialOwners = _createSingleOwner(
             keccak256(abi.encodePacked(_bob)),

@@ -1,8 +1,7 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
 import {IOwnerManager} from "./interfaces/IOwnerManager.sol";
-import {Errors} from "./libraries/Errors.sol";
 import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
 import {Static} from "./libraries/Static.sol";
 import {BaseAuthorization} from "./BaseAuthorization.sol";
@@ -13,13 +12,13 @@ import {BaseAuthorization} from "./BaseAuthorization.sol";
 abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
     using EnumerableSetLib for EnumerableSetLib.Bytes32Set;
 
-    // ============ State Variables ============
+    // State Variables
 
     EnumerableSetLib.Bytes32Set internal _ownerKeys; // Set of all owner keyHashes
-    mapping(bytes32 => address) public ownerValidators; // keyHash => validator address for this owner
-    mapping(bytes32 => uint256) public ownerSettings; // keyHash => packed settings (isAdmin + expiration + hook)
+    mapping(bytes32 => address) internal _ownerValidators; // keyHash => validator address for this owner
+    mapping(bytes32 => uint256) internal _ownerSettings; // keyHash => packed settings (isAdmin + expiration + hook)
 
-    // ============ External Functions ============
+    // External Functions
 
     /// @notice Registers a validator with optional settings
     /// @dev Only callable by the wallet itself. Use packSettings() to create the settings parameter.
@@ -45,7 +44,7 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
     ) internal {
         // Check if keyHash is already registered
         if (_ownerKeys.contains(keyHash)) {
-            revert Errors.ValidatorAlreadyExists();
+            revert IOwnerManager.ValidatorAlreadyExists();
         }
 
         // Validate validator address
@@ -69,15 +68,15 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
     ) external onlySelf {
         // Check if keyHash exists
         if (!_ownerKeys.contains(keyHash)) {
-            revert Errors.ValidatorNotFound();
+            revert IOwnerManager.ValidatorNotFound();
         }
 
         // Validate new validator address
         _validateValidatorAddress(newValidator);
 
         // Update validator and settings
-        ownerValidators[keyHash] = newValidator;
-        ownerSettings[keyHash] = newSettings;
+        _ownerValidators[keyHash] = newValidator;
+        _ownerSettings[keyHash] = newSettings;
 
         emit OwnerUpdated(keyHash, newValidator);
     }
@@ -86,14 +85,13 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
     /// @dev Only callable by the wallet owner
     /// @param keyHash The public key hash to remove
     function removeOwner(bytes32 keyHash) external onlySelf {
-        emit OwnerRemoved(keyHash, ownerValidators[keyHash]);
+        emit OwnerRemoved(keyHash, _ownerValidators[keyHash]);
 
         _removeValidator(keyHash);
     }
 
-    // ============ External View Functions (Interface Implementation) ============
-    // Note: Function names retain "Validator" for interface compatibility,
-    // but they actually enumerate wallet owners and their keyHashes
+    // External View Functions
+    // Note: Function names retain "Validator" for interface compatibility
 
     function ownerCount() external view override returns (uint256) {
         return _ownerKeys.length();
@@ -132,8 +130,8 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
             bool expired
         )
     {
-        validator = ownerValidators[keyHash];
-        uint256 settings = ownerSettings[keyHash];
+        validator = _ownerValidators[keyHash];
+        uint256 settings = _ownerSettings[keyHash];
 
         if (settings == 0) {
             // No additional settings, return defaults
@@ -146,20 +144,20 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
         expired = isSettingsExpired(settings);
     }
 
-    // ============ Public View Functions ============
+    // Public View Functions
 
-    /// @notice Get the verified validator address for a given keyHash with EIP-7702 support
-    /// @dev Returns built-in ECDSA validator (address(1)) for self-signing when no validator installed
+    /// @notice Get the active validator address for a given `keyHash`
+    /// @dev Returns the configured validator address if present and not expired; otherwise returns address(0).
     /// @param keyHash The public key hash to look up
-    /// @return The validator address to use for validation
+    /// @return The validator address to use for validation (address(0) if none or expired)
     function getVerifiedValidator(
         bytes32 keyHash
     ) public view returns (address) {
-        address validator = ownerValidators[keyHash];
+        address validator = _ownerValidators[keyHash];
 
         // Check if validator exists and is not expired
         if (validator != address(0)) {
-            uint256 settings = ownerSettings[keyHash];
+            uint256 settings = _ownerSettings[keyHash];
             if (settings != 0 && isSettingsExpired(settings)) {
                 validator = address(0); // Expired validator
             }
@@ -177,10 +175,8 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
         return expiration != 0 && expiration < block.timestamp;
     }
 
-    // ============ Public Pure Functions (Settings Management) ============
-    // Bit layout for settings
-    // Layout: 6 bytes UNUSED | 1 byte isAdmin | 5 bytes expiration | 20 bytes hook
-    // Bits:   [255-208]       | [207-200]      | [199-160]        | [159-0]
+    // Public Pure Functions (Settings Management)
+    // Bit layout: [255-208: UNUSED] [207-200: isAdmin] [199-160: expiration] [159-0: hook]
 
     /// @notice Pack settings into uint256
     /// @param adminFlag Admin flag
@@ -219,7 +215,7 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
         return ((settings >> 200) & 0xff) == 1;
     }
 
-    // ============ Internal Functions ============
+    // Internal Functions
 
     /// @notice Internal function to set an owner's validator with settings atomically
     /// @param keyHash The owner's public key hash
@@ -230,16 +226,16 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
         address validator,
         uint256 settings
     ) internal {
-        ownerValidators[keyHash] = validator;
-        ownerSettings[keyHash] = settings;
+        _ownerValidators[keyHash] = validator;
+        _ownerSettings[keyHash] = settings;
         _ownerKeys.add(keyHash); // Add to the set
     }
 
     /// @notice Internal function to remove an owner's validator mapping
     /// @param keyHash The owner's public key hash to remove
     function _removeValidator(bytes32 keyHash) internal {
-        delete ownerValidators[keyHash];
-        delete ownerSettings[keyHash];
+        delete _ownerValidators[keyHash];
+        delete _ownerSettings[keyHash];
         _ownerKeys.remove(keyHash); // Remove from the set
     }
 
@@ -252,7 +248,7 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
             validator != Static.PASSKEY_VALIDATOR_ADDRESS &&
             validator.code.length == 0
         ) {
-            revert Errors.InvalidValidatorImpl(validator);
+            revert IOwnerManager.InvalidValidatorImpl(validator);
         }
     }
 }

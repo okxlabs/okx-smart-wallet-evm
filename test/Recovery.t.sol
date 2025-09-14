@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
 import {Base} from "./Base.t.sol";
@@ -113,7 +113,7 @@ contract RecoveryTest is Base {
         );
     }
 
-    function test_RecoverySigner_as_initial_owner() public {
+    function test_RecoverySigner_AsInitialOwner_Success() public {
         // Use existing _aliceWallet account and add RecoverySigner as owner
         recoveredAccount = _aliceWallet;
 
@@ -133,9 +133,8 @@ contract RecoveryTest is Base {
         );
 
         // Verify the validator is set correctly
-        address validator = IOwnerManager(recoveredAccount).ownerValidators(
-            recoverySignerKeyHash
-        );
+        (address validator, , , , ) = IOwnerManager(recoveredAccount)
+            .getOwnerSettings(recoverySignerKeyHash);
         assertEq(
             validator,
             address(1),
@@ -143,7 +142,7 @@ contract RecoveryTest is Base {
         );
     }
 
-    function test_addOwner_interface_compatibility() public {
+    function test_AddOwner_InterfaceCompatibility_Success() public {
         // Use existing _aliceWallet account and add RecoverySigner as owner
         recoveredAccount = _aliceWallet;
 
@@ -195,7 +194,7 @@ contract RecoveryTest is Base {
         assertTrue(isAdmin, "New owner should have admin privileges");
     }
 
-    function test_recovery_full_flow() public {
+    function test_Recovery_FullFlow_Success() public {
         // Use existing _aliceWallet account and add RecoverySigner as owner
         recoveredAccount = _aliceWallet;
 
@@ -242,18 +241,13 @@ contract RecoveryTest is Base {
         );
 
         // Verify the new owner has admin privileges
-        uint256 settings = IOwnerManager(recoveredAccount).ownerSettings(
-            newOwnerKeyHash
-        );
-        assertTrue(
-            IOwnerManager(recoveredAccount).isAdmin(settings),
-            "Recovered owner should have admin privileges"
-        );
+        (, , , bool isAdmin, ) = IOwnerManager(recoveredAccount)
+            .getOwnerSettings(newOwnerKeyHash);
+        assertTrue(isAdmin, "Recovered owner should have admin privileges");
 
         // Verify the validator is set correctly
-        address validator = IOwnerManager(recoveredAccount).ownerValidators(
-            newOwnerKeyHash
-        );
+        (address validator, , , , ) = IOwnerManager(recoveredAccount)
+            .getOwnerSettings(newOwnerKeyHash);
         assertEq(
             validator,
             address(_ecdsaValidator),
@@ -261,7 +255,7 @@ contract RecoveryTest is Base {
         );
     }
 
-    function test_recovery_requires_RecoverySigner_ownership() public {
+    function test_RevertWhen_Recover_RequiresRecoverySignerOwnership() public {
         // Create account WITHOUT RecoverySigner as owner
         recoveredAccount = _deployAccountSingleOwner(
             keccak256(abi.encodePacked(_alice)),
@@ -297,7 +291,7 @@ contract RecoveryTest is Base {
         recoverySigner.recover(recoveryData, signatures);
     }
 
-    function test_recovery_settings_match_expected() public {
+    function test_Recovery_SettingsMatchExpected_Success() public {
         // Create an account first
         recoveredAccount = _deployAccountSingleOwner(
             keccak256(abi.encodePacked(_alice)),
@@ -343,7 +337,7 @@ contract RecoveryTest is Base {
         );
     }
 
-    function test_multiple_accounts_recovery() public {
+    function test_MultipleAccounts_Recovery_Success() public {
         // Create multiple accounts with RecoverySigner as owner
         address[] memory accounts = new address[](3);
 
@@ -394,7 +388,7 @@ contract RecoveryTest is Base {
         }
     }
 
-    function test_recovery_timestamp_management() public {
+    function test_Recovery_TimestampManagement_Success() public {
         // Use existing _aliceWallet account and add RecoverySigner as owner
         recoveredAccount = _aliceWallet;
 

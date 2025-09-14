@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
 import {Base} from "./Base.t.sol";
@@ -11,7 +11,7 @@ contract FactoryTest is Base {
         super.setUp();
     }
 
-    function test_create_wallet_with_factory() external {
+    function test_CreateWallet_WithFactory_Success() external {
         vm.prank(_alice);
 
         ISmartWallet wallet = ISmartWallet(
@@ -30,7 +30,7 @@ contract FactoryTest is Base {
         );
     }
 
-    function test_predict_address() external {
+    function test_PredictAddress_Success() external {
         vm.prank(_alice);
 
         address wallet = _deployAccountSingleOwner(
@@ -49,7 +49,7 @@ contract FactoryTest is Base {
         assertEq(wallet, predictedAddress);
     }
 
-    function test_predict_address_before_deployment() external {
+    function test_GetAddress_PredictedBeforeDeployment_Success() external {
         // Prepare initial owners
         bytes32[] memory keyHashes = new bytes32[](2);
         keyHashes[0] = keccak256(abi.encodePacked(_alice));
@@ -111,7 +111,7 @@ contract FactoryTest is Base {
         );
     }
 
-    function test_predict_address_with_different_salts() external {
+    function test_GetAddress_PredictedWithDifferentSalts_Success() external {
         // Use same initial owners but different salts
         InitialOwner[] memory initialOwners = _createSingleOwner(
             keccak256(abi.encodePacked(_alice)),
@@ -178,7 +178,10 @@ contract FactoryTest is Base {
         vm.stopPrank();
     }
 
-    function test_predict_address_deterministic_calculation() external view {
+    function test_GetAddress_PredictedDeterministicCalculation_Success()
+        external
+        view
+    {
         // This test demonstrates the deterministic nature of address calculation
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
@@ -227,7 +230,7 @@ contract FactoryTest is Base {
         );
     }
 
-    function test_already_deployed_account_returns_same_address() external {
+    function test_AlreadyDeployedAccount_ReturnsSameAddress_Success() external {
         uint256 salt = 100;
 
         // First deployment
@@ -261,7 +264,7 @@ contract FactoryTest is Base {
         );
     }
 
-    function test_createAccountWithCall() external {
+    function test_CreateAccountWithCall_Success() external {
         uint256 salt = 0;
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
