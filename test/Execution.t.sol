@@ -874,7 +874,7 @@ contract ExecutionTest is Base {
         );
 
         // Create a new EOA that will become a smart wallet
-        (address eoaWallet, uint256 eoaWalletPk) = makeAddrAndKey("eoaWallet");
+        (address eoaWallet, ) = makeAddrAndKey("eoaWallet");
         vm.deal(eoaWallet, 10 ether);
 
         // Step 1: Set wallet code to EOA (simulating EIP-7702 delegation)
@@ -919,7 +919,7 @@ contract ExecutionTest is Base {
         console.log("Testing EIP-7702: EOA with wallet code can add owners");
 
         // Create a new EOA that will become a smart wallet
-        (address eoaWallet, uint256 eoaWalletPk) = makeAddrAndKey("eoaWallet");
+        (address eoaWallet, ) = makeAddrAndKey("eoaWallet");
         vm.deal(eoaWallet, 10 ether);
 
         // Step 1: Set wallet code to EOA
@@ -979,7 +979,7 @@ contract ExecutionTest is Base {
         );
 
         // Create a new EOA that will become a smart wallet
-        (address eoaWallet, uint256 eoaWalletPk) = makeAddrAndKey("eoaWallet");
+        (address eoaWallet, ) = makeAddrAndKey("eoaWallet");
         vm.deal(eoaWallet, 10 ether);
 
         // Step 1: Set wallet code to EOA
@@ -1033,7 +1033,7 @@ contract ExecutionTest is Base {
         console.log("Testing EIP-7702: onlyOwner modifier allows self-calls");
 
         // Create a new EOA that will become a smart wallet
-        (address eoaWallet, uint256 eoaWalletPk) = makeAddrAndKey("eoaWallet");
+        (address eoaWallet, ) = makeAddrAndKey("eoaWallet");
         vm.deal(eoaWallet, 10 ether);
 
         // Step 1: Set wallet code to EOA

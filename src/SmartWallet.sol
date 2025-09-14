@@ -77,7 +77,7 @@ abstract contract SmartWallet is
     /// @param initialOwners Array of tuples containing keyHash and validator address pairs
     function initialize(
         InitialOwner[] calldata initialOwners
-    ) external initializer {
+    ) external initializer onlyFactoryOrSelf {
         // Set up initial owners
         // isAdmin = true, expiration = 0 (never expires), hook = address(0)
         uint256 settings = packSettings(true, 0, address(0));

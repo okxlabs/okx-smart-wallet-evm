@@ -1092,6 +1092,8 @@ contract IsValidSignatureTest is Base {
             validator: address(1) // Built-in ECDSA validator
         });
 
+        // Self-initialization: EOA initializes itself (EIP-7702 scenario)
+        vm.prank(eoaAddress);
         ISmartWallet(eoaAddress).initialize(initialOwners);
 
         // Now test that the wallet can validate its own signature

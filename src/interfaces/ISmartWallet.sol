@@ -15,6 +15,7 @@ interface ISmartWallet is IERC165 {
     error InvalidNonceKey(uint256 nonce);
     error InvalidSignature();
     error DelegateAndRevert(bool success, bytes ret);
+    error UnauthorizedInitialization();
 
     // EVENTS
     event WalletInitialized();

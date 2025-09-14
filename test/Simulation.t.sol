@@ -11,7 +11,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Static} from "src/libraries/Static.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
-import {IValidator} from "src/interfaces/IValidator.sol";
 import {ERC712} from "src/ERC712.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 
