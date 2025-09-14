@@ -4,6 +4,7 @@ pragma solidity ^0.8.23;
 import {Base, MockERC20} from "./Base.t.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
+import {ISmartWalletSimulator} from "script/utils/ISmartWalletSimulator.s.sol";
 import {console} from "forge-std/console.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC712} from "src/ERC712.sol";
@@ -49,7 +50,7 @@ contract SimulationTest is Base {
     TestTarget public target;
     MockERC20 public token;
 
-    // Helper to decode DelegateAndRevert error
+    // Helper function to decode DelegateAndRevert error
     function decodeDelegateAndRevert(
         bytes memory errorData
     ) internal pure returns (bool success, bytes memory returnData) {
@@ -289,9 +290,6 @@ contract SimulationTest is Base {
             "Token balance should not have changed"
         );
     }
-
-    // Additional simulation tests would need to be reimplemented
-    // based on the actual SmartWalletSimulator interface
 
     // ============ Helper Functions ============
 
