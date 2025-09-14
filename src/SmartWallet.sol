@@ -182,6 +182,13 @@ abstract contract SmartWallet is
         if (!validateAndUpdateNonce(batchedCall.nonce))
             revert ISmartWallet.InvalidNonce(batchedCall.nonce);
 
+        // Minimum length check: 32 bytes (pubKeyHash) + 6 bytes (validUntil) = 38 bytes
+        if (validatorData.length < 38) {
+            revert ISmartWallet.InvalidValidatorDataLength(
+                validatorData.length,
+                38
+            );
+        }
         // Step 2: Extract validation components from validatorData
         uint48 validUntil;
         (pubKeyHash, validUntil) = DecodeLib.decodeSignatureComponents(
@@ -243,15 +250,20 @@ abstract contract SmartWallet is
         // Step 1: Pay the prefund
         _payPrefund(missingAccountFunds);
 
-        // Step 2: Extract validation components from signature
+        // Step 2: Check minimum signature length first
+        if (userOp.signature.length < 38) {
+            return Static.SIG_VALIDATION_FAILED;
+        }
+
+        // Step 3: Extract validation components from signature
         (bytes32 pubKeyHash, uint48 validUntil) = DecodeLib
             .decodeSignatureComponents(userOp.signature);
 
-        // Step 3: Verify validator exists and is not expired
+        // Step 4: Verify validator exists and is not expired
         address validator = getVerifiedValidator(pubKeyHash);
         if (validator == address(0)) return Static.SIG_VALIDATION_FAILED;
 
-        // Step 4: Handle chainless execution if applicable
+        // Step 5: Handle chainless execution if applicable
         uint256 nonceKey = userOp.nonce >> 64;
         if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
             // Decode calls from userOp.callData
@@ -270,12 +282,12 @@ abstract contract SmartWallet is
             userOpHash = getUserOpHashWithoutChainId(userOp);
         }
 
-        // Step 5: Add validUntil and IMPLEMENTATION to hash after chainless processing
+        // Step 6: Add validUntil and IMPLEMENTATION to hash after chainless processing
         userOpHash = keccak256(
             abi.encode(userOpHash, validUntil, IMPLEMENTATION)
         );
 
-        // Step 6: Validate signature
+        // Step 7: Validate signature
         if (
             !_validateSignature(
                 validator,
@@ -285,7 +297,7 @@ abstract contract SmartWallet is
             )
         ) return Static.SIG_VALIDATION_FAILED;
 
-        // Step 7: Return the validation data in EntryPoint-compatible format
+        // Step 8: Return the validation data in EntryPoint-compatible format
         return uint256(validUntil) << 160;
     }
 

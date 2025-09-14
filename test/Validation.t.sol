@@ -603,6 +603,51 @@ contract ValidationTest is Base {
         assertEq(result, Static.INVALID_VALUE);
     }
 
+    function test_RevertWhen_ExecuteWithRelayer_SignatureTooShort() public {
+        // Test that executeWithRelayer reverts with InvalidSignatureLength when signature is too short
+        Call[] memory calls = new Call[](0);
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
+
+        // Test with various invalid lengths (less than 38 bytes)
+        bytes memory shortSignature = new bytes(37); // Just under minimum
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISmartWallet.InvalidValidatorDataLength.selector,
+                37,
+                38
+            )
+        );
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            shortSignature
+        );
+
+        // Test with empty signature
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISmartWallet.InvalidValidatorDataLength.selector,
+                0,
+                38
+            )
+        );
+        ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, "");
+
+        // Test with only pubKeyHash (32 bytes, missing validUntil)
+        bytes memory onlyPubKeyHash = abi.encodePacked(bytes32(0));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISmartWallet.InvalidValidatorDataLength.selector,
+                32,
+                38
+            )
+        );
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            onlyPubKeyHash
+        );
+    }
+
     function test_IsValidSignature_WithDefaultValidator_ReturnsMagicValue()
         public
         view

@@ -1465,7 +1465,9 @@ contract ValidatorTest is Base {
 
     // ============ UserOp Edge Case Tests ============
 
-    function test_RevertWhen_ValidateUserOp_SignatureTooShort() public {
+    function test_ValidateUserOp_SignatureTooShort_ReturnsSigValidationFailed()
+        public
+    {
         vm.prank(_alice);
 
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
@@ -1478,7 +1480,7 @@ contract ValidatorTest is Base {
         vm.deal(address(account), 1 ether);
 
         PackedUserOperation memory userOp;
-        // Signature too short (less than 32 bytes)
+        // Signature too short (less than 38 bytes)
         userOp.signature = abi.encodePacked(
             bytes16(0x1234567890abcdef1234567890abcdef)
         );
@@ -1486,17 +1488,22 @@ contract ValidatorTest is Base {
         bytes32 userOpHash = keccak256("test");
         uint256 missingAccountFunds = 100;
 
-        // Should revert due to array bounds error when trying to access signature[0:32]
-        vm.expectRevert();
-        _testValidateUserOp(
-            address(account),
-            userOp,
-            userOpHash,
-            missingAccountFunds
+        // Should return SIG_VALIDATION_FAILED for short signature
+        assertEq(
+            _testValidateUserOp(
+                address(account),
+                userOp,
+                userOpHash,
+                missingAccountFunds
+            ),
+            Static.SIG_VALIDATION_FAILED,
+            "Short signature should fail validation"
         );
     }
 
-    function test_RevertWhen_ValidateUserOp_EmptySignature() public {
+    function test_ValidateUserOp_EmptySignature_ReturnsSigValidationFailed()
+        public
+    {
         vm.prank(_alice);
 
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
@@ -1515,13 +1522,16 @@ contract ValidatorTest is Base {
         bytes32 userOpHash = keccak256("test");
         uint256 missingAccountFunds = 100;
 
-        // Should revert due to array bounds error when trying to access signature[0:32]
-        vm.expectRevert();
-        _testValidateUserOp(
-            address(account),
-            userOp,
-            userOpHash,
-            missingAccountFunds
+        // Should return SIG_VALIDATION_FAILED for empty signature
+        assertEq(
+            _testValidateUserOp(
+                address(account),
+                userOp,
+                userOpHash,
+                missingAccountFunds
+            ),
+            Static.SIG_VALIDATION_FAILED,
+            "Empty signature should fail validation"
         );
     }
 

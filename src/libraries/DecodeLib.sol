@@ -2,7 +2,6 @@
 pragma solidity ^0.8.29;
 
 import {Call} from "../Types.sol";
-
 library DecodeLib {
     /// @notice Decode `Call[]` from function params (WITHOUT selector)
     /// @dev Expects input like `bytes params = callData[4:]` or `abi.encode(calls)`

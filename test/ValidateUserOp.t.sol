@@ -949,6 +949,72 @@ contract ValidateUserOpTest is Base {
         );
     }
 
+    function test_ValidateUserOp_SignatureTooShort_ReturnsSigValidationFailed()
+        external
+    {
+        // Test that validateUserOp returns SIG_VALIDATION_FAILED when signature is too short
+        address account = _aliceWallet;
+
+        // Create a user operation with a short signature (less than 38 bytes)
+        PackedUserOperation memory userOp = PackedUserOperation({
+            sender: account,
+            nonce: 0,
+            initCode: bytes(""),
+            callData: abi.encodeWithSelector(
+                ISmartWallet.execute.selector,
+                constructCallsData()
+            ),
+            accountGasLimits: bytes32((uint256(3000000) << 128) | 100000),
+            preVerificationGas: 21000,
+            gasFees: bytes32((uint256(1 gwei) << 128) | 10 gwei),
+            paymasterAndData: bytes(""),
+            signature: new bytes(37) // Just under minimum (should be at least 38)
+        });
+
+        bytes32 userOpHash = IEntryPoint(ENTRYPOINT_ADDRESS).getUserOpHash(
+            userOp
+        );
+        uint256 missingAccountFunds = 0;
+
+        // Should return SIG_VALIDATION_FAILED (1)
+        assertEq(
+            _testValidateUserOp(
+                account,
+                userOp,
+                userOpHash,
+                missingAccountFunds
+            ),
+            Static.SIG_VALIDATION_FAILED,
+            "Short signature should fail validation"
+        );
+
+        // Test with empty signature
+        userOp.signature = "";
+        assertEq(
+            _testValidateUserOp(
+                account,
+                userOp,
+                userOpHash,
+                missingAccountFunds
+            ),
+            Static.SIG_VALIDATION_FAILED,
+            "Empty signature should fail validation"
+        );
+
+        // Test with only pubKeyHash (32 bytes, missing validUntil)
+        userOp.signature = abi.encodePacked(bytes32(0));
+        assertEq(
+            _testValidateUserOp(
+                account,
+                userOp,
+                userOpHash,
+                missingAccountFunds
+            ),
+            Static.SIG_VALIDATION_FAILED,
+            "32-byte signature should fail validation"
+        );
+    }
+
     // Test canSkipChainIdValidation logic in validateUserOp context
     function test_ValidateUserOp_AllowsChainlessNonceForAddOwner_Success()
         external
