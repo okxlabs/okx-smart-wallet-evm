@@ -937,11 +937,10 @@ contract ExecutionTest is Base {
         ISmartWallet(eoaWallet).initialize(initialOwners);
 
         // Verify EOA is admin
-        uint256 settings = IOwnerManager(eoaWallet).ownerSettings(eoaKeyHash);
-        assertTrue(
-            IOwnerManager(eoaWallet).isAdmin(settings),
-            "EOA should be admin"
+        (, , , bool isAdmin, ) = IOwnerManager(eoaWallet).getOwnerSettings(
+            eoaKeyHash
         );
+        assertTrue(isAdmin, "EOA should be admin");
 
         // Step 3: EOA adds a new owner through execute
         bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(_charlie));
@@ -962,7 +961,7 @@ contract ExecutionTest is Base {
         ISmartWallet(eoaWallet).execute(calls);
 
         // Verify the new owner was added
-        address validator = IOwnerManager(eoaWallet).ownerValidators(
+        (address validator, , , , ) = IOwnerManager(eoaWallet).getOwnerSettings(
             newOwnerKeyHash
         );
         assertEq(

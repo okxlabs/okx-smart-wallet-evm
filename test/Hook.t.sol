@@ -1258,10 +1258,9 @@ contract HookTest is Base {
         );
 
         // Now verify the hook is set
-        uint256 settings = IOwnerManager(_aliceWallet).ownerSettings(
+        (, address hook, , , ) = IOwnerManager(_aliceWallet).getOwnerSettings(
             aliceKeyHash
         );
-        address hook = address(uint160(settings));
         console.log("Hook address after proper setup:", hook);
 
         // Now try to execute a call that should trigger the hook
@@ -1305,14 +1304,20 @@ contract HookTest is Base {
         _setHookForOwnerWithRelayer(aliceKeyHash, address(mockHook), 0);
 
         // Check what the contract actually reads for ownerSettings
-        uint256 contractSettings = IOwnerManager(_aliceWallet).ownerSettings(
-            aliceKeyHash
+        (
+            ,
+            address contractHook,
+            uint40 expiration,
+            bool isAdmin,
+
+        ) = IOwnerManager(_aliceWallet).getOwnerSettings(aliceKeyHash);
+        uint256 contractSettings = IOwnerManager(_aliceWallet).packSettings(
+            isAdmin,
+            expiration,
+            contractHook
         );
         console.log("Contract settings:", contractSettings);
-        console.log(
-            "Contract hook address:",
-            address(uint160(contractSettings))
-        );
+        console.log("Contract hook address:", contractHook);
 
         // Now try to execute a call that should trigger the hook
         Call[] memory calls = new Call[](1);

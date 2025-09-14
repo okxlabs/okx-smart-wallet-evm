@@ -12,17 +12,6 @@ interface IOwnerManager {
     event OwnerRemoved(bytes32 keyHash, address validator);
     event OwnerUpdated(bytes32 keyHash, address newValidator);
 
-    // Public mappings (auto-generated getters)
-    /// @notice Returns the validator address for a given keyHash
-    /// @param keyHash The keyHash to look up
-    /// @return The validator address associated with the keyHash
-    function ownerValidators(bytes32 keyHash) external view returns (address);
-
-    /// @notice Returns the packed settings for a given keyHash
-    /// @param keyHash The keyHash to look up
-    /// @return The packed settings value for the owner
-    function ownerSettings(bytes32 keyHash) external view returns (uint256);
-
     /// @notice Add an owner to the wallet
     /// @param keyHash The public key hash to associate with this validator
     /// @param validator The address of the validator contract to be registered

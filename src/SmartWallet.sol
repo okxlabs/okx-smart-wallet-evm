@@ -65,7 +65,7 @@ abstract contract SmartWallet is
             revert ISmartWallet.InvalidCaller(msg.sender);
         }
 
-        uint256 settings = ownerSettings[keyHash];
+        uint256 settings = _ownerSettings[keyHash];
         if (settings != 0 && isSettingsExpired(settings)) {
             revert ISmartWallet.OwnerExpired();
         }
@@ -142,7 +142,7 @@ abstract contract SmartWallet is
     /// @dev Reverts if any of the calls fail
     /// @param calls Array of Call structs containing destination address, value, and calldata
     function _batchCall(Call[] calldata calls, bytes32 keyHash) internal {
-        uint256 settings = ownerSettings[keyHash];
+        uint256 settings = _ownerSettings[keyHash];
         address hookAddress = getHook(settings);
 
         // Allow self-calls for EIP-7702 EOAs or admins

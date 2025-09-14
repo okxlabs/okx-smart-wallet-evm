@@ -77,6 +77,25 @@ contract ValidatorTest is Base {
         mockValidator = new MockValidator();
     }
 
+    // Helper function to extract validator from getOwnerSettings
+    function _getValidatorFromSettings(
+        IOwnerManager manager,
+        bytes32 keyHash
+    ) internal view returns (address) {
+        (address validator, , , , ) = manager.getOwnerSettings(keyHash);
+        return validator;
+    }
+
+    // Helper function to reconstruct packed settings from getOwnerSettings
+    function _getPackedSettings(
+        IOwnerManager manager,
+        bytes32 keyHash
+    ) internal view returns (uint256) {
+        (, address hook, uint40 expiration, bool isAdmin, ) = manager
+            .getOwnerSettings(keyHash);
+        return manager.packSettings(isAdmin, expiration, hook);
+    }
+
     function test_RevertWhen_AddValidator_NonOwner() public {
         // Test that a non-owner can't add a validator through execute
         address validatorAddress = address(_ecdsaValidator);
@@ -332,19 +351,18 @@ contract ValidatorTest is Base {
         );
 
         // Validator should be valid initially
-        address retrievedValidator = IOwnerManager(_aliceWallet)
-            .ownerValidators(keyHash);
+        (address retrievedValidator, , , , ) = IOwnerManager(_aliceWallet)
+            .getOwnerSettings(keyHash);
         assertEq(retrievedValidator, validatorAddress);
         assertFalse(_isSignerExpired(_aliceWallet, keyHash));
 
         // Advance time past expiration
         vm.warp(block.timestamp + 2);
 
-        // Validator should now be expired but ownerValidators still returns the address
+        // Validator should now be expired but getOwnerSettings still returns the address
         // Only getVerifiedValidator checks expiration
-        retrievedValidator = IOwnerManager(_aliceWallet).ownerValidators(
-            keyHash
-        );
+        (retrievedValidator, , , , ) = IOwnerManager(_aliceWallet)
+            .getOwnerSettings(keyHash);
         assertEq(retrievedValidator, validatorAddress); // Still returns the address
         assertTrue(_isSignerExpired(_aliceWallet, keyHash));
     }
@@ -377,14 +395,13 @@ contract ValidatorTest is Base {
             "Validator should be returned before expiration"
         );
 
-        // Verify the validator exists in ownerValidators mapping
-        address storedValidator = IOwnerManager(_aliceWallet).ownerValidators(
-            keyHash
-        );
+        // Verify the validator exists in owner settings
+        (address storedValidator, , , , ) = IOwnerManager(_aliceWallet)
+            .getOwnerSettings(keyHash);
         assertEq(
             storedValidator,
             validatorAddress,
-            "Validator should exist in ownerValidators"
+            "Validator should exist in owner settings"
         );
 
         // Fast forward time past expiration
@@ -400,12 +417,13 @@ contract ValidatorTest is Base {
             "getVerifiedValidator should return address(0) for expired validator"
         );
 
-        // But ownerValidators still returns the validator address (doesn't check expiration)
-        storedValidator = IOwnerManager(_aliceWallet).ownerValidators(keyHash);
+        // But getOwnerSettings still returns the validator address (doesn't check expiration)
+        (storedValidator, , , , ) = IOwnerManager(_aliceWallet)
+            .getOwnerSettings(keyHash);
         assertEq(
             storedValidator,
             validatorAddress,
-            "ownerValidators should still return the validator address"
+            "getOwnerSettings should still return the validator address"
         );
 
         // Verify the owner is indeed expired
@@ -445,14 +463,13 @@ contract ValidatorTest is Base {
             "Validator should be returned before expiration"
         );
 
-        // Verify the validator exists in ownerValidators mapping
-        address storedValidator = IOwnerManager(_aliceWallet).ownerValidators(
-            keyHash
-        );
+        // Verify the validator exists in owner settings
+        (address storedValidator, , , , ) = IOwnerManager(_aliceWallet)
+            .getOwnerSettings(keyHash);
         assertEq(
             storedValidator,
             validatorAddress,
-            "Validator should exist in ownerValidators"
+            "Validator should exist in owner settings"
         );
 
         // Fast forward time past expiration
@@ -468,12 +485,13 @@ contract ValidatorTest is Base {
             "getVerifiedValidator should return address(0) for expired validator"
         );
 
-        // But ownerValidators still returns the validator address (doesn't check expiration)
-        storedValidator = IOwnerManager(_aliceWallet).ownerValidators(keyHash);
+        // But getOwnerSettings still returns the validator address (doesn't check expiration)
+        (storedValidator, , , , ) = IOwnerManager(_aliceWallet)
+            .getOwnerSettings(keyHash);
         assertEq(
             storedValidator,
             validatorAddress,
-            "ownerValidators should still return the validator address"
+            "getOwnerSettings should still return the validator address"
         );
 
         // Verify the owner is indeed expired
@@ -503,8 +521,8 @@ contract ValidatorTest is Base {
         // Even after advancing time significantly, validator should remain valid
         vm.warp(block.timestamp + 365 days);
 
-        address retrievedValidator = IOwnerManager(_aliceWallet)
-            .ownerValidators(keyHash);
+        (address retrievedValidator, , , , ) = IOwnerManager(_aliceWallet)
+            .getOwnerSettings(keyHash);
         assertEq(retrievedValidator, validatorAddress);
         assertFalse(_isSignerExpired(_aliceWallet, keyHash));
         assertEq(_getSignerExpiration(_aliceWallet, keyHash), 0);
@@ -667,7 +685,7 @@ contract ValidatorTest is Base {
         // No signers should be set
         bytes32 testKeyHash = keccak256(abi.encodePacked(_alice));
         assertEq(
-            IOwnerManager(newWallet).ownerValidators(testKeyHash),
+            _getValidatorFromSettings(IOwnerManager(newWallet), testKeyHash),
             address(0)
         );
         assertFalse(_isSignerAdmin(newWallet, testKeyHash));
@@ -838,7 +856,7 @@ contract ValidatorTest is Base {
 
         // Verify validator exists
         assertEq(
-            IOwnerManager(_aliceWallet).ownerValidators(keyHash),
+            _getValidatorFromSettings(IOwnerManager(_aliceWallet), keyHash),
             Static.ECDSA_VALIDATOR_ADDRESS
         );
 
@@ -874,7 +892,7 @@ contract ValidatorTest is Base {
 
         // Verify validator is removed
         assertEq(
-            IOwnerManager(_aliceWallet).ownerValidators(keyHash),
+            _getValidatorFromSettings(IOwnerManager(_aliceWallet), keyHash),
             address(0)
         );
     }
@@ -886,7 +904,10 @@ contract ValidatorTest is Base {
 
         // Verify the validator doesn't exist
         assertEq(
-            IOwnerManager(_aliceWallet).ownerValidators(nonExistentKeyHash),
+            _getValidatorFromSettings(
+                IOwnerManager(_aliceWallet),
+                nonExistentKeyHash
+            ),
             address(0)
         );
         assertFalse(IOwnerManager(_aliceWallet).hasOwner(nonExistentKeyHash));
@@ -923,7 +944,10 @@ contract ValidatorTest is Base {
 
         // Verify the validator still doesn't exist (no-op)
         assertEq(
-            IOwnerManager(_aliceWallet).ownerValidators(nonExistentKeyHash),
+            _getValidatorFromSettings(
+                IOwnerManager(_aliceWallet),
+                nonExistentKeyHash
+            ),
             address(0)
         );
         assertFalse(IOwnerManager(_aliceWallet).hasOwner(nonExistentKeyHash));
@@ -947,7 +971,7 @@ contract ValidatorTest is Base {
 
         // Verify initial validator
         assertEq(
-            IOwnerManager(_aliceWallet).ownerValidators(keyHash),
+            _getValidatorFromSettings(IOwnerManager(_aliceWallet), keyHash),
             Static.ECDSA_VALIDATOR_ADDRESS
         );
 
@@ -992,11 +1016,11 @@ contract ValidatorTest is Base {
 
         // Verify validator is updated
         assertEq(
-            IOwnerManager(_aliceWallet).ownerValidators(keyHash),
+            _getValidatorFromSettings(IOwnerManager(_aliceWallet), keyHash),
             Static.PASSKEY_VALIDATOR_ADDRESS
         );
         assertEq(
-            IOwnerManager(_aliceWallet).ownerSettings(keyHash),
+            _getPackedSettings(IOwnerManager(_aliceWallet), keyHash),
             newSettings
         );
     }
@@ -1216,7 +1240,8 @@ contract ValidatorTest is Base {
         );
 
         // Verify validator was added
-        address addedValidator = IOwnerManager(_aliceWallet).ownerValidators(
+        address addedValidator = _getValidatorFromSettings(
+            IOwnerManager(_aliceWallet),
             charlieKeyHash
         );
         assertEq(addedValidator, address(externalEcdsaValidator));
@@ -1719,7 +1744,7 @@ contract ValidatorTest is Base {
 
         // Verify owner was not updated
         assertEq(
-            IOwnerManager(_aliceWallet).ownerValidators(keyHash),
+            _getValidatorFromSettings(IOwnerManager(_aliceWallet), keyHash),
             Static.ECDSA_VALIDATOR_ADDRESS
         );
     }

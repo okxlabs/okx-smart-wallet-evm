@@ -104,12 +104,12 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
         }
 
         // Step 4: Verify validator exists and is not expired
-        address actualValidator = ownerValidators[pubKeyHash];
+        address actualValidator = _ownerValidators[pubKeyHash];
         if (actualValidator == address(0)) {
             // revert Errors.InvalidKeyHash(pubKeyHash);
         }
 
-        uint256 settings = ownerSettings[pubKeyHash];
+        uint256 settings = _ownerSettings[pubKeyHash];
         if (settings != 0 && isSettingsExpired(settings)) {
             // revert Errors.ValidatorExpired(pubKeyHash);
         }

@@ -285,13 +285,9 @@ contract AdminPermissionsTest is Base {
         );
 
         // Verify settings were updated
-        uint256 updatedSettings = IOwnerManager(_aliceWallet).ownerSettings(
-            nonAdminKeyHash
-        );
-        assertGt(
-            IOwnerManager(_aliceWallet).getExpiration(updatedSettings),
-            block.timestamp
-        );
+        (, , uint40 expiration, , ) = IOwnerManager(_aliceWallet)
+            .getOwnerSettings(nonAdminKeyHash);
+        assertGt(expiration, block.timestamp);
     }
 
     // ============ Admin Rights Dynamic Changes ============

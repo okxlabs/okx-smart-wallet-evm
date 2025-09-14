@@ -683,8 +683,10 @@ contract Base is Test {
         address wallet,
         bytes32 keyHash
     ) internal view returns (bool) {
-        uint256 settings = IOwnerManager(wallet).ownerSettings(keyHash);
-        return settings != 0 && IOwnerManager(wallet).isAdmin(settings);
+        (, , , bool adminStatus, ) = IOwnerManager(wallet).getOwnerSettings(
+            keyHash
+        );
+        return adminStatus;
     }
 
     // Helper function to test validateUserOp from EntryPoint's perspective
@@ -729,9 +731,10 @@ contract Base is Test {
         address wallet,
         bytes32 keyHash
     ) internal view returns (bool) {
-        uint256 settings = IOwnerManager(wallet).ownerSettings(keyHash);
-        return
-            settings != 0 && IOwnerManager(wallet).isSettingsExpired(settings);
+        (, , , , bool expired) = IOwnerManager(wallet).getOwnerSettings(
+            keyHash
+        );
+        return expired;
     }
 
     // Helper function for tests to get signer expiration
@@ -739,9 +742,10 @@ contract Base is Test {
         address wallet,
         bytes32 keyHash
     ) internal view returns (uint40) {
-        uint256 settings = IOwnerManager(wallet).ownerSettings(keyHash);
-        return
-            settings != 0 ? IOwnerManager(wallet).getExpiration(settings) : 0;
+        (, , uint40 expiration, , ) = IOwnerManager(wallet).getOwnerSettings(
+            keyHash
+        );
+        return expiration;
     }
     // Helper function to call removeValidator through execute
     function _executeRemoveValidator(address wallet, bytes32 keyHash) internal {

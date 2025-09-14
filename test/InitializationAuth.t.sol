@@ -28,12 +28,10 @@ contract InitializationAuthTest is Base {
         address wallet = factory.createAccount(initialOwners, 123);
 
         // Verify owner was set correctly
-        assertEq(
-            IOwnerManager(wallet).ownerValidators(
-                keccak256(abi.encodePacked(_alice))
-            ),
-            address(_ecdsaValidator)
+        (address validator, , , , ) = IOwnerManager(wallet).getOwnerSettings(
+            keccak256(abi.encodePacked(_alice))
         );
+        assertEq(validator, address(_ecdsaValidator));
     }
 
     function test_RevertWhen_Initialize_UnauthorizedCaller() public {
@@ -70,12 +68,10 @@ contract InitializationAuthTest is Base {
         ISmartWallet(_bob).initialize(initialOwners);
 
         // Verify owner was set
-        assertEq(
-            IOwnerManager(_bob).ownerValidators(
-                keccak256(abi.encodePacked(_bob))
-            ),
-            address(_ecdsaValidator)
+        (address validator2, , , , ) = IOwnerManager(_bob).getOwnerSettings(
+            keccak256(abi.encodePacked(_bob))
         );
+        assertEq(validator2, address(_ecdsaValidator));
     }
 
     function test_RevertWhen_Initialize_NotSelfInEIP7702() public {
@@ -98,12 +94,10 @@ contract InitializationAuthTest is Base {
         ISmartWallet(wallet).initialize(initialOwners);
 
         // Verify initialization succeeded
-        assertEq(
-            IOwnerManager(wallet).ownerValidators(
-                keccak256(abi.encodePacked(_alice))
-            ),
-            address(_ecdsaValidator)
+        (address validator3, , , , ) = IOwnerManager(wallet).getOwnerSettings(
+            keccak256(abi.encodePacked(_alice))
         );
+        assertEq(validator3, address(_ecdsaValidator));
     }
 
     function test_Initialize_FactoryAddressFromImmutableArgs() public {
@@ -125,12 +119,10 @@ contract InitializationAuthTest is Base {
         ISmartWallet(wallet).initialize(initialOwners);
 
         // Verify initialization succeeded
-        assertEq(
-            IOwnerManager(wallet).ownerValidators(
-                keccak256(abi.encodePacked(_alice))
-            ),
-            address(_ecdsaValidator)
+        (address validator4, , , , ) = IOwnerManager(wallet).getOwnerSettings(
+            keccak256(abi.encodePacked(_alice))
         );
+        assertEq(validator4, address(_ecdsaValidator));
     }
 
     function test_RevertWhen_Initialize_WrongFactoryAddress() public {
@@ -192,11 +184,9 @@ contract InitializationAuthTest is Base {
         ISmartWallet(wallet).initialize(legitOwners);
 
         // Verify legitimate owner was set
-        assertEq(
-            IOwnerManager(wallet).ownerValidators(
-                keccak256(abi.encodePacked(_alice))
-            ),
-            address(_ecdsaValidator)
+        (address validator5, , , , ) = IOwnerManager(wallet).getOwnerSettings(
+            keccak256(abi.encodePacked(_alice))
         );
+        assertEq(validator5, address(_ecdsaValidator));
     }
 }

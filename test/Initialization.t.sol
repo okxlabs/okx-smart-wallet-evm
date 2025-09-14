@@ -73,14 +73,14 @@ contract InitializationTest is Base {
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
 
-        assertEq(
-            IOwnerManager(_bob).ownerValidators(aliceKeyHash),
-            address(_ecdsaValidator)
+        (address aliceValidator, , , , ) = IOwnerManager(_bob).getOwnerSettings(
+            aliceKeyHash
         );
-        assertEq(
-            IOwnerManager(_bob).ownerValidators(bobKeyHash),
-            address(_ecdsaValidator)
+        assertEq(aliceValidator, address(_ecdsaValidator));
+        (address bobValidator, , , , ) = IOwnerManager(_bob).getOwnerSettings(
+            bobKeyHash
         );
+        assertEq(bobValidator, address(_ecdsaValidator));
     }
 
     function test_Initialize_EmitsWalletInitializedEvent_Success() public {

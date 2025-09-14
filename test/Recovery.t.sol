@@ -133,9 +133,8 @@ contract RecoveryTest is Base {
         );
 
         // Verify the validator is set correctly
-        address validator = IOwnerManager(recoveredAccount).ownerValidators(
-            recoverySignerKeyHash
-        );
+        (address validator, , , , ) = IOwnerManager(recoveredAccount)
+            .getOwnerSettings(recoverySignerKeyHash);
         assertEq(
             validator,
             address(1),
@@ -242,18 +241,13 @@ contract RecoveryTest is Base {
         );
 
         // Verify the new owner has admin privileges
-        uint256 settings = IOwnerManager(recoveredAccount).ownerSettings(
-            newOwnerKeyHash
-        );
-        assertTrue(
-            IOwnerManager(recoveredAccount).isAdmin(settings),
-            "Recovered owner should have admin privileges"
-        );
+        (, , , bool isAdmin, ) = IOwnerManager(recoveredAccount)
+            .getOwnerSettings(newOwnerKeyHash);
+        assertTrue(isAdmin, "Recovered owner should have admin privileges");
 
         // Verify the validator is set correctly
-        address validator = IOwnerManager(recoveredAccount).ownerValidators(
-            newOwnerKeyHash
-        );
+        (address validator, , , , ) = IOwnerManager(recoveredAccount)
+            .getOwnerSettings(newOwnerKeyHash);
         assertEq(
             validator,
             address(_ecdsaValidator),
