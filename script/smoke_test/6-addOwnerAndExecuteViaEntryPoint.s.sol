@@ -238,7 +238,7 @@ contract AddOwnerAndExecuteViaEntryPoint is Script {
 
         // Process chainless hash if needed
         uint256 nonceKey = nonce >> 64;
-        if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
+        if (nonceKey == Static.CHAINLESS_NONCE_KEY) {
             userOpHash = SmartWallet(userWallet).getUserOpHashWithoutChainId(
                 userOp
             );
@@ -298,7 +298,7 @@ contract AddOwnerAndExecuteViaEntryPoint is Script {
         IEntryPoint entryPoint,
         address userWallet
     ) private view returns (uint256) {
-        uint192 chainlessKey = uint192(Static.CHAIN_LESS_NONCE_KEY);
+        uint192 chainlessKey = uint192(Static.CHAINLESS_NONCE_KEY);
         uint256 sequentialNonce = entryPoint.getNonce(userWallet, chainlessKey);
         return (uint256(chainlessKey) << 64) | sequentialNonce;
     }
@@ -395,7 +395,7 @@ contract AddOwnerAndExecuteViaEntryPoint is Script {
 
         // For chainless nonce, we need to get the chainless hash
         uint256 nonceKey = userOp.nonce >> 64;
-        if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
+        if (nonceKey == Static.CHAINLESS_NONCE_KEY) {
             // Get the chainless hash (without chainId) to match what validateUserOp expects
             userOpHash = SmartWallet(userWallet).getUserOpHashWithoutChainId(
                 userOp

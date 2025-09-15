@@ -236,7 +236,7 @@ contract ValidateUserOpTest is Base {
         // Build UserOperation with chainless nonce
         PackedUserOperation memory userOp = PackedUserOperation({
             sender: account,
-            nonce: uint256(Static.CHAIN_LESS_NONCE_KEY) << 64, // Chainless nonce key
+            nonce: uint256(Static.CHAINLESS_NONCE_KEY) << 64, // Chainless nonce key
             initCode: bytes(""),
             callData: callData,
             accountGasLimits: bytes32((uint256(3000000) << 128) | 100000),
@@ -498,7 +498,7 @@ contract ValidateUserOpTest is Base {
 
         TestTemps memory t;
         PackedUserOperation memory userOp;
-        userOp.nonce = Static.CHAIN_LESS_NONCE_KEY << 64;
+        userOp.nonce = Static.CHAINLESS_NONCE_KEY << 64;
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -555,7 +555,7 @@ contract ValidateUserOpTest is Base {
 
         TestTemps memory t;
         PackedUserOperation memory userOp;
-        userOp.nonce = Static.CHAIN_LESS_NONCE_KEY << 64;
+        userOp.nonce = Static.CHAINLESS_NONCE_KEY << 64;
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -606,7 +606,7 @@ contract ValidateUserOpTest is Base {
     {
         TestTemps memory t;
         PackedUserOperation memory userOp;
-        userOp.nonce = Static.CHAIN_LESS_NONCE_KEY << 64;
+        userOp.nonce = Static.CHAINLESS_NONCE_KEY << 64;
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -1034,7 +1034,7 @@ contract ValidateUserOpTest is Base {
         });
 
         PackedUserOperation memory userOp;
-        userOp.nonce = Static.CHAIN_LESS_NONCE_KEY << 64; // Use chainless nonce
+        userOp.nonce = Static.CHAINLESS_NONCE_KEY << 64; // Use chainless nonce
         userOp.callData = abi.encodeWithSelector(
             ISmartWallet.execute.selector,
             calls
@@ -1089,7 +1089,7 @@ contract ValidateUserOpTest is Base {
         });
 
         PackedUserOperation memory userOp;
-        userOp.nonce = Static.CHAIN_LESS_NONCE_KEY << 64;
+        userOp.nonce = Static.CHAINLESS_NONCE_KEY << 64;
         userOp.callData = abi.encodeWithSelector(
             ISmartWallet.execute.selector,
             calls
@@ -1140,7 +1140,7 @@ contract ValidateUserOpTest is Base {
         });
 
         PackedUserOperation memory userOp;
-        userOp.nonce = Static.CHAIN_LESS_NONCE_KEY << 64;
+        userOp.nonce = Static.CHAINLESS_NONCE_KEY << 64;
         userOp.callData = abi.encodeWithSelector(
             ISmartWallet.execute.selector,
             calls
@@ -1181,7 +1181,7 @@ contract ValidateUserOpTest is Base {
         calls[0] = Call({target: _bob, value: 1 ether, data: ""});
 
         PackedUserOperation memory userOp;
-        userOp.nonce = Static.CHAIN_LESS_NONCE_KEY << 64;
+        userOp.nonce = Static.CHAINLESS_NONCE_KEY << 64;
         userOp.callData = abi.encodeWithSelector(
             ISmartWallet.execute.selector,
             calls
@@ -1233,7 +1233,7 @@ contract ValidateUserOpTest is Base {
             )
         });
         PackedUserOperation memory userOp;
-        userOp.nonce = Static.CHAIN_LESS_NONCE_KEY << 64;
+        userOp.nonce = Static.CHAINLESS_NONCE_KEY << 64;
         userOp.callData = abi.encodeWithSelector(
             ISmartWallet.execute.selector,
             calls
@@ -1350,7 +1350,7 @@ contract ValidateUserOpTest is Base {
 
         PackedUserOperation memory userOp;
         userOp.sender = account;
-        userOp.nonce = Static.CHAIN_LESS_NONCE_KEY << 64; // Chainless nonce
+        userOp.nonce = Static.CHAINLESS_NONCE_KEY << 64; // Chainless nonce
         userOp.callData = abi.encodeCall(ISmartWallet.execute, (calls));
 
         // Get hash on chain 1

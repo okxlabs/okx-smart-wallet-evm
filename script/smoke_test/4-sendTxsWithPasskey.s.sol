@@ -142,7 +142,7 @@ contract SendTxsWithPasskey is Script {
         address userWallet
     ) private view returns (uint256) {
         // Get chainless nonce (matching EntryPoint version)
-        uint192 chainlessKey = uint192(Static.CHAIN_LESS_NONCE_KEY);
+        uint192 chainlessKey = uint192(Static.CHAINLESS_NONCE_KEY);
         uint256 sequentialNonce = INonceManager(userWallet).getNonce(
             chainlessKey
         );

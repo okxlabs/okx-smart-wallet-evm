@@ -108,7 +108,7 @@ contract CreateAccountWithAddOwner is Script {
         // 5. Create BatchedCall for addOwner with hook
         BatchedCall memory batchedCall = BatchedCall({
             calls: _createAddOwnerCall(predictedAddress, eoaKeyHash),
-            nonce: (uint256(Static.CHAIN_LESS_NONCE_KEY) << 64) | 0
+            nonce: (uint256(Static.CHAINLESS_NONCE_KEY) << 64) | 0
         });
 
         // 6. Create Merkle tree with 2 leaves

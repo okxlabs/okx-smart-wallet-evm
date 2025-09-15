@@ -371,7 +371,7 @@ contract Base is Test {
 
         // 3. Apply ERC712 domain separator
         uint256 nonceKey = batchedCall.nonce >> 64;
-        if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
+        if (nonceKey == Static.CHAINLESS_NONCE_KEY) {
             // For chainless nonce, use hashTypedDataSansChainId
             return ERC712(wallet).hashTypedDataSansChainId(dataHash);
         } else {
@@ -618,7 +618,7 @@ contract Base is Test {
     ) internal view returns (bytes32) {
         // 1. If chainless nonce, apply getUserOpHashWithoutChainId
         uint256 nonceKey = userOp.nonce >> 64;
-        if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
+        if (nonceKey == Static.CHAINLESS_NONCE_KEY) {
             // For chainless, get hash without chainId
             userOpHash = ERC4337Account(wallet).getUserOpHashWithoutChainId(
                 userOp

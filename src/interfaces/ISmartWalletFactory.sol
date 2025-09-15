@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
-import {InitialOwner} from "../Types.sol";
+import {InitialOwner} from "../../src/Types.sol";
 
 interface ISmartWalletFactory {
     /// @notice Event when account is created
