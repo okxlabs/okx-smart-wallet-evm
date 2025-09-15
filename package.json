@@ -2,7 +2,7 @@
   "name": "smart-wallet",
   "version": "1.0.0",
   "main": "index.js",
-  "license": "GPL-3.0",
+  "license": "MIT",
   "scripts": {
     "prettier:sol": "prettier --write --plugin=prettier-plugin-solidity 'src/**/*.sol' 'test/**/*.sol'",
     "prettier:solhint": "solhint 'src/**/*.sol' 'test/**/*.sol' --fix --noPrompt",
