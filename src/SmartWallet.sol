@@ -209,7 +209,7 @@ abstract contract SmartWallet is
         bytes32 intentHash = batchedCall.hash(validUntil, IMPLEMENTATION);
 
         // Step 6: Handle chainless execution if applicable
-        if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
+        if (nonceKey == Static.CHAINLESS_NONCE_KEY) {
             // Validate all calls are allowed for chainless execution
             if (
                 !ChainlessLib.validateChainlessNonceCallData(
@@ -265,7 +265,7 @@ abstract contract SmartWallet is
 
         // Step 5: Handle chainless execution if applicable
         uint256 nonceKey = userOp.nonce >> 64;
-        if (nonceKey == Static.CHAIN_LESS_NONCE_KEY) {
+        if (nonceKey == Static.CHAINLESS_NONCE_KEY) {
             // Decode calls from userOp.callData
             Call[] calldata calls = DecodeLib.decodeCalls(userOp.callData[4:]);
 
