@@ -143,7 +143,7 @@ contract ChainlessExecutionTest is Base {
 
         PackedUserOperation memory userOp = PackedUserOperation({
             sender: testAccount,
-            nonce: Static.CHAIN_LESS_NONCE_KEY << 64,
+            nonce: Static.CHAINLESS_NONCE_KEY << 64,
             initCode: "",
             callData: abi.encodeWithSelector(
                 ISmartWallet.execute.selector,
@@ -237,7 +237,7 @@ contract ChainlessExecutionTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: Static.CHAIN_LESS_NONCE_KEY << 64
+            nonce: Static.CHAINLESS_NONCE_KEY << 64
         });
 
         bytes memory validatorData = _constructRelayerSignature(
@@ -252,7 +252,7 @@ contract ChainlessExecutionTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISmartWallet.InvalidNonceKey.selector,
-                Static.CHAIN_LESS_NONCE_KEY
+                Static.CHAINLESS_NONCE_KEY
             )
         );
         SmartWallet(payable(testAccount)).executeWithRelayer(
@@ -281,7 +281,7 @@ contract ChainlessExecutionTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISmartWallet.InvalidNonceKey.selector,
-                Static.CHAIN_LESS_NONCE_KEY
+                Static.CHAINLESS_NONCE_KEY
             )
         );
         SmartWallet(payable(testAccount)).executeWithRelayer(
@@ -309,7 +309,7 @@ contract ChainlessExecutionTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: Static.CHAIN_LESS_NONCE_KEY << 64
+            nonce: Static.CHAINLESS_NONCE_KEY << 64
         });
 
         bytes memory validatorData = _constructRelayerSignature(
@@ -324,7 +324,7 @@ contract ChainlessExecutionTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISmartWallet.InvalidNonceKey.selector,
-                Static.CHAIN_LESS_NONCE_KEY
+                Static.CHAINLESS_NONCE_KEY
             )
         );
         SmartWallet(payable(testAccount)).executeWithRelayer(
@@ -346,7 +346,7 @@ contract ChainlessExecutionTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: Static.CHAIN_LESS_NONCE_KEY << 64
+            nonce: Static.CHAINLESS_NONCE_KEY << 64
         });
 
         bytes memory validatorData = _constructRelayerSignature(
@@ -360,7 +360,7 @@ contract ChainlessExecutionTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISmartWallet.InvalidNonceKey.selector,
-                Static.CHAIN_LESS_NONCE_KEY
+                Static.CHAINLESS_NONCE_KEY
             )
         );
         SmartWallet(payable(testAccount)).executeWithRelayer(
@@ -430,7 +430,7 @@ contract ChainlessExecutionTest is Base {
         return
             PackedUserOperation({
                 sender: testAccount,
-                nonce: Static.CHAIN_LESS_NONCE_KEY << 64,
+                nonce: Static.CHAINLESS_NONCE_KEY << 64,
                 initCode: "",
                 callData: abi.encodeWithSelector(
                     ISmartWallet.execute.selector,
@@ -470,7 +470,7 @@ contract ChainlessExecutionTest is Base {
         return
             PackedUserOperation({
                 sender: testAccount,
-                nonce: Static.CHAIN_LESS_NONCE_KEY << 64,
+                nonce: Static.CHAINLESS_NONCE_KEY << 64,
                 initCode: "",
                 callData: abi.encodeWithSelector(
                     ISmartWallet.execute.selector,
@@ -500,7 +500,7 @@ contract ChainlessExecutionTest is Base {
         return
             PackedUserOperation({
                 sender: testAccount,
-                nonce: Static.CHAIN_LESS_NONCE_KEY << 64,
+                nonce: Static.CHAINLESS_NONCE_KEY << 64,
                 initCode: "",
                 callData: abi.encodeWithSelector(
                     ISmartWallet.execute.selector,
@@ -525,7 +525,7 @@ contract ChainlessExecutionTest is Base {
         return
             PackedUserOperation({
                 sender: testAccount,
-                nonce: Static.CHAIN_LESS_NONCE_KEY << 64,
+                nonce: Static.CHAINLESS_NONCE_KEY << 64,
                 initCode: "",
                 callData: abi.encodeWithSelector(
                     ISmartWallet.execute.selector,
@@ -559,7 +559,7 @@ contract ChainlessExecutionTest is Base {
         return
             BatchedCall({
                 calls: calls,
-                nonce: Static.CHAIN_LESS_NONCE_KEY << 64
+                nonce: Static.CHAINLESS_NONCE_KEY << 64
             });
     }
 
@@ -574,7 +574,7 @@ contract ChainlessExecutionTest is Base {
         return
             BatchedCall({
                 calls: calls,
-                nonce: Static.CHAIN_LESS_NONCE_KEY << 64
+                nonce: Static.CHAINLESS_NONCE_KEY << 64
             });
     }
 

@@ -763,7 +763,7 @@ contract ValidationTest is Base {
         BatchedCall memory batchedCall
     ) internal view returns (bytes32) {
         // _getExecuteWithRelayerHash will automatically use hashTypedDataSansChainId
-        // when the nonce has CHAIN_LESS_NONCE_KEY
+        // when the nonce has CHAINLESS_NONCE_KEY
         return
             _getExecuteWithRelayerHash(
                 batchedCall,
@@ -795,8 +795,8 @@ contract ValidationTest is Base {
             )
         });
 
-        // Use chainless nonce key (Static.CHAIN_LESS_NONCE_KEY = 196)
-        uint256 chainlessNonce = Static.CHAIN_LESS_NONCE_KEY << 64; // nonce key = 196, sequence = 0
+        // Use chainless nonce key (Static.CHAINLESS_NONCE_KEY = 196)
+        uint256 chainlessNonce = Static.CHAINLESS_NONCE_KEY << 64; // nonce key = 196, sequence = 0
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: chainlessNonce
@@ -860,7 +860,7 @@ contract ValidationTest is Base {
             )
         });
 
-        uint256 chainlessNonce = Static.CHAIN_LESS_NONCE_KEY << 64;
+        uint256 chainlessNonce = Static.CHAINLESS_NONCE_KEY << 64;
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: chainlessNonce
@@ -879,7 +879,7 @@ contract ValidationTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISmartWallet.InvalidNonceKey.selector,
-                Static.CHAIN_LESS_NONCE_KEY
+                Static.CHAINLESS_NONCE_KEY
             )
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
@@ -917,7 +917,7 @@ contract ValidationTest is Base {
             )
         });
 
-        uint256 chainlessNonce = Static.CHAIN_LESS_NONCE_KEY << 64;
+        uint256 chainlessNonce = Static.CHAINLESS_NONCE_KEY << 64;
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: chainlessNonce
@@ -936,7 +936,7 @@ contract ValidationTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISmartWallet.InvalidNonceKey.selector,
-                Static.CHAIN_LESS_NONCE_KEY
+                Static.CHAINLESS_NONCE_KEY
             )
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
@@ -952,7 +952,7 @@ contract ValidationTest is Base {
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _bob, value: 1 ether, data: ""});
 
-        uint256 chainlessNonce = Static.CHAIN_LESS_NONCE_KEY << 64;
+        uint256 chainlessNonce = Static.CHAINLESS_NONCE_KEY << 64;
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: chainlessNonce
@@ -971,7 +971,7 @@ contract ValidationTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISmartWallet.InvalidNonceKey.selector,
-                Static.CHAIN_LESS_NONCE_KEY
+                Static.CHAINLESS_NONCE_KEY
             )
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
@@ -1017,7 +1017,7 @@ contract ValidationTest is Base {
             )
         });
 
-        uint256 chainlessNonce = Static.CHAIN_LESS_NONCE_KEY << 64;
+        uint256 chainlessNonce = Static.CHAINLESS_NONCE_KEY << 64;
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: chainlessNonce
@@ -1036,7 +1036,7 @@ contract ValidationTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISmartWallet.InvalidNonceKey.selector,
-                Static.CHAIN_LESS_NONCE_KEY
+                Static.CHAINLESS_NONCE_KEY
             )
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
@@ -1061,7 +1061,7 @@ contract ValidationTest is Base {
             )
         });
 
-        uint256 chainlessNonce = Static.CHAIN_LESS_NONCE_KEY << 64;
+        uint256 chainlessNonce = Static.CHAINLESS_NONCE_KEY << 64;
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: chainlessNonce
@@ -1161,7 +1161,7 @@ contract ValidationTest is Base {
             )
         });
 
-        uint256 chainlessNonce = Static.CHAIN_LESS_NONCE_KEY << 64;
+        uint256 chainlessNonce = Static.CHAINLESS_NONCE_KEY << 64;
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: chainlessNonce
@@ -1180,7 +1180,7 @@ contract ValidationTest is Base {
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISmartWallet.InvalidNonceKey.selector,
-                Static.CHAIN_LESS_NONCE_KEY
+                Static.CHAINLESS_NONCE_KEY
             )
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(

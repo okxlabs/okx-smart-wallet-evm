@@ -31,7 +31,7 @@ library ChainlessLib {
     /// @param calls Array of calls to validate
     /// @param selfAddress The address of the current contract (for self-call validation)
     /// @return true if all calls are allowed to skip chain ID validation, false otherwise
-    /// @dev This is used when CHAIN_LESS_NONCE_KEY is used to ensure only allowed operations are performed
+    /// @dev This is used when CHAINLESS_NONCE_KEY is used to ensure only allowed operations are performed
     ///      All chainless calls must be self-calls (target == address(this))
     function validateChainlessNonceCallData(
         Call[] calldata calls,
