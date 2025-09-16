@@ -245,7 +245,7 @@ contract AllowanceManagerTest is Base {
         unauthorized = makeAddr("unauthorized");
 
         // Set up relayer
-        (relayer, relayerPk) = makeAddrAndKey("relayer");
+        relayer = makeAddr("relayer");
 
         // Deploy mock tokens
         mockToken = new MockERC20();

@@ -66,7 +66,7 @@ contract SmartWalletUpgradeTest is Base {
         , uint48(0));
         
         // 4. Execute upgrade through relayer
-        vm.prank(_alice); // Anyone can be relayer, using alice for simplicity
+        vm.prank(relayer); // Anyone can be relayer, using alice for simplicity
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, validatorData);
         
         // 5. Verify upgrade was successful
@@ -102,7 +102,7 @@ contract SmartWalletUpgradeTest is Base {
         , uint48(0));
         
         // Execute upgrade
-        vm.prank(_alice);
+        vm.prank(relayer);
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, validatorData);
         
         // Verify owners are preserved after upgrade
@@ -125,7 +125,7 @@ contract SmartWalletUpgradeTest is Base {
             bytes memory txValidatorData = _constructRelayerSignature(_aliceWallet, _alice, _alicePk, txCall
             , uint48(0));
             
-            vm.prank(_alice);
+            vm.prank(relayer);
             ISmartWallet(_aliceWallet).executeWithRelayer(txCall, txValidatorData);
         }
         
@@ -153,7 +153,7 @@ contract SmartWalletUpgradeTest is Base {
         bytes memory validatorData = _constructRelayerSignature(_aliceWallet, _alice, _alicePk, batchedCall
         , uint48(0));
         
-        vm.prank(_alice);
+        vm.prank(relayer);
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, validatorData);
         
         // Verify nonce is preserved and incremented correctly
@@ -186,7 +186,7 @@ contract SmartWalletUpgradeTest is Base {
         bytes memory validatorData = _constructRelayerSignature(_aliceWallet, _alice, _alicePk, batchedCall
         , uint48(0));
         
-        vm.prank(_alice);
+        vm.prank(relayer);
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, validatorData);
         
         // Verify upgrade with initialization succeeded

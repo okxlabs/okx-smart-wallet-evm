@@ -82,6 +82,8 @@ contract MockERC20 is ERC20 {
 }
 
 contract Base is Test {
+    using BatchedCallLib for BatchedCall;
+
     string public constant NAME = "SmartWallet";
     string public constant VERSION = "1.0.0";
 
@@ -108,7 +110,6 @@ contract Base is Test {
     SmartWalletFactory internal _factory;
     IDeployFactory public deployFactory;
     address internal relayer;
-    uint256 internal relayerPk;
     Call[] internal relayerCalls;
     Call[] internal emptyRelayerCalls;
     SmartWalletSimulator internal _simulator;
@@ -755,7 +756,7 @@ contract Base is Test {
         );
         return expiration;
     }
-    // Helper function to call removeValidator through execute
+    // Helper function to call removeValidator through executeWithRelayer
     function _executeRemoveValidator(address wallet, bytes32 keyHash) internal {
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -767,7 +768,32 @@ contract Base is Test {
             )
         });
 
-        vm.prank(wallet);
-        ISmartWallet(wallet).execute(calls);
+        // Create BatchedCall for relayer execution
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: _getNonce(wallet)
+        });
+
+        // Sign with alice's private key (as the authorized owner)
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        uint48 validUntil = 0; // No expiry
+
+        bytes32 intentHash = batchedCall.hash(
+            validUntil,
+            _smartWallet.IMPLEMENTATION()
+        );
+        bytes32 typedDataHash = ERC712(wallet).hashTypedData(intentHash);
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, typedDataHash);
+        bytes memory signature = abi.encodePacked(r, s, v);
+        bytes memory validatorData = abi.encodePacked(
+            aliceKeyHash,
+            validUntil,
+            signature
+        );
+
+        // Use relayer to execute the transaction
+        vm.prank(relayer);
+        ISmartWallet(wallet).executeWithRelayer(batchedCall, validatorData);
     }
 }

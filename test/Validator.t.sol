@@ -1117,9 +1117,9 @@ contract ValidatorTest is Base {
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, signature);
     }
 
-    function test_GetVerifiedValidator_NoFallback_Success() public {
-        // Test that there's no longer an EIP-7702 fallback
-        // When keyHash equals keccak256(abi.encodePacked(address(this))), it should return address(0)
+    function test_GetVerifiedValidator_EIP7702BuiltInOwner_Success() public {
+        // Test that EIP-7702 built-in owner works correctly
+        // When keyHash equals keccak256(abi.encodePacked(address(this))), it should return ECDSA validator
 
         // Create a new wallet to test cleanly
         (address newWallet, ) = makeAddrAndKey("newWallet");
@@ -1137,11 +1137,11 @@ contract ValidatorTest is Base {
         // This keyHash should NOT be a registered owner
         assertFalse(IOwnerManager(newWallet).hasOwner(selfKeyHash));
 
-        // getVerifiedValidator should return address(0) (no fallback)
+        // getVerifiedValidator should return ECDSA validator for EIP-7702 compatibility
         address validator = IOwnerManager(newWallet).getVerifiedValidator(
             selfKeyHash
         );
-        assertEq(validator, address(0));
+        assertEq(validator, Static.ECDSA_VALIDATOR_ADDRESS);
     }
 
     function test_UnifiedEncoding_Design_Success() public {
@@ -1166,11 +1166,11 @@ contract ValidatorTest is Base {
         // This keyHash should NOT be a registered owner
         assertFalse(IOwnerManager(freshWallet).hasOwner(selfKeyHash));
 
-        // Without fallback, should return address(0)
+        // With EIP-7702 built-in owner, should return ECDSA validator
         address validator = IOwnerManager(freshWallet).getVerifiedValidator(
             selfKeyHash
         );
-        assertEq(validator, address(0));
+        assertEq(validator, Static.ECDSA_VALIDATOR_ADDRESS);
 
         // Test that we can add this same keyHash as a regular owner
         // Use executeWithRelayer with alice's signature since alice is admin
@@ -1611,7 +1611,7 @@ contract ValidatorTest is Base {
         // The transaction should revert with InvalidSignature because the validator reverts
         // and _validateSignature returns false when external validator reverts
         vm.expectRevert(ISmartWallet.InvalidSignature.selector);
-        vm.prank(_alice);
+        vm.prank(relayer);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
@@ -1657,7 +1657,7 @@ contract ValidatorTest is Base {
 
         // The transaction should revert with InvalidSignature because validator returns false
         vm.expectRevert(ISmartWallet.InvalidSignature.selector);
-        vm.prank(_alice);
+        vm.prank(relayer);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData

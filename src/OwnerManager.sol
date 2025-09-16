@@ -148,6 +148,9 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
 
     /// @notice Get the active validator address for a given `keyHash`
     /// @dev Returns the configured validator address if present and not expired; otherwise returns address(0).
+    ///      For EIP-7702 compatibility, returns ECDSA validator for address(this) when no validator is configured.
+    ///      Note: The built-in address(this) owner can be overridden by _ownerValidators & _ownerSettings,
+    ///      allowing customization of expiry, hooks, and admin status for address(this).
     /// @param keyHash The public key hash to look up
     /// @return The validator address to use for validation (address(0) if none or expired)
     function getVerifiedValidator(
@@ -160,6 +163,11 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
             uint256 settings = _ownerSettings[keyHash];
             if (settings != 0 && isSettingsExpired(settings)) {
                 validator = address(0); // Expired validator
+            }
+        } else {
+            // EIP-7702 compatible: Built-in owner for address(this)
+            if (keyHash == keccak256(abi.encodePacked(address(this)))) {
+                validator = Static.ECDSA_VALIDATOR_ADDRESS;
             }
         }
 

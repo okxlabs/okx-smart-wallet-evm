@@ -95,7 +95,8 @@ contract ValidationTest is Base {
         );
         _executeRemoveValidator(_aliceWallet, bobKeyHash);
 
-        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
+        // Note: nonce is 1 because _executeRemoveValidator consumed nonce 0
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 1});
         bytes memory validatorData = _constructRelayerSignature(
             _aliceWallet,
             _bob, // Using _bob's address
@@ -104,7 +105,7 @@ contract ValidationTest is Base {
             uint48(0)
         );
 
-        vm.prank(_alice);
+        vm.prank(relayer);
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISmartWallet.InvalidKeyHash.selector,
@@ -112,7 +113,7 @@ contract ValidationTest is Base {
             )
         );
         ISmartWallet(_aliceWallet).executeWithRelayer(
-            BatchedCall({calls: calls, nonce: 0}),
+            batchedCall,
             validatorData
         );
 
@@ -340,7 +341,7 @@ contract ValidationTest is Base {
                 validUntil
             )
         );
-        vm.prank(_alice);
+        vm.prank(relayer);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
@@ -367,7 +368,7 @@ contract ValidationTest is Base {
         vm.warp(block.timestamp + 365 days);
 
         // Should still execute successfully since expiry = 0 means never expires
-        vm.prank(_alice);
+        vm.prank(relayer);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
@@ -811,7 +812,7 @@ contract ValidationTest is Base {
         );
 
         // Should succeed with chainless nonce for addOwner
-        vm.prank(_alice);
+        vm.prank(relayer);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData

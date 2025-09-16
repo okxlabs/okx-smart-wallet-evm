@@ -8,8 +8,16 @@ import {OwnerManager} from "src/OwnerManager.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
+import {INonceManager} from "src/interfaces/INonceManager.sol";
+import {Static} from "src/libraries/Static.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
+import {ERC712} from "src/ERC712.sol";
 
 contract ExecutionTest is Base {
+    using ECDSA for bytes32;
+    using BatchedCallLib for BatchedCall;
+
     MockERC20 mockToken;
     MockERC20 mockToken2;
 
@@ -1053,5 +1061,283 @@ contract ExecutionTest is Base {
 
         assertEq(_bob.balance, 0.25 ether, "Self-call should succeed");
         console.log("Self-call succeeded even with no registered owners");
+    }
+
+    // ============ EIP-7702 Relayer Bypass Tests (Built-in Owner) ============
+
+    function test_Execute_EIP7702RelayerBypass_UninitializedEOA() public {
+        console.log(
+            "Testing: Relayer can execute on uninitialized EIP-7702 EOA"
+        );
+
+        // Create a new EOA for this test
+        (address eoaWallet, uint256 eoaPrivateKey) = makeAddrAndKey(
+            "eoaRelayerTest"
+        );
+        vm.deal(eoaWallet, 10 ether);
+
+        // Step 1: Set wallet code to EOA (simulating EIP-7702)
+        _setCodeToEoa(address(_smartWallet), eoaWallet);
+        console.log("Set wallet code to EOA:", eoaWallet);
+
+        // Step 2: Verify EOA is not initialized (no owners)
+        uint256 ownerCount = IOwnerManager(eoaWallet).ownerCount();
+        assertEq(ownerCount, 0, "Should have no owners initially");
+
+        // Step 3: Prepare a transaction to send ETH to Bob via relayer
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _bob, value: 0.5 ether, data: ""});
+
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: INonceManager(eoaWallet).getNonce(0)
+        });
+
+        // Step 4: Create signature from EOA (the EOA itself)
+        bytes32 eoaKeyHash = keccak256(abi.encodePacked(eoaWallet));
+        uint48 validUntil = 0; // No expiry
+
+        // Hash the batched call
+        bytes32 intentHash = batchedCall.hash(
+            validUntil,
+            _smartWallet.IMPLEMENTATION()
+        );
+        bytes32 typedDataHash = ERC712(eoaWallet).hashTypedData(intentHash);
+
+        // Sign with EOA's private key
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, typedDataHash);
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        // Combine keyHash + validUntil + signature
+        bytes memory validatorData = abi.encodePacked(
+            eoaKeyHash,
+            validUntil,
+            signature
+        );
+
+        // Step 5: Execute via relayer (should succeed without initialization)
+        uint256 bobBalanceBefore = _bob.balance;
+
+        vm.prank(relayer);
+        ISmartWallet(eoaWallet).executeWithRelayer(batchedCall, validatorData);
+
+        // Step 6: Verify execution succeeded
+        uint256 bobBalanceAfter = _bob.balance;
+        assertEq(
+            bobBalanceAfter - bobBalanceBefore,
+            0.5 ether,
+            "Bob should receive 0.5 ETH"
+        );
+        console.log(
+            "Successfully executed transaction without initialization!"
+        );
+    }
+
+    function test_RevertWhen_Execute_EIP7702RelayerBypass_InvalidSignature()
+        public
+    {
+        console.log(
+            "Testing: Invalid signature fails for uninitialized EIP-7702 EOA"
+        );
+
+        // Create a new EOA for this test
+        (address eoaWallet, ) = makeAddrAndKey("eoaInvalidSig");
+        vm.deal(eoaWallet, 10 ether);
+
+        // Step 1: Set wallet code to EOA
+        _setCodeToEoa(address(_smartWallet), eoaWallet);
+
+        // Step 2: Prepare transaction
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _bob, value: 0.5 ether, data: ""});
+
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: INonceManager(eoaWallet).getNonce(0)
+        });
+
+        // Step 3: Create INVALID signature (using wrong private key)
+        bytes32 eoaKeyHash = keccak256(abi.encodePacked(eoaWallet));
+        uint48 validUntil = 0;
+
+        bytes32 intentHash = batchedCall.hash(
+            validUntil,
+            _smartWallet.IMPLEMENTATION()
+        );
+        bytes32 typedDataHash = ERC712(eoaWallet).hashTypedData(intentHash);
+
+        // Sign with WRONG private key
+        (, uint256 wrongPrivateKey) = makeAddrAndKey("wrong");
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            wrongPrivateKey,
+            typedDataHash
+        );
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        bytes memory validatorData = abi.encodePacked(
+            eoaKeyHash,
+            validUntil,
+            signature
+        );
+
+        // Step 4: Should revert with invalid signature
+        vm.prank(relayer);
+        vm.expectRevert(ISmartWallet.InvalidSignature.selector);
+        ISmartWallet(eoaWallet).executeWithRelayer(batchedCall, validatorData);
+
+        console.log("Correctly rejected invalid signature");
+    }
+
+    function test_Execute_EIP7702RelayerBypass_ConfiguredValidatorPrecedence()
+        public
+    {
+        console.log(
+            "Testing: Configured validator takes precedence over built-in"
+        );
+
+        // Create a new EOA for this test
+        (address eoaWallet, ) = makeAddrAndKey("eoaPrecedence");
+        vm.deal(eoaWallet, 10 ether);
+
+        // Step 1: Set wallet code to EOA
+        _setCodeToEoa(address(_smartWallet), eoaWallet);
+
+        // Step 2: Initialize with EOA as owner (explicitly configured)
+        bytes32 eoaKeyHash = keccak256(abi.encodePacked(eoaWallet));
+        InitialOwner[] memory owners = new InitialOwner[](1);
+        owners[0] = InitialOwner({
+            keyHash: eoaKeyHash,
+            validator: Static.ECDSA_VALIDATOR_ADDRESS
+        });
+
+        vm.prank(eoaWallet);
+        ISmartWallet(eoaWallet).initialize(owners);
+
+        // Step 3: Verify configured validator is returned
+        address validator = IOwnerManager(eoaWallet).getVerifiedValidator(
+            eoaKeyHash
+        );
+        assertEq(
+            validator,
+            Static.ECDSA_VALIDATOR_ADDRESS,
+            "Should return configured validator"
+        );
+
+        // Step 4: Remove the owner
+        vm.prank(eoaWallet);
+        IOwnerManager(eoaWallet).removeOwner(eoaKeyHash);
+
+        // Step 5: Now getVerifiedValidator should return built-in for address(this)
+        validator = IOwnerManager(eoaWallet).getVerifiedValidator(eoaKeyHash);
+        assertEq(
+            validator,
+            Static.ECDSA_VALIDATOR_ADDRESS,
+            "Should return built-in validator after removal"
+        );
+
+        console.log("Verified precedence: configured > built-in");
+    }
+
+    function test_Execute_EIP7702RelayerBypass_OnlyAddressThisBuiltin() public {
+        console.log("Testing: Different keyHash returns zero (no built-in)");
+
+        // Create a new EOA for this test
+        (address eoaWallet, ) = makeAddrAndKey("eoaOnlyThis");
+        vm.deal(eoaWallet, 10 ether);
+
+        // Step 1: Set wallet code to EOA
+        _setCodeToEoa(address(_smartWallet), eoaWallet);
+
+        // Step 2: Check validator for a different keyHash (not address(this))
+        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        address validator = IOwnerManager(eoaWallet).getVerifiedValidator(
+            bobKeyHash
+        );
+
+        assertEq(
+            validator,
+            address(0),
+            "Should return zero for non-address(this) keyHash"
+        );
+
+        // Step 3: Verify address(this) returns ECDSA validator
+        bytes32 eoaKeyHash = keccak256(abi.encodePacked(eoaWallet));
+        validator = IOwnerManager(eoaWallet).getVerifiedValidator(eoaKeyHash);
+        assertEq(
+            validator,
+            Static.ECDSA_VALIDATOR_ADDRESS,
+            "Should return ECDSA for address(this)"
+        );
+
+        console.log("Verified: only address(this) gets built-in validator");
+    }
+
+    function test_Execute_EIP7702RelayerBypass_ChainlessExecution() public {
+        console.log(
+            "Testing: Chainless execution with uninitialized EIP-7702 EOA"
+        );
+
+        // Create a new EOA for this test
+        (address eoaWallet, uint256 eoaPrivateKey) = makeAddrAndKey(
+            "eoaChainless"
+        );
+        vm.deal(eoaWallet, 10 ether);
+
+        // Step 1: Set wallet code to EOA
+        _setCodeToEoa(address(_smartWallet), eoaWallet);
+
+        // Step 2: Prepare chainless addOwner call
+        bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(_bob));
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: eoaWallet, // Self-call required for chainless
+            value: 0,
+            data: abi.encodeWithSelector(
+                IOwnerManager.addOwner.selector,
+                newOwnerKeyHash,
+                Static.ECDSA_VALIDATOR_ADDRESS,
+                0 // No special settings
+            )
+        });
+
+        // Use chainless nonce - starting from 0 for uninitialized wallet
+        uint256 chainlessNonce = (uint256(Static.CHAINLESS_NONCE_KEY) << 64) |
+            uint256(0);
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: chainlessNonce
+        });
+
+        // Step 3: Create signature for chainless execution
+        bytes32 eoaKeyHash = keccak256(abi.encodePacked(eoaWallet));
+        uint48 validUntil = 0;
+
+        bytes32 intentHash = batchedCall.hash(
+            validUntil,
+            _smartWallet.IMPLEMENTATION()
+        );
+        bytes32 typedDataHash = ERC712(eoaWallet).hashTypedDataSansChainId(
+            intentHash
+        );
+
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, typedDataHash);
+        bytes memory signature = abi.encodePacked(r, s, v);
+        bytes memory validatorData = abi.encodePacked(
+            eoaKeyHash,
+            validUntil,
+            signature
+        );
+
+        // Step 4: Execute chainless via relayer (should succeed)
+        vm.prank(relayer);
+        ISmartWallet(eoaWallet).executeWithRelayer(batchedCall, validatorData);
+
+        // Step 5: Verify owner was added
+        bool hasOwner = IOwnerManager(eoaWallet).hasOwner(newOwnerKeyHash);
+        assertTrue(hasOwner, "Bob should be added as owner");
+
+        console.log(
+            "Successfully executed chainless operation without initialization!"
+        );
     }
 }

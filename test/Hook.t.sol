@@ -180,7 +180,7 @@ contract HookTest is Base {
             uint48(0)
         );
 
-        vm.prank(_alice);
+        vm.prank(relayer);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
@@ -427,7 +427,7 @@ contract HookTest is Base {
             uint48(0)
         );
 
-        vm.prank(_alice);
+        vm.prank(relayer);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
@@ -466,7 +466,7 @@ contract HookTest is Base {
             uint48(0)
         );
 
-        vm.prank(_alice);
+        vm.prank(relayer);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
@@ -551,7 +551,7 @@ contract HookTest is Base {
             uint48(0)
         );
 
-        vm.prank(_alice);
+        vm.prank(relayer);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
@@ -737,7 +737,7 @@ contract HookTest is Base {
             uint48(0)
         );
 
-        vm.prank(_alice);
+        vm.prank(relayer);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
@@ -801,7 +801,7 @@ contract HookTest is Base {
             uint48(0)
         );
 
-        vm.prank(_alice);
+        vm.prank(relayer);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
@@ -935,7 +935,7 @@ contract HookTest is Base {
             uint48(0)
         );
 
-        vm.prank(_alice);
+        vm.prank(relayer);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
@@ -1071,7 +1071,7 @@ contract HookTest is Base {
             uint48(0)
         );
 
-        vm.prank(_alice);
+        vm.prank(relayer);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
@@ -1099,7 +1099,7 @@ contract HookTest is Base {
             uint48(0)
         );
 
-        vm.prank(_alice);
+        vm.prank(relayer);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
@@ -1174,7 +1174,7 @@ contract HookTest is Base {
             uint48(0)
         );
 
-        vm.prank(_alice);
+        vm.prank(relayer);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall1,
             validatorData1
@@ -1206,7 +1206,7 @@ contract HookTest is Base {
             uint48(0)
         );
 
-        vm.prank(_alice);
+        vm.prank(relayer);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall2,
             validatorData2
@@ -1251,7 +1251,7 @@ contract HookTest is Base {
             uint48(0)
         );
 
-        vm.prank(_alice);
+        vm.prank(relayer);
         ISmartWallet(_aliceWallet).executeWithRelayer(
             setupBatchedCall,
             setupValidatorData

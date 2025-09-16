@@ -146,6 +146,7 @@ abstract contract SmartWallet is
         address hookAddress = getHook(settings);
 
         // Allow self-calls for EIP-7702 EOAs or admins
+        // Built-in address(this) owner is treated as admin by default
         bool allowSelfCall = keyHash ==
             keccak256(abi.encodePacked(address(this))) ||
             isAdmin(settings);
