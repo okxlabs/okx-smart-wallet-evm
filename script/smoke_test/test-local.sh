@@ -195,17 +195,17 @@ else
     exit $TEST0_RESULT
 fi
 
-# Test 1: Set Code and Initialize (Using yarn command from package.json)
-echo -e "${YELLOW}📝 Test 1: EIP-7702 Set Code and Initialize${NC}"
-yarn 1-setCodeAndInitialize $RPC_URL --broadcast --evm-version prague --skip-simulation
+# Test 1: Set Code and Add Owner (Using yarn command from package.json)
+echo -e "${YELLOW}📝 Test 1: EIP-7702 Set Code and Add Owner${NC}"
+yarn 1-setCodeAndAddOwner $RPC_URL --broadcast --evm-version prague --skip-simulation
 TEST1_RESULT=$?
 
 if [ $TEST1_RESULT -eq 0 ]; then
-    echo -e "${GREEN}✅ Test 1: EIP-7702 initialization completed successfully!${NC}"
+    echo -e "${GREEN}✅ Test 1: EIP-7702 code delegation and owner addition completed successfully!${NC}"
     # USER_WALLET is already set from Test 0 (the created account), keep it as is
     echo -e "${YELLOW}📝 USER_WALLET (from Test 0): $USER_WALLET${NC}"
 else
-    echo -e "${RED}❌ Test 1: EIP-7702 initialization failed with exit code $TEST1_RESULT${NC}"
+    echo -e "${RED}❌ Test 1: EIP-7702 code delegation and owner addition failed with exit code $TEST1_RESULT${NC}"
     exit $TEST1_RESULT
 fi
 

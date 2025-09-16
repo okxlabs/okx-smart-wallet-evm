@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {console} from "forge-std/console.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
-import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
+import {Call, BatchedCall} from "src/Types.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {Static} from "src/libraries/Static.sol";
@@ -873,85 +873,17 @@ contract ExecutionTest is Base {
 
     // ============ EIP-7702 Execution Tests ============
 
-    function test_Execute_EIP7702AfterSetCodeWithSelfAsOwner() public {
-        console.log(
-            "Testing EIP-7702: EOA with wallet code can execute as self-owner"
-        );
+    function test_Execute_AddOwnerViaRelayer() public {
+        console.log("Testing: Add owner via executeWithRelayer");
 
-        // Create a new EOA that will become a smart wallet
-        (address eoaWallet, ) = makeAddrAndKey("eoaWallet");
-        vm.deal(eoaWallet, 10 ether);
+        // Use alice's wallet which is already deployed and initialized
+        // Alice is an admin owner of this wallet
 
-        // Step 1: Set wallet code to EOA (simulating EIP-7702 delegation)
-        _setCodeToEoa(address(_smartWallet), eoaWallet);
-        console.log("Set wallet code to EOA address:", eoaWallet);
-
-        // Step 2: Initialize the wallet with the EOA itself as owner
-        // This simulates the EIP-7702 scenario where EOA = wallet
-        bytes32 eoaKeyHash = keccak256(abi.encodePacked(eoaWallet));
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: eoaKeyHash,
-            validator: address(_ecdsaValidator)
-        });
-
-        vm.prank(eoaWallet);
-        ISmartWallet(eoaWallet).initialize(initialOwners);
-        console.log("Initialized wallet with EOA as owner");
-
-        // Step 3: Test that EOA can execute calls directly
-        // In EIP-7702, the EOA address == wallet address
-        // So when calling from eoaWallet, msg.sender == address(this)
-        Call[] memory calls = new Call[](1);
-        calls[0] = Call({target: _bob, value: 1 ether, data: ""});
-
-        uint256 bobBalanceBefore = _bob.balance;
-
-        // The EOA (now a wallet) executes the call
-        vm.prank(eoaWallet);
-        ISmartWallet(eoaWallet).execute(calls);
-
-        // Verify the transfer succeeded
-        assertEq(
-            _bob.balance - bobBalanceBefore,
-            1 ether,
-            "Transfer should succeed"
-        );
-        console.log("Successfully executed transfer from EIP-7702 wallet");
-    }
-
-    function test_Execute_EIP7702AddOwnerAsSelf() public {
-        console.log("Testing EIP-7702: EOA with wallet code can add owners");
-
-        // Create a new EOA that will become a smart wallet
-        (address eoaWallet, ) = makeAddrAndKey("eoaWallet");
-        vm.deal(eoaWallet, 10 ether);
-
-        // Step 1: Set wallet code to EOA
-        _setCodeToEoa(address(_smartWallet), eoaWallet);
-
-        // Step 2: Initialize with EOA as owner (admin)
-        bytes32 eoaKeyHash = keccak256(abi.encodePacked(eoaWallet));
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: eoaKeyHash,
-            validator: address(_ecdsaValidator)
-        });
-
-        vm.prank(eoaWallet);
-        ISmartWallet(eoaWallet).initialize(initialOwners);
-
-        // Verify EOA is admin
-        (, , , bool isAdmin, ) = IOwnerManager(eoaWallet).getOwnerSettings(
-            eoaKeyHash
-        );
-        assertTrue(isAdmin, "EOA should be admin");
-
-        // Step 3: EOA adds a new owner through execute
+        // Add charlie as a new owner through executeWithRelayer
         bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(_charlie));
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
-            target: eoaWallet, // Self-call to add owner
+            target: _aliceWallet, // Self-call to add owner
             value: 0,
             data: abi.encodeWithSelector(
                 IOwnerManager.addOwner.selector,
@@ -961,106 +893,37 @@ contract ExecutionTest is Base {
             )
         });
 
-        // Execute the addOwner call
-        vm.prank(eoaWallet);
-        ISmartWallet(eoaWallet).execute(calls);
+        // Create BatchedCall with the addOwner call
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: _getNonce(_aliceWallet)
+        });
+
+        // Create signature from alice (who is an admin)
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
+        );
+
+        // Execute via relayer (anyone can be the relayer)
+        vm.prank(_bob); // Bob acts as relayer
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
 
         // Verify the new owner was added
-        (address validator, , , , ) = IOwnerManager(eoaWallet).getOwnerSettings(
-            newOwnerKeyHash
-        );
+        (address validator, , , , ) = IOwnerManager(_aliceWallet)
+            .getOwnerSettings(newOwnerKeyHash);
         assertEq(
             validator,
             address(_ecdsaValidator),
             "New owner should be added"
         );
-        console.log("Successfully added new owner from EIP-7702 wallet");
-    }
-
-    function test_Execute_EIP7702WithDifferentOwner() public {
-        console.log(
-            "Testing EIP-7702: Different owner can execute on EIP-7702 wallet"
-        );
-
-        // Create a new EOA that will become a smart wallet
-        (address eoaWallet, ) = makeAddrAndKey("eoaWallet");
-        vm.deal(eoaWallet, 10 ether);
-
-        // Step 1: Set wallet code to EOA
-        _setCodeToEoa(address(_smartWallet), eoaWallet);
-
-        // Step 2: Initialize with Alice as owner (not the EOA itself)
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: aliceKeyHash,
-            validator: address(_ecdsaValidator)
-        });
-
-        vm.prank(eoaWallet);
-        ISmartWallet(eoaWallet).initialize(initialOwners);
-        console.log("Initialized EIP-7702 wallet with Alice as owner");
-
-        // Step 3: Alice can execute on the EIP-7702 wallet
-        Call[] memory calls = new Call[](1);
-        calls[0] = Call({target: _bob, value: 0.5 ether, data: ""});
-
-        uint256 bobBalanceBefore = _bob.balance;
-
-        // Alice executes on the EIP-7702 wallet
-        vm.prank(_alice);
-        ISmartWallet(eoaWallet).execute(calls);
-
-        assertEq(
-            _bob.balance - bobBalanceBefore,
-            0.5 ether,
-            "Transfer should succeed"
-        );
-        console.log("Alice successfully executed on EIP-7702 wallet");
-
-        // Step 4: EOA itself CAN STILL execute due to self-call bypass
-        // Even though EOA is not an owner, msg.sender == address(this) allows execution
-        vm.prank(eoaWallet);
-        ISmartWallet(eoaWallet).execute(calls);
-
-        assertEq(
-            _bob.balance - bobBalanceBefore,
-            1 ether,
-            "EOA self-call should succeed"
-        );
-        console.log(
-            "EOA can still execute due to self-call bypass (msg.sender == address(this))"
-        );
-    }
-
-    function test_Execute_EIP7702OnlyOwnerSelfCallBypass() public {
-        console.log("Testing EIP-7702: onlyOwner modifier allows self-calls");
-
-        // Create a new EOA that will become a smart wallet
-        (address eoaWallet, ) = makeAddrAndKey("eoaWallet");
-        vm.deal(eoaWallet, 10 ether);
-
-        // Step 1: Set wallet code to EOA
-        _setCodeToEoa(address(_smartWallet), eoaWallet);
-
-        // Step 2: Initialize with empty owners (no owners at all)
-        InitialOwner[] memory emptyOwners = new InitialOwner[](0);
-        vm.prank(eoaWallet);
-        ISmartWallet(eoaWallet).initialize(emptyOwners);
-        console.log("Initialized with no owners");
-
-        // Step 3: Even with no owners, wallet can call itself
-        // This is because onlyOwner allows msg.sender == address(this)
-        Call[] memory calls = new Call[](1);
-        calls[0] = Call({target: _bob, value: 0.25 ether, data: ""});
-
-        // Make the call from the wallet to itself
-        // This simulates internal execution where msg.sender == address(this)
-        vm.prank(eoaWallet);
-        ISmartWallet(eoaWallet).execute(calls);
-
-        assertEq(_bob.balance, 0.25 ether, "Self-call should succeed");
-        console.log("Self-call succeeded even with no registered owners");
+        console.log("Successfully added new owner via executeWithRelayer");
     }
 
     // ============ EIP-7702 Relayer Bypass Tests (Built-in Owner) ============
@@ -1186,56 +1049,6 @@ contract ExecutionTest is Base {
         ISmartWallet(eoaWallet).executeWithRelayer(batchedCall, validatorData);
 
         console.log("Correctly rejected invalid signature");
-    }
-
-    function test_Execute_EIP7702RelayerBypass_ConfiguredValidatorPrecedence()
-        public
-    {
-        console.log(
-            "Testing: Configured validator takes precedence over built-in"
-        );
-
-        // Create a new EOA for this test
-        (address eoaWallet, ) = makeAddrAndKey("eoaPrecedence");
-        vm.deal(eoaWallet, 10 ether);
-
-        // Step 1: Set wallet code to EOA
-        _setCodeToEoa(address(_smartWallet), eoaWallet);
-
-        // Step 2: Initialize with EOA as owner (explicitly configured)
-        bytes32 eoaKeyHash = keccak256(abi.encodePacked(eoaWallet));
-        InitialOwner[] memory owners = new InitialOwner[](1);
-        owners[0] = InitialOwner({
-            keyHash: eoaKeyHash,
-            validator: Static.ECDSA_VALIDATOR_ADDRESS
-        });
-
-        vm.prank(eoaWallet);
-        ISmartWallet(eoaWallet).initialize(owners);
-
-        // Step 3: Verify configured validator is returned
-        address validator = IOwnerManager(eoaWallet).getVerifiedValidator(
-            eoaKeyHash
-        );
-        assertEq(
-            validator,
-            Static.ECDSA_VALIDATOR_ADDRESS,
-            "Should return configured validator"
-        );
-
-        // Step 4: Remove the owner
-        vm.prank(eoaWallet);
-        IOwnerManager(eoaWallet).removeOwner(eoaKeyHash);
-
-        // Step 5: Now getVerifiedValidator should return built-in for address(this)
-        validator = IOwnerManager(eoaWallet).getVerifiedValidator(eoaKeyHash);
-        assertEq(
-            validator,
-            Static.ECDSA_VALIDATOR_ADDRESS,
-            "Should return built-in validator after removal"
-        );
-
-        console.log("Verified precedence: configured > built-in");
     }
 
     function test_Execute_EIP7702RelayerBypass_OnlyAddressThisBuiltin() public {

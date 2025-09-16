@@ -9,7 +9,6 @@ import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {HelperLib} from "script/utils/Helper.s.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
-import {InitialOwner} from "src/Types.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
 
 contract IsValidSignatureTest is Base {
@@ -1071,45 +1070,47 @@ contract IsValidSignatureTest is Base {
         return abi.encodePacked(r, s, v);
     }
 
-    /// @notice Test EIP-7702 scenario where wallet signs for itself
-    function test_IsValidSignature_WalletSelfSigning_ReturnsMagicValue()
+    /// @notice Test that alice can sign for her wallet using custom validator
+    function test_IsValidSignature_WalletOwnerWithCustomValidator_ReturnsMagicValue()
         public
+        view
     {
-        // Create a new EOA that will become a smart wallet
-        uint256 eoaPrivateKey = 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef;
-        address eoaAddress = vm.addr(eoaPrivateKey);
+        // Use the already deployed alice wallet from Base.t.sol
+        // _aliceWallet is already deployed and initialized with _alice as owner using _ecdsaValidator
 
-        // Deploy a new wallet at the EOA address using vm.etch
-        // This simulates EIP-7702 delegation where an EOA delegates to wallet code
-        bytes memory walletCode = address(_smartWallet).code;
-        vm.etch(eoaAddress, walletCode);
+        bytes32 hash = keccak256("test_wallet_owner_signing");
 
-        // Initialize the wallet with the EOA as owner
-        bytes32 eoaKeyHash = keccak256(abi.encodePacked(eoaAddress));
-        InitialOwner[] memory initialOwners = new InitialOwner[](1);
-        initialOwners[0] = InitialOwner({
-            keyHash: eoaKeyHash,
-            validator: address(1) // Built-in ECDSA validator
-        });
+        // Get alice's keyHash
+        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
 
-        // Self-initialization: EOA initializes itself (EIP-7702 scenario)
-        vm.prank(eoaAddress);
-        ISmartWallet(eoaAddress).initialize(initialOwners);
-
-        // Now test that the wallet can validate its own signature
-        bytes32 hash = keccak256("test_wallet_self_signing");
-
-        // Get the typed data hash that the wallet would use
-        bytes32 typedDataHash = SmartWallet(payable(eoaAddress)).hashTypedData(
-            hash
+        // Create signature with custom validator format (keyHash + validUntil + validator signature)
+        // The signature needs to sign the MessageSignLib hash format
+        uint48 validUntil = 0; // no expiry
+        bytes32 messageTypehash = keccak256(
+            "SmartWalletMessage(bytes32 hash,uint48 validUntil,address walletImpl)"
+        );
+        bytes32 messageHash = keccak256(
+            abi.encode(messageTypehash, hash, validUntil, address(_smartWallet))
         );
 
-        // Sign with the EOA's private key
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(eoaPrivateKey, typedDataHash);
-        bytes memory signature = abi.encodePacked(r, s, v);
+        // The wallet will call hashTypedData on messageHash, which uses Solady's EIP-712
+        // We need to compute the same hash that the wallet will compute
+        bytes32 typedDataHash = SmartWallet(_aliceWallet).hashTypedData(
+            messageHash
+        );
 
-        // The wallet should recognize its own signature (recovered == address(this))
-        bytes4 result = ISmartWallet(eoaAddress).isValidSignature(
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, typedDataHash);
+
+        // Encode signature in the format expected by custom validators
+        bytes memory validatorSig = abi.encodePacked(r, s, v);
+        bytes memory signature = abi.encodePacked(
+            aliceKeyHash,
+            validUntil,
+            validatorSig
+        );
+
+        // The wallet should recognize alice's signature through the custom validator
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
             hash,
             signature
         );
@@ -1117,7 +1118,7 @@ contract IsValidSignatureTest is Base {
         assertEq(
             result,
             Static.MAGIC_VALUE,
-            "65-byte signature from wallet itself (EIP-7702) should succeed"
+            "Wallet owner signature with custom validator should succeed"
         );
     }
 

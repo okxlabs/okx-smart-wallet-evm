@@ -16,26 +16,14 @@ abstract contract BaseAuthorization {
         _;
     }
 
-    /// @notice Restricts initialization to authorized callers only
-    /// @dev Allows initialization by:
-    /// @dev 1. Self (EIP-7702 scenario where EOA delegates to this code)
-    /// @dev 2. Factory address stored in immutable args (traditional deployment)
-    modifier onlyFactoryOrSelf() {
-        // Path 1: Self-initialization (EIP-7702)
-        if (msg.sender == address(this)) {
-            _;
-            return;
+    /// @notice Restricts initialization to factory only
+    /// @dev Only allows initialization by the factory address stored in immutable args
+    /// @dev For EIP-7702 scenarios, owners should be added via execute/executeWithRelayer
+    modifier onlyFactory() {
+        if (msg.sender != getImmutableFactory()) {
+            revert ISmartWallet.UnauthorizedInitialization();
         }
-
-        // Path 2: Factory initialization (traditional deployment)
-        address immutableFactory = getImmutableFactory();
-        if (immutableFactory != address(0) && msg.sender == immutableFactory) {
-            _;
-            return;
-        }
-
-        // If neither condition is met, initialization is unauthorized
-        revert ISmartWallet.UnauthorizedInitialization();
+        _;
     }
 
     /// @notice Reads the factory address from immutable args if present

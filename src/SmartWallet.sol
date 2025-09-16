@@ -73,11 +73,12 @@ abstract contract SmartWallet is
     }
 
     /// @notice Initializes the wallet core with initial owners
-    /// @dev Storage is now integrated directly into SmartWallet
+    /// @dev Can only be called by factory during deployment. For EIP-7702 scenarios,
+    ///      use execute/executeWithRelayer to add owners after delegation
     /// @param initialOwners Array of tuples containing keyHash and validator address pairs
     function initialize(
         InitialOwner[] calldata initialOwners
-    ) external initializer onlyFactoryOrSelf {
+    ) external initializer onlyFactory {
         // Set up initial owners
         // isAdmin = true, expiration = 0 (never expires), hook = address(0)
         uint256 settings = packSettings(true, 0, address(0));

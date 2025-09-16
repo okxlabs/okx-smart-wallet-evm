@@ -54,28 +54,26 @@ contract InitializationAuthTest is Base {
         ISmartWallet(wallet).initialize(initialOwners);
     }
 
-    function test_Initialize_SelfCanInitialize_EIP7702_Success() public {
+    function test_RevertWhen_Initialize_EIP7702_SelfInitialization() public {
         // Simulate EIP-7702 scenario
         _setCodeToEoa(address(_smartWallet), _bob);
 
-        // Bob (as the EOA with wallet code) can initialize himself
+        // Bob (as the EOA with wallet code) cannot initialize himself anymore
         InitialOwner[] memory initialOwners = _createSingleOwner(
             keccak256(abi.encodePacked(_bob)),
             address(_ecdsaValidator)
         );
 
-        vm.prank(_bob); // Self-initialization
+        // Self-initialization should fail (only factory can initialize)
+        // Note: When using _setCodeToEoa, no immutable args are set, so getImmutableFactory() returns address(0)
+        // The authorization check fails, which is the important behavior
+        vm.prank(_bob);
+        vm.expectRevert(); // Expect any revert - the important thing is that it reverts
         ISmartWallet(_bob).initialize(initialOwners);
-
-        // Verify owner was set
-        (address validator2, , , , ) = IOwnerManager(_bob).getOwnerSettings(
-            keccak256(abi.encodePacked(_bob))
-        );
-        assertEq(validator2, address(_ecdsaValidator));
     }
 
-    function test_RevertWhen_Initialize_NotSelfInEIP7702() public {
-        // Deploy a proxy without factory (simulating direct EIP-7702)
+    function test_RevertWhen_Initialize_NoFactory() public {
+        // Deploy a proxy without factory (simulating direct deployment)
         // This will have no immutable args
         address wallet = LibClone.deployERC1967(0, address(_smartWallet));
 
@@ -84,20 +82,15 @@ contract InitializationAuthTest is Base {
             address(_ecdsaValidator)
         );
 
-        // Alice tries to initialize wallet (should fail - not self, no factory)
+        // Alice tries to initialize wallet (should fail - no factory)
         vm.prank(_alice);
         vm.expectRevert(ISmartWallet.UnauthorizedInitialization.selector);
         ISmartWallet(wallet).initialize(initialOwners);
 
-        // But wallet itself can initialize
+        // Even wallet itself cannot initialize (no factory address)
         vm.prank(wallet);
+        vm.expectRevert(ISmartWallet.UnauthorizedInitialization.selector);
         ISmartWallet(wallet).initialize(initialOwners);
-
-        // Verify initialization succeeded
-        (address validator3, , , , ) = IOwnerManager(wallet).getOwnerSettings(
-            keccak256(abi.encodePacked(_alice))
-        );
-        assertEq(validator3, address(_ecdsaValidator));
     }
 
     function test_Initialize_FactoryAddressFromImmutableArgs() public {

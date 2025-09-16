@@ -16,7 +16,7 @@
     "deploy-factory": "forge script script/deploy/DeploySingletonFactory.s.sol:DeploySingletonFactory --rpc-url",
     "smoke-test": "bash script/smoke_test/test-local.sh",
     "0-createAccount": "forge script script/smoke_test/0-createAccount.s.sol --rpc-url",
-    "1-setCodeAndInitialize": "forge script script/smoke_test/1-setCodeAndInitialize.s.sol --rpc-url",
+    "1-setCodeAndAddOwner": "forge script script/smoke_test/1-setCodeAndAddOwner.s.sol --rpc-url",
     "2-sendTxs": "forge script script/smoke_test/2-sendTxs.s.sol --rpc-url",
     "3-sendTxsAsRelayer": "forge script script/smoke_test/3-sendTxsAsRelayer.s.sol --rpc-url",
     "4-sendTxsWithPasskey": "forge script script/smoke_test/4-sendTxsWithPasskey.s.sol --rpc-url",

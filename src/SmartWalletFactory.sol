@@ -22,14 +22,11 @@ contract SmartWalletFactory is ISmartWalletFactory {
         InitialOwner[] calldata initialOwners,
         uint256 salt
     ) public payable returns (address account) {
-        // Encode factory address as immutable args
-        bytes memory factoryAddress = abi.encode(address(this));
-
         (bool alreadyDeployed, address instance) = LibClone
             .createDeterministicERC1967(
                 msg.value,
                 IMPLEMENTATION,
-                factoryAddress,
+                abi.encode(address(this)),
                 _getSalt(initialOwners, salt)
             );
 
@@ -63,12 +60,10 @@ contract SmartWalletFactory is ISmartWalletFactory {
         InitialOwner[] calldata initialOwners,
         uint256 salt
     ) external view returns (address) {
-        // Include immutable args in address prediction
-        bytes memory factoryAddress = abi.encode(address(this));
         return
             LibClone.predictDeterministicAddressERC1967(
                 IMPLEMENTATION,
-                factoryAddress,
+                abi.encode(address(this)),
                 _getSalt(initialOwners, salt),
                 address(this)
             );

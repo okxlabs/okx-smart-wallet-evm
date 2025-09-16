@@ -600,11 +600,6 @@ contract ValidatorTest is Base {
     function test_Initialize_SetsAdminPrivilegesForInitialOwners_Success()
         public
     {
-        // Create a new wallet for this test
-        (address newWallet, ) = makeAddrAndKey("newWallet");
-        vm.deal(newWallet, 10 ether);
-        _setCodeToEoa(address(_smartWallet), newWallet);
-
         // Prepare initial owners with different keys
         bytes32[] memory keyHashes = new bytes32[](2);
         address[] memory validators = new address[](2);
@@ -619,13 +614,13 @@ contract ValidatorTest is Base {
         keyHashes[1] = bobKeyHash;
         validators[1] = Static.ECDSA_VALIDATOR_ADDRESS;
 
-        // Initialize the wallet with initial owners
+        // Deploy the wallet through factory with initial owners
         InitialOwner[] memory initialOwners = _createOwners(
             keyHashes,
             validators
         );
-        vm.prank(newWallet);
-        ISmartWallet(newWallet).initialize(initialOwners);
+        address newWallet = _factory.createAccount(initialOwners, 1); // Use salt 1 to avoid collision
+        vm.deal(newWallet, 10 ether);
 
         // Verify both initial owners have admin privileges
         assertTrue(_isSignerAdmin(newWallet, charlieKeyHash));
@@ -663,16 +658,10 @@ contract ValidatorTest is Base {
     }
 
     function test_Initialize_WithEmptyInitialOwners_Success() public {
-        // Create a new wallet for this test
-        (address newWallet, ) = makeAddrAndKey("emptyWallet");
-        vm.deal(newWallet, 10 ether);
-        _setCodeToEoa(address(_smartWallet), newWallet);
-
-        // Initialize with empty array
+        // Deploy wallet through factory with empty array
         InitialOwner[] memory initialOwners = new InitialOwner[](0);
-
-        vm.prank(newWallet);
-        ISmartWallet(newWallet).initialize(initialOwners);
+        address newWallet = _factory.createAccount(initialOwners, 2); // Use salt 2 to avoid collision
+        vm.deal(newWallet, 10 ether);
 
         // Should succeed without errors
         // No signers should be set
@@ -1117,48 +1106,11 @@ contract ValidatorTest is Base {
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, signature);
     }
 
-    function test_GetVerifiedValidator_EIP7702BuiltInOwner_Success() public {
-        // Test that EIP-7702 built-in owner works correctly
-        // When keyHash equals keccak256(abi.encodePacked(address(this))), it should return ECDSA validator
-
-        // Create a new wallet to test cleanly
-        (address newWallet, ) = makeAddrAndKey("newWallet");
-        vm.deal(newWallet, 10 ether);
-        _setCodeToEoa(address(_smartWallet), newWallet);
-
-        // Initialize with empty owners
-        vm.prank(newWallet);
-        InitialOwner[] memory initialOwners = new InitialOwner[](0);
-        ISmartWallet(newWallet).initialize(initialOwners);
-
-        // Generate keyHash for wallet's own address using unified abi.encodePacked
-        bytes32 selfKeyHash = keccak256(abi.encodePacked(newWallet));
-
-        // This keyHash should NOT be a registered owner
-        assertFalse(IOwnerManager(newWallet).hasOwner(selfKeyHash));
-
-        // getVerifiedValidator should return ECDSA validator for EIP-7702 compatibility
-        address validator = IOwnerManager(newWallet).getVerifiedValidator(
-            selfKeyHash
-        );
-        assertEq(validator, Static.ECDSA_VALIDATOR_ADDRESS);
-    }
-
     function test_UnifiedEncoding_Design_Success() public {
         // This test validates the unified abi.encodePacked design for all keyHash generation
 
-        // Create a fresh wallet to test cleanly
-        (address freshWallet, ) = makeAddrAndKey("freshWallet");
-        vm.deal(freshWallet, 10 ether);
-        _setCodeToEoa(address(_smartWallet), freshWallet);
-
-        // Initialize with alice as admin so we can test adding the selfKeyHash
-        vm.prank(freshWallet);
-        InitialOwner[] memory initialOwners = _createSingleOwner(
-            keccak256(abi.encodePacked(_alice)),
-            address(_ecdsaValidator)
-        );
-        ISmartWallet(freshWallet).initialize(initialOwners);
+        // Use alice's wallet which is already deployed and initialized
+        address freshWallet = _aliceWallet;
 
         // Now both regular owners and EIP-7702 use the same encoding method
         bytes32 selfKeyHash = keccak256(abi.encodePacked(freshWallet));
