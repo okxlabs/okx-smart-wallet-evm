@@ -18,4 +18,11 @@ library Static {
 
     address public constant NATIVE_ETH =
         0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
+    string public constant ERC712_NAMESPACE = "SmartWallet";
+    string public constant ERC712_VERSION = "1.0.0";
+    string public constant ERC7201_NAMESPACE_AND_VERSION =
+        "SmartWallet.ERC7201.CustomStorage";
+    bytes32 public constant ERC7201_CUSTOM_STORAGE_ROOT =
+        0x653ff6dcbda533c3c7d8ffb646da3e510d0de40f237170c4da3f874472aecb00;
 }

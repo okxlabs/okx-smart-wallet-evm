@@ -2,6 +2,7 @@
 pragma solidity ^0.8.29;
 
 import {EIP712} from "solady/utils/EIP712.sol";
+import {Static} from "./libraries/Static.sol";
 
 /// @title EIP712
 abstract contract ERC712 is EIP712 {
@@ -33,7 +34,7 @@ abstract contract ERC712 is EIP712 {
         override
         returns (string memory name, string memory version)
     {
-        return ("SmartWallet", "1.0.0");
+        return (Static.ERC712_NAMESPACE, Static.ERC712_VERSION);
     }
 
     /// @dev Returns if `_domainNameAndVersion()` may change
@@ -45,6 +46,6 @@ abstract contract ERC712 is EIP712 {
         override
         returns (bool result)
     {
-        return true;
+        return false;
     }
 }

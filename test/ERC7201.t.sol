@@ -11,7 +11,10 @@ contract ERC7201Test is Base {
 
     /// @notice Test the namespaceAndVersion function
     function test_NamespaceAndVersion_Success() external view {
-        assertEq(_smartWallet.namespaceAndVersion(), "SmartWallet.1.0.0");
+        assertEq(
+            _smartWallet.namespaceAndVersion(),
+            "SmartWallet.ERC7201.CustomStorage"
+        );
     }
 
     /// @notice Test that CUSTOM_STORAGE_ROOT is correctly calculated using ERC7201 formula

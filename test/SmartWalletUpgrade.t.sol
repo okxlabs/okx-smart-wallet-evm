@@ -14,7 +14,7 @@ import {Call, BatchedCall} from "src/Types.sol";
 // SmartWalletEntryV2 - Upgraded version for testing
 // Cannot inherit from SmartWalletEntry directly due to custom storage layout
 // Instead, inherit from SmartWallet and define the same storage layout
-contract SmartWalletEntryV2 is SmartWallet layout at 0xd2f25270280c292d8930a730093bb680163a837f93acc639d858c440b5c53800 {
+contract SmartWalletEntryV2 is SmartWallet layout at 0x653ff6dcbda533c3c7d8ffb646da3e510d0de40f237170c4da3f874472aecb00 {
     // New state variable (append only to maintain storage layout)
     string public constant VERSION = "v2";
     
