@@ -86,10 +86,9 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
     /// @param keyHash The public key hash to remove
     function removeOwner(bytes32 keyHash) external onlySelf {
         // Check if keyHash exists before removing
-        require(
-            _ownerKeys.contains(keyHash),
-            IOwnerManager.ValidatorNotFound()
-        );
+        if (!_ownerKeys.contains(keyHash)) {
+            revert IOwnerManager.ValidatorNotFound();
+        }
 
         emit OwnerRemoved(keyHash, _ownerValidators[keyHash]);
 
