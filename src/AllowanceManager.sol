@@ -27,7 +27,7 @@ abstract contract AllowanceManager is IAllowanceManager, BaseAuthorization {
     ) external onlySelf returns (bool) {
         uint256 length = approvals.length;
 
-        for (uint256 i = 0; i < length; ) {
+        for (uint256 i = 0; i < length; i++) {
             ApprovalInfo calldata approval = approvals[i];
             tokenAllowance[approval.token][approval.spender] = approval.amount;
 
@@ -38,10 +38,6 @@ abstract contract AllowanceManager is IAllowanceManager, BaseAuthorization {
                 approval.spender,
                 approval.amount
             );
-
-            unchecked {
-                ++i;
-            }
         }
         return true;
     }

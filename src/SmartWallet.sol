@@ -72,7 +72,7 @@ abstract contract SmartWallet is
         _;
     }
 
-    /// @notice Initializes the wallet core with initial owners
+    /// @notice Initializes the smart wallet with initial owners
     /// @dev Can only be called by factory during deployment. For EIP-7702 scenarios,
     ///      use execute/executeWithRelayer to add owners after delegation
     /// @param initialOwners Array of tuples containing keyHash and validator address pairs
@@ -94,7 +94,7 @@ abstract contract SmartWallet is
     }
 
     /// @notice Executes multiple contract calls in a single transaction
-    /// @dev Only callable by the account itself
+    /// @dev Only callable by the account owner
     /// @param calls Array of Call structs containing destination address, value, and calldata
     function execute(Call[] calldata calls) external onlyOwner {
         _batchCall(calls, keccak256(abi.encodePacked(msg.sender)));

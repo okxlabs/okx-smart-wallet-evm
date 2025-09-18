@@ -82,7 +82,7 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
     }
 
     /// @notice Removes a validator associated with a keyHash
-    /// @dev Only callable by the wallet owner
+    /// @dev Only callable by the wallet itself
     /// @param keyHash The public key hash to remove
     function removeOwner(bytes32 keyHash) external onlySelf {
         emit OwnerRemoved(keyHash, _ownerValidators[keyHash]);
@@ -91,7 +91,6 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
     }
 
     // External View Functions
-    // Note: Function names retain "Validator" for interface compatibility
 
     function ownerCount() external view override returns (uint256) {
         return _ownerKeys.length();
