@@ -879,9 +879,8 @@ contract ValidatorTest is Base {
         );
     }
 
-    function test_RemoveValidator_OnNonexistentValidator_Success() public {
-        // Test that removing a validator that was never added succeeds (idempotent operation)
-        // This is the actual contract behavior - it doesn't revert for non-existent validators
+    function test_RevertWhen_RemoveValidator_OnNonexistentValidator() public {
+        // Test that removing a validator that was never added reverts for consistency
         bytes32 nonExistentKeyHash = keccak256(abi.encodePacked(_dave));
 
         // Verify the validator doesn't exist
@@ -919,12 +918,13 @@ contract ValidatorTest is Base {
             uint48(0)
         );
 
-        // Should succeed even though validator doesn't exist (idempotent behavior)
-        vm.expectEmit(true, true, true, true);
-        emit OwnerRemoved(nonExistentKeyHash, address(0));
+        // Should revert when trying to remove non-existent validator
+        vm.expectRevert(
+            abi.encodeWithSelector(IOwnerManager.ValidatorNotFound.selector)
+        );
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, signature);
 
-        // Verify the validator still doesn't exist (no-op)
+        // Verify the validator still doesn't exist
         assertEq(
             _getValidatorFromSettings(
                 IOwnerManager(_aliceWallet),

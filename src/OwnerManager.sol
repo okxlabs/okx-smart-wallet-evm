@@ -85,6 +85,12 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
     /// @dev Only callable by the wallet itself
     /// @param keyHash The public key hash to remove
     function removeOwner(bytes32 keyHash) external onlySelf {
+        // Check if keyHash exists before removing
+        require(
+            _ownerKeys.contains(keyHash),
+            IOwnerManager.ValidatorNotFound()
+        );
+
         emit OwnerRemoved(keyHash, _ownerValidators[keyHash]);
 
         _removeValidator(keyHash);
