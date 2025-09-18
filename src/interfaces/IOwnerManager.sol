@@ -8,9 +8,9 @@ interface IOwnerManager {
     error ValidatorNotFound();
 
     // EVENTS
-    event OwnerAdded(bytes32 keyHash, address validator);
+    event OwnerAdded(bytes32 keyHash, address validator, uint256 settings);
     event OwnerRemoved(bytes32 keyHash, address validator);
-    event OwnerUpdated(bytes32 keyHash, address newValidator);
+    event OwnerUpdated(bytes32 keyHash, address newValidator, uint256 settings);
 
     /// @notice Add an owner to the wallet
     /// @param keyHash The public key hash to associate with this validator

@@ -56,9 +56,9 @@ contract ValidatorTest is Base {
     PasskeyValidator internal externalPasskeyValidator;
     MockValidator internal mockValidator;
 
-    event OwnerAdded(bytes32 keyHash, address validator);
+    event OwnerAdded(bytes32 keyHash, address validator, uint256 settings);
     event OwnerRemoved(bytes32 keyHash, address validator);
-    event OwnerUpdated(bytes32 keyHash, address newValidator);
+    event OwnerUpdated(bytes32 keyHash, address newValidator, uint256 settings);
     error FailedDeployment();
 
     function setUp() public override {
@@ -211,7 +211,7 @@ contract ValidatorTest is Base {
         // Expect owner added event
         vm.expectEmit();
         bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
-        emit OwnerAdded(charlieKeyHash, charlieValidator);
+        emit OwnerAdded(charlieKeyHash, charlieValidator, 0);
 
         // Deploy and add validator using the helper
         _addOwnerToAccount(
@@ -993,7 +993,11 @@ contract ValidatorTest is Base {
 
         // Should succeed and emit event
         vm.expectEmit(true, true, true, true);
-        emit OwnerUpdated(keyHash, Static.PASSKEY_VALIDATOR_ADDRESS);
+        emit OwnerUpdated(
+            keyHash,
+            Static.PASSKEY_VALIDATOR_ADDRESS,
+            newSettings
+        );
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, signature);
 
         // Verify validator is updated

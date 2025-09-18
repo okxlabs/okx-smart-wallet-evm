@@ -53,7 +53,7 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
         // Store validator with settings
         _setValidatorWithSettings(keyHash, validator, settings);
 
-        emit OwnerAdded(keyHash, validator);
+        emit OwnerAdded(keyHash, validator, settings);
     }
 
     /// @notice Updates an existing validator's address and/or settings
@@ -78,7 +78,7 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
         _ownerValidators[keyHash] = newValidator;
         _ownerSettings[keyHash] = newSettings;
 
-        emit OwnerUpdated(keyHash, newValidator);
+        emit OwnerUpdated(keyHash, newValidator, newSettings);
     }
 
     /// @notice Removes a validator associated with a keyHash
