@@ -27,8 +27,13 @@ abstract contract AllowanceManager is IAllowanceManager, BaseAuthorization {
     ) external onlySelf returns (bool) {
         uint256 length = approvals.length;
 
-        for (uint256 i = 0; i < length; i++) {
+        for (uint256 i = 0; i < length; ++i) {
             ApprovalInfo calldata approval = approvals[i];
+
+            // Validate spender
+            if (approval.spender == address(0)) revert InvalidSpender();
+
+            // Update allowance
             tokenAllowance[approval.token][approval.spender] = approval.amount;
 
             // Emit event for all approvals (both native ETH and ERC20 tokens)

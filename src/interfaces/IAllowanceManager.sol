@@ -52,6 +52,9 @@ interface IAllowanceManager {
     /// @notice Error thrown when attempting to use native ETH in token transfer function
     error InvalidTokenForTransfer();
 
+    /// @notice Error thrown when attempting to use an invalid spender
+    error InvalidSpender();
+
     /// @notice Struct for encapsulating approval data
     struct ApprovalInfo {
         address token;

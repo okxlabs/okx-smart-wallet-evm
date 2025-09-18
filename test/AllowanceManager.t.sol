@@ -1092,6 +1092,66 @@ contract AllowanceManagerTest is Base {
         );
     }
 
+    function test_RevertWhen_BatchApproveToken_InvalidSpender() public {
+        // Test with single invalid spender (address(0))
+        IAllowanceManager.ApprovalInfo[]
+            memory approvals = new IAllowanceManager.ApprovalInfo[](1);
+        approvals[0] = IAllowanceManager.ApprovalInfo(
+            address(mockToken),
+            address(0), // Invalid spender
+            100 * 10 ** 18
+        );
+
+        vm.expectRevert(IAllowanceManager.InvalidSpender.selector);
+        _executeApprove(
+            abi.encodeWithSelector(
+                IAllowanceManager.batchApproveToken.selector,
+                approvals
+            )
+        );
+
+        // Test with multiple approvals where one has invalid spender
+        IAllowanceManager.ApprovalInfo[]
+            memory multipleApprovals = new IAllowanceManager.ApprovalInfo[](3);
+        multipleApprovals[0] = IAllowanceManager.ApprovalInfo(
+            address(mockToken),
+            spender, // Valid spender
+            50 * 10 ** 18
+        );
+        multipleApprovals[1] = IAllowanceManager.ApprovalInfo(
+            address(mockToken2),
+            address(0), // Invalid spender in the middle
+            75 * 10 ** 18
+        );
+        multipleApprovals[2] = IAllowanceManager.ApprovalInfo(
+            Static.NATIVE_ETH,
+            recipient, // Valid spender
+            1 ether
+        );
+
+        vm.expectRevert(IAllowanceManager.InvalidSpender.selector);
+        _executeApprove(
+            abi.encodeWithSelector(
+                IAllowanceManager.batchApproveToken.selector,
+                multipleApprovals
+            )
+        );
+
+        // Verify no allowances were set (transaction should revert entirely)
+        assertEq(
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
+            0
+        );
+        assertEq(
+            aliceSmartWallet.getTokenAllowance(address(mockToken2), address(0)),
+            0
+        );
+        assertEq(
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, recipient),
+            0
+        );
+    }
+
     function test_RevertWhen_BathApproveToken_UnauthorizedAccess() public {
         IAllowanceManager.ApprovalInfo[]
             memory approvals = new IAllowanceManager.ApprovalInfo[](1);
