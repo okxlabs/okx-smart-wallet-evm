@@ -11,6 +11,7 @@ import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
+import {ChainlessLib} from "src/libraries/ChainlessLib.sol";
 
 /**
  * @title ChainlessExecutionTest
@@ -598,6 +599,46 @@ contract ChainlessExecutionTest is Base {
             keyHash,
             validator,
             adminSettings
+        );
+    }
+
+    /// @notice Test validateChainlessNonceCallData returns false for calls with data length < 4
+    /// @dev This test hits the specific line: if (callData.length < 4) return false;
+    /// @dev Tests through executeWithRelayer since validateChainlessNonceCallData is internal
+    function test_ValidateChainlessNonceCallData_ShortCallData() public {
+        // Create a call with empty data to trigger: if (callData.length < 4) return false;
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: testAccount,
+            value: 0,
+            data: "" // Empty data - length 0, which is < 4
+        });
+
+        // Create chainless nonce: CHAINLESS_NONCE_KEY (196) in upper 192 bits, nonce 0 in lower 64 bits
+        uint256 chainlessNonce = (Static.CHAINLESS_NONCE_KEY << 64) | 0;
+
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: chainlessNonce
+        });
+
+        // Create dummy validator data (won't be validated since we expect early revert)
+        bytes memory validatorData = abi.encodePacked(
+            aliceKeyHash, // keyHash (32 bytes)
+            uint48(0), // validUntil (6 bytes) - 0 means never expires
+            new bytes(65) // dummy signature (65 bytes)
+        );
+
+        // The execution should revert with InvalidNonceKey because validateChainlessNonceCallData returns false
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISmartWallet.InvalidNonceKey.selector,
+                Static.CHAINLESS_NONCE_KEY
+            )
+        );
+        ISmartWallet(testAccount).executeWithRelayer(
+            batchedCall,
+            validatorData
         );
     }
 }

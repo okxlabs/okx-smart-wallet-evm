@@ -7,6 +7,7 @@ import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
 import {LibClone} from "solady/utils/LibClone.sol";
+import {BaseAuthorization} from "src/BaseAuthorization.sol";
 
 contract InitializationAuthTest is Base {
     SmartWalletFactory public factory;
@@ -181,5 +182,56 @@ contract InitializationAuthTest is Base {
             keccak256(abi.encodePacked(_alice))
         );
         assertEq(validator5, address(_ecdsaValidator));
+    }
+
+    function test_GetImmutableFactory() public {
+        InitialOwner[] memory initialOwners = _createSingleOwner(
+            keccak256(abi.encodePacked(_alice)),
+            address(_ecdsaValidator)
+        );
+
+        // Case 1: Wallet deployed through factory (has immutable args) - should return factory address
+        address factoryWallet = factory.createAccount(initialOwners, 456);
+        address retrievedFactory = BaseAuthorization(factoryWallet)
+            .getImmutableFactory();
+        assertEq(
+            retrievedFactory,
+            address(factory),
+            "Factory-deployed wallet should return factory address"
+        );
+
+        // Case 2: Test with different factory to ensure it returns the correct one
+        SmartWalletFactory factory2 = new SmartWalletFactory(
+            address(_smartWallet)
+        );
+        address factory2Wallet = factory2.createAccount(initialOwners, 789);
+        address retrieved2Factory = BaseAuthorization(factory2Wallet)
+            .getImmutableFactory();
+        assertEq(
+            retrieved2Factory,
+            address(factory2),
+            "Second factory deployment should return correct factory address"
+        );
+
+        // Case 3: Verify different factories return different addresses
+        assertTrue(
+            retrievedFactory != retrieved2Factory,
+            "Different factories should return different addresses"
+        );
+
+        // Case 4: Test with different salt values from same factory should return same factory address
+        address factoryWallet3 = factory.createAccount(initialOwners, 999);
+        address retrievedFactory3 = BaseAuthorization(factoryWallet3)
+            .getImmutableFactory();
+        assertEq(
+            retrievedFactory3,
+            address(factory),
+            "Different salt should return same factory address"
+        );
+        assertEq(
+            retrievedFactory,
+            retrievedFactory3,
+            "Same factory should return same address regardless of salt"
+        );
     }
 }

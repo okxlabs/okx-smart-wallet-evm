@@ -564,4 +564,83 @@ contract AdminPermissionsTest is Base {
         assertFalse(IOwnerManager(_aliceWallet).hasOwner(aliceKeyHash));
         assertTrue(IOwnerManager(_aliceWallet).hasOwner(adminKeyHash));
     }
+
+    /// @notice Comprehensive test for isSettingsExpired function
+    function test_IsSettingsExpired() public {
+        // Set a stable timestamp for consistent testing
+        vm.warp(1000);
+        uint256 baseTime = block.timestamp;
+
+        // Case 1: Never expires (expiration = 0)
+        uint256 neverExpiresSettings = OwnerManager(_aliceWallet).packSettings(
+            true,
+            0,
+            address(0)
+        );
+        assertFalse(
+            OwnerManager(_aliceWallet).isSettingsExpired(neverExpiresSettings),
+            "expiration=0 should never expire"
+        );
+
+        // Case 2: Future expiration (not expired)
+        uint40 futureTime = uint40(baseTime + 500);
+        uint256 futureSettings = OwnerManager(_aliceWallet).packSettings(
+            false,
+            futureTime,
+            address(0)
+        );
+        assertFalse(
+            OwnerManager(_aliceWallet).isSettingsExpired(futureSettings),
+            "future expiration should not be expired"
+        );
+
+        // Case 3: Current timestamp (not expired - boundary case)
+        uint40 currentTime = uint40(baseTime);
+        uint256 currentSettings = OwnerManager(_aliceWallet).packSettings(
+            true,
+            currentTime,
+            address(0)
+        );
+        assertFalse(
+            OwnerManager(_aliceWallet).isSettingsExpired(currentSettings),
+            "current timestamp should not be expired"
+        );
+
+        // Case 4: Past expiration (expired)
+        uint40 pastTime = uint40(baseTime - 1);
+        uint256 pastSettings = OwnerManager(_aliceWallet).packSettings(
+            false,
+            pastTime,
+            address(0)
+        );
+        assertTrue(
+            OwnerManager(_aliceWallet).isSettingsExpired(pastSettings),
+            "past expiration should be expired"
+        );
+
+        // Case 5: Time warp test - transition from not expired to expired
+        uint40 targetTime = uint40(baseTime + 100);
+        uint256 warpSettings = OwnerManager(_aliceWallet).packSettings(
+            true,
+            targetTime,
+            address(0)
+        );
+
+        assertFalse(
+            OwnerManager(_aliceWallet).isSettingsExpired(warpSettings),
+            "should not be expired before target time"
+        );
+
+        vm.warp(targetTime);
+        assertFalse(
+            OwnerManager(_aliceWallet).isSettingsExpired(warpSettings),
+            "should not be expired at exact time"
+        );
+
+        vm.warp(targetTime + 1);
+        assertTrue(
+            OwnerManager(_aliceWallet).isSettingsExpired(warpSettings),
+            "should be expired after target time"
+        );
+    }
 }
