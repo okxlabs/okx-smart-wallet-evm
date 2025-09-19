@@ -24,7 +24,7 @@ contract SendTxsWithPasskey is Script {
         uint256 passkeyPubX1 = vm.envUint("PASSKEY_PUB_X");
         uint256 passkeyPubY1 = vm.envUint("PASSKEY_PUB_Y");
 
-        address passkeyValidator = vm.envAddress("PASSKEY_VALIDATOR");
+        address passkeyValidator = Static.PASSKEY_VALIDATOR_ADDRESS;
 
         // Get user wallet address (the SmartWallet account)
         address payable userWallet = payable(vm.envAddress("USER_WALLET"));

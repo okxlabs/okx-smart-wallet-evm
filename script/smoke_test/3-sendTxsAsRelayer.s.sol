@@ -7,6 +7,7 @@ import {SmartWallet} from "src/SmartWallet.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {Call, BatchedCall} from "src/Types.sol";
+import {Static} from "src/libraries/Static.sol";
 
 /// @title SendTxsAsRelayer
 /// @notice A script for sending transactions as a relayer using executeWithRelayer
@@ -30,7 +31,7 @@ contract SendTxsAsRelayer is Script {
     }
 
     function _addOwner(address sender) private {
-        address ecdsaValidator = vm.envAddress("ECDSA_VALIDATOR");
+        address ecdsaValidator = Static.ECDSA_VALIDATOR_ADDRESS;
         console.log("ECDSAValidator address:", ecdsaValidator);
 
         Call[] memory addOwnerCalls = new Call[](1);

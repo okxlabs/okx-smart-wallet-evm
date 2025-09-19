@@ -25,7 +25,7 @@ contract CreateAccountWithAddOwner is Script {
         console.log("Deployer address: ", deployer);
         console.log("Factory address: ", vm.envAddress("SMART_WALLET_FACTORY"));
         console.log("Implementation address: ", vm.envAddress("SMART_WALLET"));
-        console.log("PasskeyValidator: ", vm.envAddress("PASSKEY_VALIDATOR"));
+        console.log("PasskeyValidator: ", Static.PASSKEY_VALIDATOR_ADDRESS);
 
         console.log(
             "\n=== Creating account with initial Passkey and adding EOA via createAccountWithCall ==="
@@ -59,7 +59,7 @@ contract CreateAccountWithAddOwner is Script {
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
             keyHash: passkeyKeyHash,
-            validator: vm.envAddress("PASSKEY_VALIDATOR")
+            validator: Static.PASSKEY_VALIDATOR_ADDRESS
         });
 
         console.log("Initial Passkey owner:");

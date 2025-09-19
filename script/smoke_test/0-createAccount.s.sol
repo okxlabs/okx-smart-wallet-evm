@@ -13,7 +13,7 @@ contract CreateAccount is Script {
         // Get environment variables
         uint256 deployerPk = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address factory = vm.envAddress("SMART_WALLET_FACTORY");
-        address passkeyValidator = vm.envAddress("PASSKEY_VALIDATOR");
+        address passkeyValidator = Static.PASSKEY_VALIDATOR_ADDRESS;
 
         // Get Passkey public key from environment
         uint256 passkeyPubX = vm.envUint("PASSKEY_PUB_X");
@@ -103,7 +103,7 @@ contract CreateAccount is Script {
         uint256 customSalt
     ) external {
         address factory = vm.envAddress("SMART_WALLET_FACTORY");
-        address passkeyValidator = vm.envAddress("PASSKEY_VALIDATOR");
+        address passkeyValidator = Static.PASSKEY_VALIDATOR_ADDRESS;
 
         uint256 deployerPk = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address deployer = vm.addr(deployerPk);

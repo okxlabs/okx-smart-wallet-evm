@@ -17,9 +17,10 @@ contract DeployInit is Script {
         address deployOwner = vm.addr(vm.envUint("DEPLOYER_PRIVATE_KEY"));
         console.log("Deploy owner: %s", deployOwner);
 
-        // Use the EIP-2470 Singleton Factory through the interface
+        // Use the fixed EIP-2470 Singleton Factory through the interface
+        // address is uniform across all chains
         IDeployFactory deployFactory = IDeployFactory(
-            vm.envAddress("DEPLOY_FACTORY_ADDRESS")
+            0xce0042B868300000d44A59004Da54A005ffdcf9f
         );
         bytes32 deployFactorySalt = vm.envBytes32("DEPLOY_FACTORY_SALT");
         console.log("Deploy factory address: %s", address(deployFactory));
