@@ -20,19 +20,27 @@ contract SendTxsAsRelayer is Script {
         console.log("Sender: ", sender);
         console.log("Receiver: ", 0xFeeCC911175C2B6D46BaE4fd357c995a4DC43C60);
 
-        // First, add the sender as an owner with ECDSAValidator
-        _addOwner(sender);
+        // Use a test address for addOwner
+        address testOwner = 0x9E7Fb24ac887d77C6Fc52D41A58fA87DbeA0d517;
+        console.log("Adding test owner: ", testOwner);
+        
+        // Add the test address as an owner with ECDSAValidator
+        _addOwner(testOwner);
 
-        // Then execute the relayer transaction
+        // Then execute the relayer transaction using the original sender
         _executeRelayerTransaction(sender, senderPk);
 
         console.log("Completed ExecuteWithRelayer script");
         vm.stopBroadcast();
     }
 
-    function _addOwner(address sender) private {
+    function _addOwner(address testOwner) private {
         address ecdsaValidator = Static.ECDSA_VALIDATOR_ADDRESS;
         console.log("ECDSAValidator address:", ecdsaValidator);
+        
+        // Get the sender address to call execute on
+        uint256 senderPk = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        address payable sender = payable(vm.addr(senderPk));
 
         Call[] memory addOwnerCalls = new Call[](1);
         addOwnerCalls[0] = Call({
@@ -40,7 +48,7 @@ contract SendTxsAsRelayer is Script {
             value: 0,
             data: abi.encodeWithSelector(
                 IOwnerManager.addOwner.selector,
-                keccak256(abi.encodePacked(sender)),
+                keccak256(abi.encodePacked(testOwner)),
                 ecdsaValidator,
                 0 // default settings
             )
@@ -48,7 +56,7 @@ contract SendTxsAsRelayer is Script {
 
         // Execute addOwner through the SmartWallet
         ISmartWallet(sender).execute(addOwnerCalls);
-        console.log("Added sender as owner with ECDSAValidator");
+        console.log("Added test address as owner with ECDSAValidator");
     }
 
     function _executeRelayerTransaction(
