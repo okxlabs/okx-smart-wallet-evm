@@ -272,7 +272,9 @@ contract ValidationTest is Base {
 
         // Bob should be rejected after expiration
         vm.prank(_bob);
-        vm.expectRevert(ISmartWallet.OwnerExpired.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(ISmartWallet.InvalidCaller.selector, _bob)
+        );
         ISmartWallet(_aliceWallet).execute(calls);
     }
 

@@ -54,21 +54,13 @@ abstract contract SmartWallet is
     }
 
     modifier onlyOwner() {
-        // Allow self-calls for EIP-7702 compatibility
-        if (msg.sender == address(this)) {
-            _;
-            return;
-        }
-
         bytes32 keyHash = keccak256(abi.encodePacked(msg.sender));
-        if (!hasOwner(keyHash)) {
+        address validator = getVerifiedValidator(keyHash);
+
+        if (validator == address(0)) {
             revert ISmartWallet.InvalidCaller(msg.sender);
         }
 
-        uint256 settings = _ownerSettings[keyHash];
-        if (settings != 0 && isSettingsExpired(settings)) {
-            revert ISmartWallet.OwnerExpired();
-        }
         _;
     }
 

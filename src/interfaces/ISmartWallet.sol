@@ -7,7 +7,6 @@ import {Call, BatchedCall, InitialOwner} from "../Types.sol";
 interface ISmartWallet is IERC165 {
     // ERRORS
     error InvalidCaller(address owner);
-    error OwnerExpired();
     error NonAdminSelfCall();
     error InvalidNonce(uint256 nonce);
     error ExpiryPassed(uint48 expiry);

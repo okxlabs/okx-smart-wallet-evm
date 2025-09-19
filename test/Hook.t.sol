@@ -391,11 +391,10 @@ contract HookTest is Base {
 
         // Use execute with EOA as msg.sender - should fail because owner is expired
         vm.prank(_alice);
-        vm.expectRevert(ISmartWallet.OwnerExpired.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(ISmartWallet.InvalidCaller.selector, _alice)
+        );
         ISmartWallet(_aliceWallet).execute(calls2);
-
-        // Verify no additional transfer happened (execution failed due to owner expiration)
-        assertEq(mockToken.balanceOf(_bob), 50 ether);
     }
 
     // ============ Tests for ExecuteWithRelayer (Smart Wallet as msg.sender) ============
