@@ -1,14 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import {Test} from "forge-std/Test.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {CallLib} from "src/libraries/CallLib.sol";
 import {MessageSignLib} from "src/libraries/MessageSignLib.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 import {Base, MockERC20} from "./Base.t.sol";
-import {ERC712} from "src/ERC712.sol";
 import {Static} from "src/libraries/Static.sol";
 
 /// @title ERC712Test

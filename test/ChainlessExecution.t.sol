@@ -11,7 +11,6 @@ import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
-import {ChainlessLib} from "src/libraries/ChainlessLib.sol";
 
 /**
  * @title ChainlessExecutionTest
