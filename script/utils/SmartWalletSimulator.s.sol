@@ -16,11 +16,11 @@ import {DecodeLib} from "../../src/libraries/DecodeLib.sol";
 contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
     using BatchedCallLib for BatchedCall;
 
-    /// @notice Simulate a sponsored transaction, measuring gas costs for validation and execution, then reverts with detailed metrics.
-    /// @dev Always reverts with `Errors.SimulateExecutionWithGas` containing execution gas and total gas metrics.
-    /// 1) If the simulation fails during validation or the sponsor call, those other errors bubble up directly instead.
-    /// 2) "Successful simulation" means both validation and the sponsorship call passed.
-    ///    Any failure in the user's batch calls is then captured in `errorData` and surfaced inside the `SimulateExecutionWithGas` revert.
+    /// @notice Simulates SmartWallet's executeWithRelayer, measuring gas costs for validation and execution, then reverts with detailed metrics.
+    /// @dev Always reverts with `ISmartWalletSimulator.SimulateExecution` containing execution gas, intrinsic gas, and total gas metrics.
+    /// 1) Validation steps run to account for gas costs but reverts are skipped to allow simulation without valid signatures (better simulation UX).
+    /// 2) If any user batch call reverts during execution, the entire simulation will revert with that error.
+    /// 3) "Successful simulation" means all batch calls executed without reverting.
     /// @param batchedCall BatchedCall struct containing calls, nonce, and expiry
     /// @param validator Validator address to use for gas estimation
     /// @param validatorData Encoded data containing keyHash and signature: abi.encodePacked(keyHash, signature)
@@ -66,7 +66,7 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
         );
 
         // Calculate total intrinsic gas (base + calldata)
-        uint256 intrinsicGas = 21000 + calldataIntrinsicGas; // Base intrinsic gas + calldata intrinsic gas
+        uint256 intrinsicGas = 21000 + calldataIntrinsicGas;
 
         // Calculate total gas (execution gas + intrinsic gas)
         uint256 totalGas = executionGas + intrinsicGas;
@@ -80,7 +80,7 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
     }
 
     /// @notice Validate and extract relayer data for simulation with custom validator
-    /// @dev All reverts are commented out to allow simulation to continue
+    /// @dev All reverts are skipped to measure validation gas costs without requiring valid signatures     /// 1) Validation steps run to account for gas costs but reverts are skipped to allow simulation without valid signatures (better simulation UX).
     /// @param batchedCall The batched call data
     /// @param validator Custom validator address for simulation
     /// @param validatorData The validator data containing pubKeyHash, validUntil, and signature
@@ -96,6 +96,14 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
             // revert Errors.InvalidNonce(batchedCall.nonce);
         }
 
+        // Minimum length check: 32 bytes (pubKeyHash) + 6 bytes (validUntil) = 38 bytes
+        if (validatorData.length < 38) {
+            // revert ISmartWallet.InvalidValidatorDataLength(
+            //     validatorData.length,
+            //     38
+            // );
+        }
+
         // Step 2: Extract validation components from validatorData
         uint48 validUntil;
         (pubKeyHash, validUntil) = DecodeLib.decodeSignatureComponents(
@@ -108,14 +116,9 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
         }
 
         // Step 4: Verify validator exists and is not expired
-        address actualValidator = _ownerValidators[pubKeyHash];
+        address actualValidator = getVerifiedValidator(pubKeyHash);
         if (actualValidator == address(0)) {
             // revert Errors.InvalidKeyHash(pubKeyHash);
-        }
-
-        uint256 settings = _ownerSettings[pubKeyHash];
-        if (settings != 0 && isSettingsExpired(settings)) {
-            // revert Errors.ValidatorExpired(pubKeyHash);
         }
 
         // Step 5: Compute the data hash based on nonce type
@@ -203,3 +206,4 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
         gasCost = len * 16 - zeroCount * 12;
     }
 }
+

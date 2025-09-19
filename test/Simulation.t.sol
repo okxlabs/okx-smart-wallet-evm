@@ -9,6 +9,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC712} from "src/ERC712.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
+import {ISmartWalletSimulator} from "../script/utils/ISmartWalletSimulator.s.sol";
+import {SmartWalletSimulator} from "../script/utils/SmartWalletSimulator.s.sol";
 
 // Test contract with various test functions
 contract TestTarget {
@@ -49,6 +51,9 @@ contract SimulationTest is Base {
     TestTarget public target;
     MockERC20 public token;
 
+    // Simulation wallet instance for testing simulation functionality
+    address payable internal _smartWalletSimulator;
+
     // Helper function to decode DelegateAndRevert error
     function decodeDelegateAndRevert(
         bytes memory errorData
@@ -81,6 +86,10 @@ contract SimulationTest is Base {
         super.setUp();
         target = new TestTarget();
         token = new MockERC20();
+
+        // Deploy a SmartWalletSimulator instance for testing simulation functionality
+        SmartWalletSimulator simulator = new SmartWalletSimulator();
+        _smartWalletSimulator = payable(address(simulator));
 
         // Fund the wallet
         vm.deal(_aliceWallet, 10 ether);
@@ -394,5 +403,120 @@ contract SimulationTest is Base {
                 "DelegateAndRevert should use more gas"
             );
         }
+    }
+
+    function test_compareGas_simulateVsActual_executeFromRelayer() public {
+        // Setup common data for both tests
+        Call[] memory calls = constructCallsData();
+        BatchedCall memory batchedCall = BatchedCall({calls: calls, nonce: 0});
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
+        );
+
+        // Test 1: Get execution gas from simulateExecuteWithRelayer
+        uint256 simulateExecutionGas;
+
+        vm.prank(relayer);
+        try
+            ISmartWallet(_aliceWallet).delegateAndRevert(
+                address(_smartWalletSimulator),
+                abi.encodeWithSelector(
+                    ISmartWalletSimulator.simulateExecuteWithRelayer.selector,
+                    batchedCall,
+                    address(_ecdsaValidator),
+                    validatorData
+                )
+            )
+        {
+            revert("Simulation should always revert");
+        } catch (bytes memory simulationResult) {
+            // Decode the DelegateAndRevert error to get the actual error
+            (, bytes memory ret) = decodeDelegateAndRevert(simulationResult);
+
+            // Extract the selector from the ret bytes (which contains the actual error)
+            bytes4 selector;
+            assembly {
+                selector := mload(add(ret, 32))
+            }
+
+            // Check for SimulateExecution error
+            assertEq(
+                uint32(selector),
+                uint32(ISmartWalletSimulator.SimulateExecution.selector),
+                "Expected SimulateExecution error"
+            );
+
+            // Decode the gas metrics from the error
+            bytes memory errorData = new bytes(ret.length - 4);
+            for (uint i = 4; i < ret.length; i++) {
+                errorData[i - 4] = ret[i];
+            }
+            (simulateExecutionGas, , ) = abi.decode(
+                errorData,
+                (uint256, uint256, uint256)
+            );
+        }
+
+        // Test 2: Measure external gas for actual executeWithRelayer
+        uint256 actualGasUsed;
+
+        vm.prank(relayer);
+        uint256 gasStart = gasleft();
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
+        uint256 gasEnd = gasleft();
+        actualGasUsed = gasStart - gasEnd;
+
+        // Log results for comparison
+        console.log("=== GAS USAGE COMPARISON ===");
+        console.log("Simulate execution gas:", simulateExecutionGas);
+        console.log("Actual external gas used:", actualGasUsed);
+
+        // Calculate percentage difference
+        uint256 gasDifference;
+        uint256 percentageDifference;
+
+        if (actualGasUsed > simulateExecutionGas) {
+            gasDifference = actualGasUsed - simulateExecutionGas;
+            percentageDifference = (gasDifference * 100) / simulateExecutionGas;
+        } else {
+            gasDifference = simulateExecutionGas - actualGasUsed;
+            percentageDifference = (gasDifference * 100) / actualGasUsed;
+        }
+
+        console.log("Gas difference:", gasDifference);
+        console.log("Percentage difference:", percentageDifference, "%");
+
+        // Assert both operations completed (basic sanity check)
+        assertTrue(
+            simulateExecutionGas > 0,
+            "Simulation should consume execution gas"
+        );
+        assertTrue(actualGasUsed > 0, "Actual execution should consume gas");
+
+        // Assert that gas usage is within 5% tolerance
+        assertTrue(
+            percentageDifference <= 5,
+            string.concat(
+                "Gas usage difference exceeds 5% tolerance. ",
+                "Simulate Execution Gas: ",
+                vm.toString(simulateExecutionGas),
+                ", Actual External Gas: ",
+                vm.toString(actualGasUsed),
+                ", Difference: ",
+                vm.toString(percentageDifference),
+                "%"
+            )
+        );
+
+        console.log(
+            "Test passed - gas usage between simulated execution gas and actual external gas within 5% tolerance"
+        );
     }
 }
