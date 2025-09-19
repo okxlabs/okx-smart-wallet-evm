@@ -37,6 +37,8 @@ interface IOwnerManager {
     function removeOwner(bytes32 keyHash) external;
 
     /// @notice Get the verified validator for a given keyHash
+    /// @dev For EIP-7702 compatibility, address(this) ALWAYS returns ECDSA validator and cannot be overridden.
+    ///      The built-in address(this) owner is immutable and ignores any settings in ownerValidators or ownerSettings.
     /// @param keyHash The public key hash to associate with this validator
     /// @return Address of the verified validator
     function getVerifiedValidator(

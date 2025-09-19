@@ -1111,7 +1111,7 @@ contract ValidatorTest is Base {
     }
 
     function test_UnifiedEncoding_Design_Success() public {
-        // This test validates the unified abi.encodePacked design for all keyHash generation
+        // This test validates that address(this) is immutable and always uses ECDSA validator
 
         // Use alice's wallet which is already deployed and initialized
         address freshWallet = _aliceWallet;
@@ -1128,7 +1128,7 @@ contract ValidatorTest is Base {
         );
         assertEq(validator, Static.ECDSA_VALIDATOR_ADDRESS);
 
-        // Test that we can add this same keyHash as a regular owner
+        // Test that we CANNOT add address(this) as a regular owner - it's immutable
         // Use executeWithRelayer with alice's signature since alice is admin
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -1155,15 +1155,22 @@ contract ValidatorTest is Base {
             uint48(0)
         );
 
+        // This should revert with InvalidKeyHash since address(this) is immutable
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISmartWallet.InvalidKeyHash.selector,
+                selfKeyHash
+            )
+        );
         ISmartWallet(freshWallet).executeWithRelayer(batchedCall, signature);
 
-        // Now it should be a registered owner
-        assertTrue(IOwnerManager(freshWallet).hasOwner(selfKeyHash));
+        // It should still NOT be a registered owner
+        assertFalse(IOwnerManager(freshWallet).hasOwner(selfKeyHash));
 
-        // And getVerifiedValidator should return the registered validator
-        address registeredValidator = IOwnerManager(freshWallet)
+        // And getVerifiedValidator should still return the built-in ECDSA validator
+        address verifiedValidator = IOwnerManager(freshWallet)
             .getVerifiedValidator(selfKeyHash);
-        assertEq(registeredValidator, address(_ecdsaValidator));
+        assertEq(verifiedValidator, Static.ECDSA_VALIDATOR_ADDRESS);
     }
 
     // ============ External Validator Tests ============

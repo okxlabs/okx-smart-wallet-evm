@@ -6,9 +6,10 @@ import {Base, MockERC20} from "./Base.t.sol";
 import {ISmartWallet} from "../src/interfaces/ISmartWallet.sol";
 import {IOwnerManager} from "../src/interfaces/IOwnerManager.sol";
 import {OwnerManager} from "../src/OwnerManager.sol";
-import {Call, BatchedCall} from "../src/Types.sol";
+import {Call, BatchedCall, InitialOwner} from "../src/Types.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IHook} from "../src/interfaces/IHook.sol";
+import {Static} from "../src/libraries/Static.sol";
 
 contract MockHook is IHook {
     bytes4 public constant TRANSFER_SELECTOR = 0xa9059cbb;
@@ -1350,6 +1351,287 @@ contract HookTest is Base {
         ISmartWallet(_aliceWallet).executeWithRelayer(
             batchedCall,
             validatorData
+        );
+    }
+
+    // ============================================
+    // Tests for address(this) immutable behavior
+    // ============================================
+
+    function test_AddressThis_AlwaysReturnsECDSAValidator() public {
+        // Get the keyHash for address(this)
+        bytes32 selfKeyHash = keccak256(abi.encodePacked(_aliceWallet));
+
+        // Verify that getVerifiedValidator returns ECDSA validator for address(this)
+        address validator = IOwnerManager(_aliceWallet).getVerifiedValidator(
+            selfKeyHash
+        );
+        assertEq(
+            validator,
+            Static.ECDSA_VALIDATOR_ADDRESS,
+            "address(this) should always return ECDSA validator"
+        );
+
+        // Verify this works even if the wallet has no other owners
+        InitialOwner[] memory noOwners = new InitialOwner[](0);
+        address freshWallet = _factory.createAccount(noOwners, 0);
+        bytes32 freshSelfKeyHash = keccak256(abi.encodePacked(freshWallet));
+        address freshValidator = IOwnerManager(freshWallet)
+            .getVerifiedValidator(freshSelfKeyHash);
+        assertEq(
+            freshValidator,
+            Static.ECDSA_VALIDATOR_ADDRESS,
+            "Fresh wallet address(this) should return ECDSA validator"
+        );
+    }
+
+    function test_AddressThis_CannotBeOverridden() public {
+        // Get the keyHash for address(this)
+        bytes32 selfKeyHash = keccak256(abi.encodePacked(_aliceWallet));
+
+        // Attempt to set a different validator for address(this) - should revert
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: address(_aliceWallet),
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnerManager.addOwner.selector,
+                selfKeyHash,
+                address(_passkeyValidator), // Try to set passkey validator
+                0
+            )
+        });
+
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: _getNonce(_aliceWallet)
+        });
+
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
+        );
+
+        vm.prank(relayer);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISmartWallet.InvalidKeyHash.selector,
+                selfKeyHash
+            )
+        );
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
+
+        // Verify it still returns ECDSA validator
+        address validator = IOwnerManager(_aliceWallet).getVerifiedValidator(
+            selfKeyHash
+        );
+        assertEq(
+            validator,
+            Static.ECDSA_VALIDATOR_ADDRESS,
+            "address(this) should still be ECDSA after failed override"
+        );
+    }
+
+    function test_AddressThis_CannotBeRemoved() public {
+        // Get the keyHash for address(this)
+        bytes32 selfKeyHash = keccak256(abi.encodePacked(_aliceWallet));
+
+        // Attempt to remove address(this) as owner - should revert
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: address(_aliceWallet),
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnerManager.removeOwner.selector,
+                selfKeyHash
+            )
+        });
+
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: _getNonce(_aliceWallet)
+        });
+
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
+        );
+
+        vm.prank(relayer);
+        vm.expectRevert(
+            abi.encodeWithSelector(IOwnerManager.ValidatorNotFound.selector)
+        );
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
+
+        // Verify it still returns ECDSA validator
+        address validator = IOwnerManager(_aliceWallet).getVerifiedValidator(
+            selfKeyHash
+        );
+        assertEq(
+            validator,
+            Static.ECDSA_VALIDATOR_ADDRESS,
+            "address(this) should still exist after failed removal"
+        );
+    }
+
+    function test_AddressThis_CannotHaveExpirationOrHooks() public {
+        // Get the keyHash for address(this)
+        bytes32 selfKeyHash = keccak256(abi.encodePacked(_aliceWallet));
+
+        // Create a mock hook
+        MockHook hook = new MockHook();
+
+        // Attempt to set hook and expiration for address(this) - should revert
+        uint256 settings = IOwnerManager(_aliceWallet).packSettings(
+            true, // admin
+            uint40(block.timestamp + 1 hours), // expiration
+            address(hook) // hook
+        );
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: address(_aliceWallet),
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnerManager.addOwner.selector,
+                selfKeyHash,
+                Static.ECDSA_VALIDATOR_ADDRESS, // Try to add with settings
+                settings
+            )
+        });
+
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: _getNonce(_aliceWallet)
+        });
+
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
+        );
+
+        vm.prank(relayer);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISmartWallet.InvalidKeyHash.selector,
+                selfKeyHash
+            )
+        );
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
+
+        // Verify it still has no settings (default behavior)
+        (
+            address validator,
+            address retrievedHook,
+            uint40 expiration,
+            bool isAdmin,
+            bool expired
+        ) = IOwnerManager(_aliceWallet).getOwnerSettings(selfKeyHash);
+
+        // Note: getOwnerSettings doesn't return the validator for address(this) from storage
+        // since it's not stored. But getVerifiedValidator returns the correct value
+        assertEq(
+            validator,
+            address(0),
+            "address(this) should have no stored validator"
+        );
+        assertEq(
+            retrievedHook,
+            address(0),
+            "address(this) should have no hook"
+        );
+        assertEq(expiration, 0, "address(this) should have no expiration");
+        assertEq(
+            isAdmin,
+            false,
+            "address(this) should not have admin flag in storage"
+        );
+        assertEq(expired, false, "address(this) should not be expired");
+
+        // But getVerifiedValidator still returns ECDSA
+        address verifiedValidator = IOwnerManager(_aliceWallet)
+            .getVerifiedValidator(selfKeyHash);
+        assertEq(
+            verifiedValidator,
+            Static.ECDSA_VALIDATOR_ADDRESS,
+            "address(this) should still return ECDSA validator"
+        );
+    }
+
+    function test_AddressThis_WorksEvenWithOtherExpiredOwners() public {
+        // Add an owner with expiration
+        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: address(_aliceWallet),
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnerManager.addOwner.selector,
+                bobKeyHash,
+                Static.ECDSA_VALIDATOR_ADDRESS,
+                IOwnerManager(_aliceWallet).packSettings(
+                    false,
+                    uint40(block.timestamp + 1),
+                    address(0)
+                )
+            )
+        });
+
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: _getNonce(_aliceWallet)
+        });
+
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
+        );
+
+        vm.prank(relayer);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
+
+        // Fast forward to expire Bob's ownership
+        vm.warp(block.timestamp + 2);
+
+        // Bob's validator should be expired
+        address bobValidator = IOwnerManager(_aliceWallet).getVerifiedValidator(
+            bobKeyHash
+        );
+        assertEq(bobValidator, address(0), "Bob's validator should be expired");
+
+        // But address(this) should still work
+        bytes32 selfKeyHash = keccak256(abi.encodePacked(_aliceWallet));
+        address selfValidator = IOwnerManager(_aliceWallet)
+            .getVerifiedValidator(selfKeyHash);
+        assertEq(
+            selfValidator,
+            Static.ECDSA_VALIDATOR_ADDRESS,
+            "address(this) should still work even with expired owners"
         );
     }
 }

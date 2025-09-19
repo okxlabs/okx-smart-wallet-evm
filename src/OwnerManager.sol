@@ -2,6 +2,7 @@
 pragma solidity ^0.8.29;
 
 import {IOwnerManager} from "./interfaces/IOwnerManager.sol";
+import {ISmartWallet} from "./interfaces/ISmartWallet.sol";
 import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
 import {Static} from "./libraries/Static.sol";
 import {BaseAuthorization} from "./BaseAuthorization.sol";
@@ -45,6 +46,10 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
         // Check if keyHash is already registered
         if (_ownerKeys.contains(keyHash)) {
             revert IOwnerManager.ValidatorAlreadyExists();
+        }
+        // Prevent adding address(this) - it's a built-in owner
+        if (keyHash == keccak256(abi.encodePacked(address(this)))) {
+            revert ISmartWallet.InvalidKeyHash(keyHash);
         }
 
         // Validate validator address
@@ -152,14 +157,17 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
 
     /// @notice Get the active validator address for a given `keyHash`
     /// @dev Returns the configured validator address if present and not expired; otherwise returns address(0).
-    ///      For EIP-7702 compatibility, returns ECDSA validator for address(this) when no validator is configured.
-    ///      Note: The built-in address(this) owner can be overridden by _ownerValidators & _ownerSettings,
-    ///      allowing customization of expiry, hooks, and admin status for address(this).
+    ///      For EIP-7702 compatibility, address(this) ALWAYS returns ECDSA validator and cannot be overridden.
     /// @param keyHash The public key hash to look up
     /// @return The validator address to use for validation (address(0) if none or expired)
     function getVerifiedValidator(
         bytes32 keyHash
     ) public view returns (address) {
+        // EIP-7702 compatible: Built-in owner for address(this)
+        if (keyHash == keccak256(abi.encodePacked(address(this)))) {
+            return Static.ECDSA_VALIDATOR_ADDRESS;
+        }
+
         address validator = _ownerValidators[keyHash];
 
         // Check if validator exists and is not expired
@@ -167,11 +175,6 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
             uint256 settings = _ownerSettings[keyHash];
             if (settings != 0 && isSettingsExpired(settings)) {
                 validator = address(0); // Expired validator
-            }
-        } else {
-            // EIP-7702 compatible: Built-in owner for address(this)
-            if (keyHash == keccak256(abi.encodePacked(address(this)))) {
-                validator = Static.ECDSA_VALIDATOR_ADDRESS;
             }
         }
 
