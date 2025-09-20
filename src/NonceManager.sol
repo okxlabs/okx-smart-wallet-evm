@@ -26,9 +26,6 @@ abstract contract NonceManager is INonceManager {
 
         unchecked {
             emit NonceConsumed(key, nonce);
-            // Gas optimization: Nonce is always incremented optimistically.
-            // If validation fails, the outer function reverts, undoing this change.
-            // Saves ~500 gas compared to conditional increment pattern.
             return nonce == _nonces[key]++;
         }
     }
