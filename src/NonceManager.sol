@@ -24,7 +24,6 @@ abstract contract NonceManager is INonceManager {
         uint192 key = uint192(packedNonce >> 64);
         uint64 nonce = uint64(packedNonce);
 
-
         unchecked {
             emit NonceConsumed(key, nonce);
             // Gas optimization: Nonce is always incremented optimistically.
