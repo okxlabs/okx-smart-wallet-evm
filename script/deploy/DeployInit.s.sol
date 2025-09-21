@@ -20,7 +20,7 @@ contract DeployInit is Script {
         // Use the fixed EIP-2470 Singleton Factory through the interface
         // address is uniform across all chains
         IDeployFactory deployFactory = IDeployFactory(
-            0xce0042B868300000d44A59004Da54A005ffdcf9f
+            0xFaC897544659Fb136C064d5428947f5BC9cC1Fa2
         );
         bytes32 deployFactorySalt = vm.envBytes32("DEPLOY_FACTORY_SALT");
         console.log("Deploy factory address: %s", address(deployFactory));
