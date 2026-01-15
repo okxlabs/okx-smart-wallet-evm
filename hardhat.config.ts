@@ -1,9 +1,18 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
+import "@nomicfoundation/hardhat-foundry";
 import "dotenv/config";
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.23",
+  solidity: {
+    version: "0.8.29",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 2000
+      }
+    }
+  },
   paths: {
     sources: "./src",
     cache: "./cache",
@@ -18,9 +27,9 @@ const config: HardhatUserConfig = {
       chainId: 1,
       accounts: [process.env.DEPLOYER_PRIVATE_KEY || ""],
     },
-    devnet6: {
-      url: "https://rpc.pectra-devnet-6.ethpandaops.io",
-      chainId: 7072151312,
+    xlayer: {
+      url: "https://xlayerrpc.okx.com/",
+      chainId: 196,
       accounts: [process.env.DEPLOYER_PRIVATE_KEY || ""],
     },
     holesky: {

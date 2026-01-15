@@ -1,21 +1,28 @@
-// SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.26;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.29;
 
-import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-
-import {IValidator} from "../interfaces/IValidator.sol";
-
-/// @notice A library to store constant values that are used across the WalletCore contracts
+/// @notice A library to store constant values that are used across the SmartWallet contracts
 library Static {
-    /**
-     * @notice new storage should have a different salt
-     */
-    bytes32 public constant STORAGE_SALT =
-        keccak256(abi.encodePacked("storage"));
+    // Validator addresses for built-in validators
+    address public constant ECDSA_VALIDATOR_ADDRESS = address(1);
+    address public constant PASSKEY_VALIDATOR_ADDRESS = address(2);
 
-    bytes32 public constant VALIDATOR_SALT =
-        keccak256(abi.encodePacked("validator"));
+    // EIP-1271 signature validation return values
+    bytes4 public constant MAGIC_VALUE = 0x1626ba7e;
+    bytes4 public constant INVALID_VALUE = 0xffffffff;
 
-    address public constant SELF_VALIDATION_ADDRESS = address(1);
+    uint256 public constant CHAINLESS_NONCE_KEY = 196;
+
+    // EIP-1271 signature validation return values
+    uint256 public constant SIG_VALIDATION_FAILED = 1 << 96;
+
+    address public constant NATIVE_ETH =
+        0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+
+    string public constant ERC712_NAMESPACE = "SmartWallet";
+    string public constant ERC712_VERSION = "1.0.0";
+    string public constant ERC7201_NAMESPACE_AND_VERSION =
+        "SmartWallet.ERC7201.CustomStorage";
+    bytes32 public constant ERC7201_CUSTOM_STORAGE_ROOT =
+        0x653ff6dcbda533c3c7d8ffb646da3e510d0de40f237170c4da3f874472aecb00;
 }

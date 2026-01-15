@@ -24,6 +24,7 @@ coverage_report
 # Hardhat files
 artifacts
 cache
+cache_hardhat
 typechain-types
 
 #node Module
@@ -31,3 +32,10 @@ node_modules
 
 # .env
 .env
+
+# VS Code settings
+.vscode/
+.claude/
+
+# Wake framework
+.wake/

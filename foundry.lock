@@ -1,0 +1,29 @@
+{
+  "lib/account-abstraction": {
+    "rev": "7af70c8993a6f42973f520ae0752386a5032abe7"
+  },
+  "lib/solady": {
+    "rev": "a5bb996e91aae5b0c068087af7594d92068b12f1"
+  },
+  "lib/smart-wallet-recovery": {
+    "branch": {
+      "name": "dev",
+      "rev": "75f22a96d877e53db2471e547eb1d95a43a18eaf"
+    }
+  },
+  "lib/webauthn-sol": {
+    "rev": "619f20ab0f074fef41066ee4ab24849a913263b2"
+  },
+  "lib/openzeppelin-contracts-upgradeable": {
+    "tag": {
+      "name": "v5.0.2",
+      "rev": "723f8cab09cdae1aca9ec9cc1cfa040c2d4b06c1"
+    }
+  },
+  "lib/forge-std": {
+    "rev": "c7be2a3481f9e51230880bb0949072c7e3a4da82"
+  },
+  "lib/openzeppelin-contracts": {
+    "rev": "c64a1edb67b6e3f4a15cca8909c9482ad33a02b0"
+  }
+}
