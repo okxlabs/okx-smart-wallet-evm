@@ -266,7 +266,7 @@ contract MerkleExecutionTest is Base {
         // Execute with merkle validation
         vm.startPrank(_bob); // Bob is the relayer
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(
+        emit RelayerExecuteSuccessEvent(
             _getExecuteWithRelayerHash(batchedCall, 0, _aliceWallet),
             _bob,
             0
@@ -408,7 +408,7 @@ contract MerkleExecutionTest is Base {
         // First execution should succeed
         vm.startPrank(_bob);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(
+        emit RelayerExecuteSuccessEvent(
             _getExecuteWithRelayerHash(batchedCall, 0, _aliceWallet),
             _bob,
             0
@@ -520,7 +520,7 @@ contract MerkleExecutionTest is Base {
 
         vm.startPrank(_bob);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(
+        emit RelayerExecuteSuccessEvent(
             _getExecuteWithRelayerHash(batchedCall, 0, _aliceWallet),
             _bob,
             0

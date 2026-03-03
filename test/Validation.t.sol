@@ -139,7 +139,7 @@ contract ValidationTest is Base {
 
         vm.startPrank(_alice);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(
+        emit RelayerExecuteSuccessEvent(
             _getExecuteWithRelayerHash(
                 BatchedCall({calls: calls, nonce: 0}),
                 0,

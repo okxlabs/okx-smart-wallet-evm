@@ -47,7 +47,7 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
 
         // If we reach here, the call succeeded
         // Emit success event with the intent hash that the user signed
-        emit ExecuteSuccessEvent(
+        emit RelayerExecuteSuccessEvent(
             dataHash, // This is the intentHash - the hash of the user's execution intent
             msg.sender,
             batchedCall.nonce

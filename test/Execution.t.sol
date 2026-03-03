@@ -216,7 +216,7 @@ contract ExecutionTest is Base {
 
         vm.startPrank(_bob);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(
+        emit RelayerExecuteSuccessEvent(
             _getExecuteWithRelayerHash(batchedCall, 0, _aliceWallet),
             _bob,
             0
@@ -257,7 +257,7 @@ contract ExecutionTest is Base {
 
         vm.startPrank(_alice);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(
+        emit RelayerExecuteSuccessEvent(
             _getExecuteWithRelayerHash(batchedCall, 0, charlieWallet),
             _alice,
             0
@@ -320,7 +320,7 @@ contract ExecutionTest is Base {
         );
         vm.startPrank(_bob);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(
+        emit RelayerExecuteSuccessEvent(
             _getExecuteWithRelayerHash(batchedCall, 0, _aliceWallet),
             _bob,
             0
@@ -383,7 +383,7 @@ contract ExecutionTest is Base {
 
         vm.startPrank(_bob);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(
+        emit RelayerExecuteSuccessEvent(
             _getExecuteWithRelayerHash(batchedCall, 0, _aliceWallet),
             _bob,
             0
@@ -469,7 +469,7 @@ contract ExecutionTest is Base {
         uint256 initialGas = gasleft();
         vm.startPrank(_bob);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(
+        emit RelayerExecuteSuccessEvent(
             _getExecuteWithRelayerHash(batchedCall, 0, _aliceWallet),
             _bob,
             0

@@ -153,7 +153,7 @@ contract AdminPermissionsTest is Base {
         // Non-admin should be able to make external calls
         vm.startPrank(_bob);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(
+        emit RelayerExecuteSuccessEvent(
             _getExecuteWithRelayerHash(batchedCall, 0, _aliceWallet),
             _bob,
             0

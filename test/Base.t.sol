@@ -114,7 +114,7 @@ contract Base is Test {
     Call[] internal emptyRelayerCalls;
     SmartWalletSimulator internal _simulator;
 
-    event ExecuteSuccessEvent(
+    event RelayerExecuteSuccessEvent(
         bytes32 indexed intentHash,
         address sender,
         uint256 nonce

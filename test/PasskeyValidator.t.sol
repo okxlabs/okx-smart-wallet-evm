@@ -603,7 +603,7 @@ contract PasskeyValidatorTest is Base {
 
         vm.startPrank(_bob);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(
+        emit RelayerExecuteSuccessEvent(
             _getExecuteWithRelayerHash(batchedCall, 0, builtinWallet),
             _bob,
             batchedCall.nonce
