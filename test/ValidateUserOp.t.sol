@@ -16,6 +16,7 @@ import {ERC4337Account} from "src/ERC4337Account.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {Call} from "src/Types.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography//MessageHashUtils.sol";
 
 // Mock contract moved from end of file
 contract MockEntryPoint {
@@ -726,13 +727,16 @@ contract ValidateUserOpTest is Base {
         t.missingAccountFunds = 1000;
         vm.deal(address(account), 2 ether);
 
-        bytes32 passkeyHashWithValidUntil = keccak256(
-            abi.encode(
-                t.userOpHash,
-                uint48(0),
-                ISmartWallet(account).IMPLEMENTATION()
-            )
-        );
+        bytes32 passkeyHashWithValidUntil = MessageHashUtils
+            .toEthSignedMessageHash(
+                keccak256(
+                    abi.encode(
+                        t.userOpHash,
+                        uint48(0),
+                        ISmartWallet(account).IMPLEMENTATION()
+                    )
+                )
+            );
         (, , bytes32 messageHash) = HelperLib.getPasskeyMessageHash(
             passkeyHashWithValidUntil
         );

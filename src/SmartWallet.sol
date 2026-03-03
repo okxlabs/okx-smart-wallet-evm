@@ -5,6 +5,7 @@ import {ERC712} from "./ERC712.sol";
 import {ERC7201} from "./ERC7201.sol";
 import {ISmartWallet} from "./interfaces/ISmartWallet.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography//MessageHashUtils.sol";
 import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
 import {OwnerManager} from "./OwnerManager.sol";
 import {NonceManager} from "./NonceManager.sol";
@@ -282,8 +283,8 @@ abstract contract SmartWallet is
         }
 
         // Step 6: Add validUntil and IMPLEMENTATION to hash after chainless processing
-        userOpHash = keccak256(
-            abi.encode(userOpHash, validUntil, IMPLEMENTATION)
+        userOpHash = MessageHashUtils.toEthSignedMessageHash(
+            keccak256(abi.encode(userOpHash, validUntil, IMPLEMENTATION))
         );
 
         // Step 7: Validate signature

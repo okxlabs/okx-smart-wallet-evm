@@ -27,6 +27,7 @@ import {ERC4337Account} from "src/ERC4337Account.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {MessageSignLib} from "src/libraries/MessageSignLib.sol";
 import {SmartWalletSimulator} from "script/utils/SmartWalletSimulator.s.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography//MessageHashUtils.sol";
 
 // ============ Mock Contracts for Testing ============
 
@@ -629,8 +630,10 @@ contract Base is Test {
         // 2. Add validUntil and IMPLEMENTATION to hash after chainless processing
         // The IMPLEMENTATION is the deployed SmartWallet implementation address
         return
-            keccak256(
-                abi.encode(userOpHash, validUntil, address(_smartWallet))
+            MessageHashUtils.toEthSignedMessageHash(
+                keccak256(
+                    abi.encode(userOpHash, validUntil, address(_smartWallet))
+                )
             );
     }
 

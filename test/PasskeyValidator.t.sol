@@ -17,6 +17,7 @@ import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {Static} from "src/libraries/Static.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 import {InitialOwner} from "src/Types.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography//MessageHashUtils.sol";
 
 /**
  * @title PasskeyValidatorTest
@@ -724,13 +725,16 @@ contract PasskeyValidatorTest is Base {
         bytes32 userOpHash = IEntryPoint(ENTRYPOINT_ADDRESS).getUserOpHash(
             userOp
         );
-        bytes32 userOpHashWithValidUntil = keccak256(
-            abi.encode(
-                userOpHash,
-                uint48(0),
-                ISmartWallet(passkeyWallet).IMPLEMENTATION()
-            )
-        );
+        bytes32 userOpHashWithValidUntil = MessageHashUtils
+            .toEthSignedMessageHash(
+                keccak256(
+                    abi.encode(
+                        userOpHash,
+                        uint48(0),
+                        ISmartWallet(passkeyWallet).IMPLEMENTATION()
+                    )
+                )
+            );
         bytes memory signature = _createBuiltinPasskeySignature(
             builtinKeyHash,
             userOpHashWithValidUntil
