@@ -27,7 +27,7 @@ import {ERC4337Account} from "src/ERC4337Account.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {MessageSignLib} from "src/libraries/MessageSignLib.sol";
 import {SmartWalletSimulator} from "script/utils/SmartWalletSimulator.s.sol";
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography//MessageHashUtils.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 // ============ Mock Contracts for Testing ============
 

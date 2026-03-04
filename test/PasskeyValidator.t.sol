@@ -17,7 +17,7 @@ import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {Static} from "src/libraries/Static.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 import {InitialOwner} from "src/Types.sol";
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography//MessageHashUtils.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 /**
  * @title PasskeyValidatorTest

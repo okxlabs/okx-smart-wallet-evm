@@ -16,7 +16,7 @@ import {ERC4337Account} from "src/ERC4337Account.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {Call} from "src/Types.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography//MessageHashUtils.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 // Mock contract moved from end of file
 contract MockEntryPoint {
