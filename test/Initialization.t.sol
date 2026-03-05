@@ -110,21 +110,6 @@ contract InitializationTest is Base {
         _factory.createAccount(initialOwners, 0);
     }
 
-    function test_Storage_ReturnsCorrectOwner_Success() public {
-        // Deploy wallet through factory with empty owners
-        InitialOwner[] memory emptyOwners = new InitialOwner[](0);
-        address wallet = _factory.createAccount(emptyOwners, 0);
-
-        // Check that wallet is properly deployed and initialized
-        assertGt(
-            address(wallet).code.length,
-            0,
-            "Wallet should be deployed with code!"
-        );
-
-        // The wallet should be properly initialized (no specific owner check needed for empty owners)
-    }
-
     function test_RevertWhen_Implementation_CannotBeInitialized() public {
         // Attempt to call initialize directly on the implementation
         InitialOwner[] memory initialOwners = _createSingleOwner(

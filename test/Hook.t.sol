@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import {console} from "forge-std/console.sol";
 import {Base, MockERC20} from "./Base.t.sol";
 import {ISmartWallet} from "../src/interfaces/ISmartWallet.sol";
 import {IOwnerManager} from "../src/interfaces/IOwnerManager.sol";
@@ -1261,8 +1260,6 @@ contract HookTest is Base {
         (, address hook, , , ) = IOwnerManager(_aliceWallet).getOwnerSettings(
             aliceKeyHash
         );
-        console.log("Hook address after proper setup:", hook);
-
         // Now try to execute a call that should trigger the hook
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -1316,9 +1313,6 @@ contract HookTest is Base {
             expiration,
             contractHook
         );
-        console.log("Contract settings:", contractSettings);
-        console.log("Contract hook address:", contractHook);
-
         // Now try to execute a call that should trigger the hook
         Call[] memory calls = new Call[](1);
         calls[0] = Call({

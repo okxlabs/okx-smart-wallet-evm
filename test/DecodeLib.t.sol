@@ -59,7 +59,7 @@ contract DecodeLibTest is Test {
         assertEq(result.length, 1);
         assertEq(result[0].target, address(0x1234));
         assertEq(result[0].value, 1 ether);
-        assertEq(result[0].data.length, 0);
+        assertEq(result[0].data, "");
     }
 
     function test_DecodeCalls_SingleCall_WithData_Success() public {
@@ -100,8 +100,9 @@ contract DecodeLibTest is Test {
         assertEq(result.length, 3);
         assertEq(result[0].target, address(0x1111));
         assertEq(result[0].value, 1 ether);
-        assertEq(result[0].data.length, 0);
+        assertEq(result[0].data, "");
         assertEq(result[1].target, address(0x2222));
+        assertEq(result[1].value, 0);
         assertEq(result[1].data, hex"deadbeef");
         assertEq(result[2].target, address(0x3333));
         assertEq(result[2].value, 0.5 ether);
@@ -220,14 +221,15 @@ contract DecodeLibTest is Test {
         harness.decodeCalls(callData);
     }
 
-    function test_RevertWhen_DecodeCalls_OverflowAttack_OverflowToZero()
+    function test_RevertWhen_DecodeCalls_OverflowAttack_OverflowToPositive()
         public
     {
-        // relOffset = type(uint256).max - 31, add overflows to 0
-        // Old: gt(0, callData.length) = false → bypass
-        // New: correct revert
+        // relOffset = type(uint256).max - 15
+        // add(type(uint256).max - 15, 32) = 16 (overflows, wraps to positive)
+        // Old: gt(16, 64) = false → bypass
+        // New: (type(uint256).max - 15) > (64 - 32) → correct revert
         bytes memory callData = abi.encodePacked(
-            bytes32(type(uint256).max - 31),
+            bytes32(type(uint256).max - 15),
             bytes32(uint256(0))
         );
         vm.expectRevert(DecodeLib.InvalidCallData.selector);

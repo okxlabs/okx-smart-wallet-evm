@@ -22,13 +22,13 @@ contract FallbackHandlerTest is Base {
             address(this)
         );
         (bool success, ) = _aliceWallet.call(invalidData);
-        assert(!success);
+        assertFalse(success);
     }
 
     function test_Fallback_HandlesErc721Receive_Success() public {
         // Create calldata for onERC721Received
         bytes memory data = abi.encodeWithSelector(
-            0x150b7a02, // onERC721Received selector
+            IERC721Receiver.onERC721Received.selector,
             address(this),
             address(this),
             1,
@@ -40,13 +40,13 @@ contract FallbackHandlerTest is Base {
 
         // Verify success and returned selector
         assertTrue(success);
-        assertEq(bytes4(returnData), bytes4(0x150b7a02));
+        assertEq(bytes4(returnData), IERC721Receiver.onERC721Received.selector);
     }
 
     function test_Fallback_HandlesErc1155Receive_Success() public {
         // Create calldata for onERC1155Received
         bytes memory data = abi.encodeWithSelector(
-            0xf23a6e61, // onERC1155Received selector
+            IERC1155Receiver.onERC1155Received.selector,
             address(this),
             address(this),
             1,
@@ -59,7 +59,10 @@ contract FallbackHandlerTest is Base {
 
         // Verify success and returned selector
         assertTrue(success);
-        assertEq(bytes4(returnData), bytes4(0xf23a6e61));
+        assertEq(
+            bytes4(returnData),
+            IERC1155Receiver.onERC1155Received.selector
+        );
     }
 
     function test_Fallback_HandlesErc1155BatchReceive_Success() public {
@@ -73,7 +76,7 @@ contract FallbackHandlerTest is Base {
 
         // Create calldata for onERC1155BatchReceived
         bytes memory data = abi.encodeWithSelector(
-            0xbc197c81, // onERC1155BatchReceived selector
+            IERC1155Receiver.onERC1155BatchReceived.selector,
             address(this),
             address(this),
             ids,
@@ -86,7 +89,10 @@ contract FallbackHandlerTest is Base {
 
         // Verify success and returned selector
         assertTrue(success);
-        assertEq(bytes4(returnData), bytes4(0xbc197c81));
+        assertEq(
+            bytes4(returnData),
+            IERC1155Receiver.onERC1155BatchReceived.selector
+        );
     }
 
     function test_SupportsInterface_TokenReceiveInterfaces_Success()

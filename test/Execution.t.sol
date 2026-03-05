@@ -3,7 +3,6 @@ pragma solidity ^0.8.23;
 
 import {Base, MockComplexContract, MockRevertingContract, MockERC20} from "./Base.t.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {console} from "forge-std/console.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {Call, BatchedCall} from "src/Types.sol";
@@ -228,8 +227,6 @@ contract ExecutionTest is Base {
         vm.stopPrank();
 
         uint256 gasEnd = gasleft();
-        console.log("gas used", gasStart - gasEnd);
-
         assertEq(address(_bob).balance, 1 ether);
     }
 
@@ -874,8 +871,6 @@ contract ExecutionTest is Base {
     // ============ EIP-7702 Execution Tests ============
 
     function test_Execute_AddOwnerViaRelayer() public {
-        console.log("Testing: Add owner via executeWithRelayer");
-
         // Use alice's wallet which is already deployed and initialized
         // Alice is an admin owner of this wallet
 
@@ -923,16 +918,11 @@ contract ExecutionTest is Base {
             address(_ecdsaValidator),
             "New owner should be added"
         );
-        console.log("Successfully added new owner via executeWithRelayer");
     }
 
     // ============ EIP-7702 Relayer Bypass Tests (Built-in Owner) ============
 
     function test_Execute_EIP7702RelayerBypass_UninitializedEOA() public {
-        console.log(
-            "Testing: Relayer can execute on uninitialized EIP-7702 EOA"
-        );
-
         // Create a new EOA for this test
         (address eoaWallet, uint256 eoaPrivateKey) = makeAddrAndKey(
             "eoaRelayerTest"
@@ -941,7 +931,6 @@ contract ExecutionTest is Base {
 
         // Step 1: Set wallet code to EOA (simulating EIP-7702)
         _setCodeToEoa(address(_smartWallet), eoaWallet);
-        console.log("Set wallet code to EOA:", eoaWallet);
 
         // Step 2: Verify EOA is not initialized (no owners)
         uint256 ownerCount = IOwnerManager(eoaWallet).ownerCount();
@@ -991,18 +980,11 @@ contract ExecutionTest is Base {
             0.5 ether,
             "Bob should receive 0.5 ETH"
         );
-        console.log(
-            "Successfully executed transaction without initialization!"
-        );
     }
 
     function test_RevertWhen_Execute_EIP7702RelayerBypass_InvalidSignature()
         public
     {
-        console.log(
-            "Testing: Invalid signature fails for uninitialized EIP-7702 EOA"
-        );
-
         // Create a new EOA for this test
         (address eoaWallet, ) = makeAddrAndKey("eoaInvalidSig");
         vm.deal(eoaWallet, 10 ether);
@@ -1047,13 +1029,9 @@ contract ExecutionTest is Base {
         vm.prank(relayer);
         vm.expectRevert(ISmartWallet.InvalidSignature.selector);
         ISmartWallet(eoaWallet).executeWithRelayer(batchedCall, validatorData);
-
-        console.log("Correctly rejected invalid signature");
     }
 
     function test_Execute_EIP7702RelayerBypass_OnlyAddressThisBuiltin() public {
-        console.log("Testing: Different keyHash returns zero (no built-in)");
-
         // Create a new EOA for this test
         (address eoaWallet, ) = makeAddrAndKey("eoaOnlyThis");
         vm.deal(eoaWallet, 10 ether);
@@ -1081,15 +1059,9 @@ contract ExecutionTest is Base {
             Static.ECDSA_VALIDATOR_ADDRESS,
             "Should return ECDSA for address(this)"
         );
-
-        console.log("Verified: only address(this) gets built-in validator");
     }
 
     function test_Execute_EIP7702RelayerBypass_ChainlessExecution() public {
-        console.log(
-            "Testing: Chainless execution with uninitialized EIP-7702 EOA"
-        );
-
         // Create a new EOA for this test
         (address eoaWallet, uint256 eoaPrivateKey) = makeAddrAndKey(
             "eoaChainless"
@@ -1148,9 +1120,5 @@ contract ExecutionTest is Base {
         // Step 5: Verify owner was added
         bool hasOwner = IOwnerManager(eoaWallet).hasOwner(newOwnerKeyHash);
         assertTrue(hasOwner, "Bob should be added as owner");
-
-        console.log(
-            "Successfully executed chainless operation without initialization!"
-        );
     }
 }

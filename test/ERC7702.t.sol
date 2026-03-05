@@ -2,7 +2,6 @@
 pragma solidity ^0.8.23;
 
 import {Base} from "./Base.t.sol";
-import {console} from "forge-std/console.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";

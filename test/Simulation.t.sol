@@ -4,7 +4,6 @@ pragma solidity ^0.8.23;
 import {Base, MockERC20} from "./Base.t.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
-import {console} from "forge-std/console.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC712} from "src/ERC712.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
@@ -393,10 +392,6 @@ contract SimulationTest is Base {
             uint256 delegateGasAfter = gasleft();
             uint256 delegateGasUsed = delegateGasBefore - delegateGasAfter;
 
-            console.log("Direct call gas used:", directGasUsed);
-            console.log("DelegateAndRevert gas used:", delegateGasUsed);
-            console.log("Overhead:", delegateGasUsed - directGasUsed);
-
             // DelegateAndRevert should use more gas due to delegatecall overhead
             assertTrue(
                 delegateGasUsed > directGasUsed,
@@ -473,11 +468,6 @@ contract SimulationTest is Base {
         uint256 gasEnd = gasleft();
         actualGasUsed = gasStart - gasEnd;
 
-        // Log results for comparison
-        console.log("=== GAS USAGE COMPARISON ===");
-        console.log("Simulate execution gas:", simulateExecutionGas);
-        console.log("Actual external gas used:", actualGasUsed);
-
         // Calculate percentage difference
         uint256 gasDifference;
         uint256 percentageDifference;
@@ -489,9 +479,6 @@ contract SimulationTest is Base {
             gasDifference = simulateExecutionGas - actualGasUsed;
             percentageDifference = (gasDifference * 100) / actualGasUsed;
         }
-
-        console.log("Gas difference:", gasDifference);
-        console.log("Percentage difference:", percentageDifference, "%");
 
         // Assert both operations completed (basic sanity check)
         assertTrue(
@@ -513,10 +500,6 @@ contract SimulationTest is Base {
                 vm.toString(percentageDifference),
                 "%"
             )
-        );
-
-        console.log(
-            "Test passed - gas usage between simulated execution gas and actual external gas within 5% tolerance"
         );
     }
 }
