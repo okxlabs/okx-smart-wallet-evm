@@ -21,8 +21,6 @@ import {MessageSignLib} from "src/libraries/MessageSignLib.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
-
-
 library HelperLib {
     uint256 public constant CHALLENGE_LOCATION = 23;
     uint256 public constant TYPE_INDEX = 1;
@@ -258,6 +256,14 @@ contract Helper {
         return MessageHashUtils.toEthSignedMessageHash(keccak256(abi.encode(userOpHash, validUntil, IMPLEMENTATION)));
     }
 
+    function getUserOpHashWithUntilForEOA(
+        bytes32 userOpHash,
+        uint48 validUntil,
+        address IMPLEMENTATION
+    ) external pure returns (bytes32) {
+        return keccak256(abi.encode(userOpHash, validUntil, IMPLEMENTATION));
+    }
+
     function getBatchCallHash(
         BatchedCall calldata batchedCall,
         uint48 validUntil,
@@ -317,4 +323,3 @@ contract MockERC20 is ERC20 {
         _burn(from, amount);
     }
 }
-
