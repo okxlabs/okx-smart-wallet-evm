@@ -1366,9 +1366,12 @@ contract HookTest is Base {
             "address(this) should always return ECDSA validator"
         );
 
-        // Verify this works even if the wallet has no other owners
-        InitialOwner[] memory noOwners = new InitialOwner[](0);
-        address freshWallet = _factory.createAccount(noOwners, 0);
+        // Verify this works for a wallet with a single owner
+        InitialOwner[] memory singleOwner = _createSingleOwner(
+            keccak256(abi.encodePacked(_bob)),
+            address(_ecdsaValidator)
+        );
+        address freshWallet = _factory.createAccount(singleOwner, 1);
         bytes32 freshSelfKeyHash = keccak256(abi.encodePacked(freshWallet));
         address freshValidator = IOwnerManager(freshWallet)
             .getVerifiedValidator(freshSelfKeyHash);

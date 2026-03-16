@@ -16,6 +16,7 @@ interface ISmartWallet is IERC165 {
     error InvalidValidatorDataLength(uint256 actual, uint256 required);
     error DelegateAndRevert(bool success, bytes ret);
     error UnauthorizedInitialization();
+    error InitialOwnersLengthIsZero();
 
     // EVENTS
     event WalletInitialized();

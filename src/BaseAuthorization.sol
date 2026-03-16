@@ -27,19 +27,16 @@ abstract contract BaseAuthorization {
     }
 
     /// @notice Reads the factory address from immutable args if present
-    /// @dev Public function to allow external verification of the factory address
-    /// @return Factory address if deployed with immutable args, address(0) otherwise
+    /// @dev WARNING: Only valid when called on an ERC1967 proxy deployed via LibClone with immutable args.
+    /// On direct deployment, returns dirty bytecode data; on EIP-7702, reverts.
+    /// @return Factory address embedded in proxy bytecode if valid
     function getImmutableFactory() public view returns (address) {
-        // Read immutable args from bytecode using LibClone
-        // The factory address is stored as the first 32 bytes
         bytes memory args = LibClone.argsOnERC1967(address(this), 0, 32);
 
-        // If we have exactly 32 bytes, decode as address
         if (args.length == 32) {
             return abi.decode(args, (address));
         }
 
-        // No immutable args present (e.g., direct deployment or EIP-7702)
         return address(0);
     }
 }

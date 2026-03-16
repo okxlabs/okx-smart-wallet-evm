@@ -21,7 +21,7 @@ library Static {
 
     string public constant ERC712_NAMESPACE = "SmartWallet";
     string public constant ERC712_VERSION = "1.1.0";
-    string public constant ERC7201_NAMESPACE_AND_VERSION =
+    string public constant ERC7201_NAMESPACE =
         "SmartWallet.ERC7201.CustomStorage";
     bytes32 public constant ERC7201_CUSTOM_STORAGE_ROOT =
         0x653ff6dcbda533c3c7d8ffb646da3e510d0de40f237170c4da3f874472aecb00;

@@ -76,6 +76,9 @@ abstract contract SmartWallet is
         // isAdmin = true, expiration = 0 (never expires), hook = address(0)
         uint256 settings = packSettings(true, 0, address(0));
         uint256 len = initialOwners.length;
+        if (len == 0) {
+            revert InitialOwnersLengthIsZero();
+        }
         for (uint256 i = 0; i < len; i++) {
             bytes32 keyHash = initialOwners[i].keyHash;
             address validator = initialOwners[i].validator;
@@ -318,7 +321,10 @@ abstract contract SmartWallet is
         // Make sure the _signature can be decoded
         if (signature.length == 65) {
             (address recovered, , ) = ECDSA.tryRecover(_hash, signature);
-            if (recovered == address(this)) return Static.MAGIC_VALUE;
+            return
+                recovered == address(this)
+                    ? Static.MAGIC_VALUE
+                    : Static.INVALID_VALUE;
         }
 
         // Extract pubKeyHash, validUntil and signature from the input

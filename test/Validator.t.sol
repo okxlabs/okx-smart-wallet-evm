@@ -657,20 +657,15 @@ contract ValidatorTest is Base {
         assertFalse(bobIsExpired); // Not expired
     }
 
-    function test_Initialize_WithEmptyInitialOwners_Success() public {
-        // Deploy wallet through factory with empty array
+    function test_RevertWhen_Initialize_WithEmptyInitialOwners() public {
+        // Deploy wallet through factory with empty array should revert
         InitialOwner[] memory initialOwners = new InitialOwner[](0);
-        address newWallet = _factory.createAccount(initialOwners, 2); // Use salt 2 to avoid collision
-        vm.deal(newWallet, 10 ether);
-
-        // Should succeed without errors
-        // No signers should be set
-        bytes32 testKeyHash = keccak256(abi.encodePacked(_alice));
-        assertEq(
-            _getValidatorFromSettings(IOwnerManager(newWallet), testKeyHash),
-            address(0)
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISmartWallet.InitialOwnersLengthIsZero.selector
+            )
         );
-        assertFalse(_isSignerAdmin(newWallet, testKeyHash));
+        _factory.createAccount(initialOwners, 2);
     }
 
     function test_RevertWhen_RemoveValidator_NonOwner() public {

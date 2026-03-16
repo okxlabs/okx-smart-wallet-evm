@@ -14,22 +14,28 @@ contract InitializationTest is Base {
 
     function test_RevertWhen_Initialize_CalledTwice() public {
         // Deploy a wallet through factory
-        InitialOwner[] memory emptyOwners = new InitialOwner[](0);
-        address wallet = _factory.createAccount(emptyOwners, 0);
+        InitialOwner[] memory initialOwners = _createSingleOwner(
+            keccak256(abi.encodePacked(_alice)),
+            address(_ecdsaValidator)
+        );
+        address wallet = _factory.createAccount(initialOwners, 1);
 
         // Second initialization should fail with OpenZeppelin's error
         vm.expectRevert(
             abi.encodeWithSelector(Initializable.InvalidInitialization.selector)
         );
-        ISmartWallet(wallet).initialize(emptyOwners);
+        ISmartWallet(wallet).initialize(initialOwners);
     }
 
     function test_Initialize_ProperlySetsStorage_Success() public {
         // Deploy a wallet through factory and check that it modifies storage
-        InitialOwner[] memory emptyOwners = new InitialOwner[](0);
+        InitialOwner[] memory initialOwners = _createSingleOwner(
+            keccak256(abi.encodePacked(_bob)),
+            address(_ecdsaValidator)
+        );
 
         // The factory will call initialize, which should modify storage
-        address wallet = _factory.createAccount(emptyOwners, 0);
+        address wallet = _factory.createAccount(initialOwners, 1);
 
         // Verify the wallet was properly initialized by checking it's deployed
         assertGt(
