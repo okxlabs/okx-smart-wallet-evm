@@ -8,37 +8,23 @@ import {ISmartWalletFactory} from "src/interfaces/ISmartWalletFactory.sol";
 import {IERC4337Account} from "src/interfaces/IERC4337Account.sol";
 import {InitialOwner, Call} from "src/Types.sol";
 import {Static} from "src/libraries/Static.sol";
-import {HelperLib} from "./utils/Helper.s.sol";
-import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
-import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
-import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
-/// @title SendUop
-/// @notice Foundry script equivalent of sendUop.ts — builds and submits a Passkey-signed UserOperation
-contract SendUop is Script {
-    // P-256 curve order, used for low-S normalisation
-    uint256 constant P256_N =
-        0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551;
-    uint256 constant P256_N_DIV_2 = P256_N / 2;
-
+/// @title SendUopWithECDSA
+contract SendUopWithECDSA is Script {
     // Wallet configuration (mirrors TS constants)
     uint256 constant SALT = 1100;
     uint256 constant PUB_KEY_X =
         0x2080e77dc16162c7debbdeaa0bbf2de797d66bb9c42b327f58637699fbe2336a;
     uint256 constant PUB_KEY_Y =
         0xca68486eae03fa39c8567ffd461b254a00171a746eaaee435a91fb06ef53e67c;
-    address constant TOKEN_ADDRESS =
-        0x6250C0459A6565F904B71E2D53C3d2BbB582357c;
-    // Matches CHAINLESS_NONCE_KEY = 196n in TS
+    // Mirrors CHAINLESS_NONCE_KEY = 196n in TS
     uint256 constant CHAINLESS_NONCE_KEY = 196;
 
     address constant ENTRYPOINT = 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
 
     function run() external {
         uint256 deployerPk = vm.envUint("DEPLOYER_PRIVATE_KEY");
-        uint256 passkeyPk = vm.envUint("PASSKEY_PRIVATE_KEY");
-
         address deployer = vm.addr(deployerPk);
         address factory = vm.envAddress("SMART_WALLET_FACTORY");
         address smartWalletImpl = vm.envAddress("SMART_WALLET");
@@ -63,6 +49,7 @@ contract SendUop is Script {
 
         vm.startBroadcast(deployerPk);
 
+        // Prefund sender when account does not yet exist
         if (!accountExists) {
             (bool ok, ) = sender.call{value: 0.0001 ether}("");
             require(ok, "prefund failed");
@@ -73,17 +60,21 @@ contract SendUop is Script {
             nonce,
             accountExists,
             factory,
-            initialOwners
+            initialOwners,
+            deployer
         );
 
-        userOp.signature = _buildSignature(
+        userOp.signature = _buildEoaSignature(
             entrypoint,
             userOp,
             nonce,
             smartWalletImpl,
-            passkeyPk,
-            initialOwners[0].keyHash
+            deployerPk,
+            // ECDSA owner is initialOwners[1]
+            initialOwners[1].keyHash
         );
+
+        console.log("UserOp signature length:", userOp.signature.length);
 
         _logAndSubmit(entrypoint, userOp, payable(deployer));
 
@@ -101,7 +92,7 @@ contract SendUop is Script {
             keyHash: keccak256(abi.encodePacked(PUB_KEY_X, PUB_KEY_Y)),
             validator: Static.PASSKEY_VALIDATOR_ADDRESS
         });
-        // ECDSA owner (validator = address(1))
+        // ECDSA owner (validator = address(1)) — keyHash = keccak256(abi.encodePacked(address))
         initialOwners[1] = InitialOwner({
             keyHash: keccak256(abi.encodePacked(deployer)),
             validator: Static.ECDSA_VALIDATOR_ADDRESS
@@ -113,7 +104,8 @@ contract SendUop is Script {
         uint256 nonce,
         bool accountExists,
         address factory,
-        InitialOwner[] memory initialOwners
+        InitialOwner[] memory initialOwners,
+        address deployer
     ) internal view returns (PackedUserOperation memory userOp) {
         bytes memory initCode = accountExists
             ? bytes("")
@@ -126,16 +118,15 @@ contract SendUop is Script {
             );
         console.log("initCode length:", initCode.length);
 
+        // Simple ETH transfer to deployer (mirrors TS: target=deployer, value=1, data="0x")
         Call[] memory calls = new Call[](1);
-        calls[0] = Call({
-            target: TOKEN_ADDRESS,
-            value: 1,
-            data: new bytes(0)
-        });
+        calls[0] = Call({target: deployer, value: 1, data: bytes("")});
+
         bytes memory callData = abi.encodePacked(
             IERC4337Account.executeUserOp.selector,
             abi.encode(calls)
         );
+        console.log("callData length:", callData.length);
 
         // accountGasLimits: upper 128 = verificationGasLimit (2_000_000), lower 128 = callGasLimit (400_000)
         // gasFees:          upper 128 = maxPriorityFeePerGas (1 wei),     lower 128 = maxFeePerGas (1 wei)
@@ -154,88 +145,44 @@ contract SendUop is Script {
         });
     }
 
-    function _buildSignature(
+    function _buildEoaSignature(
         IEntryPoint entrypoint,
         PackedUserOperation memory userOp,
         uint256 nonce,
         address smartWalletImpl,
-        uint256 passkeyPk,
-        bytes32 passkeyKeyHash
+        uint256 signerPk,
+        bytes32 ecdsaKeyHash
     ) internal view returns (bytes memory) {
-        bytes32 uopHash = _computeUopHash(
-            entrypoint,
-            userOp,
-            nonce,
-            smartWalletImpl
-        );
-
-        bytes32[] memory proofs = new bytes32[](0);
-        bytes32 rootHash = MerkleProof.processProof(proofs, uopHash);
-
-        return _signWithPasskey(passkeyPk, passkeyKeyHash, rootHash, proofs);
-    }
-
-    function _computeUopHash(
-        IEntryPoint entrypoint,
-        PackedUserOperation memory userOp,
-        uint256 nonce,
-        address smartWalletImpl
-    ) internal view returns (bytes32 uopHash) {
         // Mirrors TS: if (nonce === CHAINLESS_NONCE_KEY) use chainless hash
+        bytes32 rawUopHash;
         if (nonce == CHAINLESS_NONCE_KEY) {
-            uopHash = IERC4337Account(smartWalletImpl)
+            rawUopHash = IERC4337Account(smartWalletImpl)
                 .getUserOpHashWithoutChainId(userOp);
         } else {
-            uopHash = entrypoint.getUserOpHash(userOp);
+            rawUopHash = entrypoint.getUserOpHash(userOp);
         }
-        // Mirrors helper.getUserOpHashWithUntil(uopHash, 0, smartWalletImpl)
-        uopHash = MessageHashUtils.toEthSignedMessageHash(
-            keccak256(abi.encode(uopHash, uint48(0), smartWalletImpl))
-        );
-    }
+        console.log("rawUopHash:");
+        console.logBytes32(rawUopHash);
 
-    function _signWithPasskey(
-        uint256 passkeyPk,
-        bytes32 passkeyKeyHash,
-        bytes32 rootHash,
-        bytes32[] memory proofs
-    ) internal view returns (bytes memory) {
-        (, , bytes32 passkeyMsgHash) = HelperLib.getPasskeyMessageHash(
-            rootHash
+        // Mirrors helper.getUserOpHashWithUntilForEOA(uopHash, 0, impl)
+        // = keccak256(abi.encode(uopHash, validUntil, impl))  — no EIP-191 prefix here
+        bytes32 uopHashForEoa = keccak256(
+            abi.encode(rawUopHash, uint48(0), smartWalletImpl)
         );
+        console.log("uopHashForEoa:");
+        console.logBytes32(uopHashForEoa);
 
-        (bytes32 r, bytes32 rawS) = vm.signP256(passkeyPk, passkeyMsgHash);
-        // Low-S normalisation (mirrors TS: s = rawS > N/2 ? N - rawS : rawS)
-        uint256 s = uint256(rawS) > P256_N_DIV_2
-            ? P256_N - uint256(rawS)
-            : uint256(rawS);
-
-        bool verified = HelperLib.webAuthnVerify(
-            rootHash,
-            uint256(r),
-            s,
-            PUB_KEY_X,
-            PUB_KEY_Y
-        );
-        console.log("WebAuthn verify:", verified);
-
-        WebAuthn.WebAuthnAuth memory auth = HelperLib.getWebAuthnAuth(
-            rootHash,
-            uint256(r),
-            s
-        );
-        bytes memory validatorData = abi.encodePacked(
-            abi.encode(
-                PasskeyValidatorLib.PasskeyPubKey({
-                    pubKeyX: PUB_KEY_X,
-                    pubKeyY: PUB_KEY_Y
-                })
-            ),
-            abi.encode(auth, proofs)
+        // Mirrors deployer.signMessage(ethers.getBytes(uopHash))
+        // ethers signMessage applies EIP-191 prefix, so we do the same before vm.sign
+        bytes32 ethSignedHash = MessageHashUtils.toEthSignedMessageHash(
+            uopHashForEoa
         );
 
-        // signature layout: keyHash (32) | validUntil (6) | validatorData
-        return abi.encodePacked(passkeyKeyHash, uint48(0), validatorData);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, ethSignedHash);
+        bytes memory sig = abi.encodePacked(r, s, v);
+
+        // signature layout: ecdsaKeyHash (32) | validUntil (6) | sig (65)
+        return abi.encodePacked(ecdsaKeyHash, uint48(0), sig);
     }
 
     function _logAndSubmit(
@@ -248,10 +195,10 @@ contract SendUop is Script {
         console.log("UserOp initCode length:   ", userOp.initCode.length);
         console.log("UserOp callData length:   ", userOp.callData.length);
         console.log("UserOp preVerificationGas:", userOp.preVerificationGas);
-        console.log("UserOp signature length:  ", userOp.signature.length);
 
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
         ops[0] = userOp;
         entrypoint.handleOps(ops, bundler);
+        console.log("handleOps submitted successfully");
     }
 }
