@@ -11,7 +11,7 @@ import {ECDSAValidator} from "./validators/ECDSAValidator.sol";
 import {PasskeyValidator} from "./validators/PasskeyValidator.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 import {DeployInitHelper} from "script/deploy/DeployInitHelper.s.sol";
-import {IDeployFactory} from "script/utils/IDeployFactory.s.sol";
+import {IDeployFactory} from "script/deploy/IDeployFactory.s.sol";
 import {EIP2470} from "script/deploy/EIP2470.s.sol";
 import {IERC20, ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
@@ -26,7 +26,6 @@ import {Static} from "src/libraries/Static.sol";
 import {ERC4337Account} from "src/ERC4337Account.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {MessageSignLib} from "src/libraries/MessageSignLib.sol";
-import {SmartWalletSimulator} from "script/utils/SmartWalletSimulator.s.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 // ============ Mock Contracts for Testing ============
@@ -113,7 +112,6 @@ contract Base is Test {
     address internal relayer;
     Call[] internal relayerCalls;
     Call[] internal emptyRelayerCalls;
-    SmartWalletSimulator internal _simulator;
 
     event RelayerExecuteSuccessEvent(
         bytes32 indexed intentHash,
@@ -148,7 +146,7 @@ contract Base is Test {
         _passkeyValidator = new PasskeyValidator();
 
         // Deploy SmartWallet, Factory, and Simulator using DeployInitHelper
-        (_smartWallet, _factory, _simulator) = DeployInitHelper.deployContracts(
+        (_smartWallet, _factory,) = DeployInitHelper.deployContracts(
             deployFactory,
             deployFactorySalt
         );

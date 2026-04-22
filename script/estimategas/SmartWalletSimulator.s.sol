@@ -1,20 +1,30 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import {SmartWallet} from "../../src/SmartWallet.sol";
-import {BatchedCall} from "../../src/Types.sol";
-import {Static} from "../../src/libraries/Static.sol";
-import {ChainlessLib} from "../../src/libraries/ChainlessLib.sol";
+import {SmartWallet} from "src/SmartWallet.sol";
+import {BatchedCall} from "src/Types.sol";
+import {Static} from "src/libraries/Static.sol";
+import {ChainlessLib} from "src/libraries/ChainlessLib.sol";
 import {ISmartWalletSimulator} from "./ISmartWalletSimulator.s.sol";
-import {BatchedCallLib} from "../../src/libraries/BatchedCallLib.sol";
-import {DecodeLib} from "../../src/libraries/DecodeLib.sol";
+import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
+import {DecodeLib} from "src/libraries/DecodeLib.sol";
+import {CalculateCallDataGas} from "./CalculateCallDataGas.sol";
+
 
 /// @title SmartWalletSimulator
 /// @notice A simulation contract that inherits from SmartWallet and implements simulation functionality
 /// @dev This contract is used for dry-run testing of SmartWallet operations
 ///      It allows relayers to simulate transactions without actually executing them
-contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
+contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator layout at 0x653ff6dcbda533c3c7d8ffb646da3e510d0de40f237170c4da3f874472aecb00 {
     using BatchedCallLib for BatchedCall;
+
+    // uint256 constant COLD_SLOAD         = 2100;  // ERC1967 read implementation slot 
+    // uint256 constant COLD_DELEGATECALL  = 2600;  // cold address DELEGATECALL
+    // uint256 constant PROXY_ASSEMBLY     = 200;   // proxy fallback 
+    // uint256 constant DISPATCH_OVERHEAD  = 300;   // executeWithRelayer function dispatch
+    uint256 constant PROXY_OVERHEAD = 5200;
+    uint256 constant EXTERNAL_CALL = 2600;          // validator is external call
+    uint256 constant ADJUST = 5000;                 // adjust final result
 
     /// @notice Simulates SmartWallet's executeWithRelayer, measuring gas costs for validation and execution, then reverts with detailed metrics.
     /// @dev Always reverts with `ISmartWalletSimulator.SimulateExecution` containing execution gas, intrinsic gas, and total gas metrics.
@@ -22,11 +32,9 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
     /// 2) If any user batch call reverts during execution, the entire simulation will revert with that error.
     /// 3) "Successful simulation" means all batch calls executed without reverting.
     /// @param batchedCall BatchedCall struct containing calls, nonce, and expiry
-    /// @param validator Validator address to use for gas estimation
     /// @param validatorData Encoded data containing keyHash and signature: abi.encodePacked(keyHash, signature)
     function simulateExecuteWithRelayer(
         BatchedCall calldata batchedCall,
-        address validator,
         bytes calldata validatorData
     ) external {
         // Start measuring execution gas (everything except intrinsic gas)
@@ -35,18 +43,18 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
         // Validate and extract relayer data using the simulation function with custom validator
         (
             bytes32 pubKeyHash,
-            bytes32 dataHash
-        ) = _validateAndExtractRelayerDataForSimulation(
+            bytes32 dataHash,
+            uint256 verficationGas
+        ) = _validateAndExtractRelayerData1(
                 batchedCall,
-                validator,
                 validatorData
             );
 
         // Execute the batch calls - any errors will bubble up and be caught by the caller
         _batchCall(batchedCall.calls, pubKeyHash);
 
-        // If we reach here, the call succeeded
-        // Emit success event with the intent hash that the user signed
+        // // If we reach here, the call succeeded
+        // // Emit success event with the intent hash that the user signed
         emit RelayerExecuteSuccessEvent(
             dataHash, // This is the intentHash - the hash of the user's execution intent
             msg.sender,
@@ -54,10 +62,10 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
         );
 
         // Calculate execution gas (everything except intrinsic gas)
-        uint256 executionGas = executionGasStart - gasleft();
+        uint256 executionGas = executionGasStart - gasleft() + verficationGas + PROXY_OVERHEAD - EXTERNAL_CALL - ADJUST;
 
         // Calculate calldata intrinsic gas for executeWithRelayer call
-        uint256 calldataIntrinsicGas = _intrinsicGas(
+        uint256 calldataIntrinsicGas = CalculateCallDataGas.intrinsicGas(
             abi.encodeWithSelector(
                 this.executeWithRelayer.selector,
                 batchedCall,
@@ -79,31 +87,27 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
         );
     }
 
-    /// @notice Validate and extract relayer data for simulation with custom validator
-    /// @dev All reverts are skipped to measure validation gas costs without requiring valid signatures     /// 1) Validation steps run to account for gas costs but reverts are skipped to allow simulation without valid signatures (better simulation UX).
+    /// @notice Validates and extracts data for relayer execution
+    /// @dev Comprehensive validation function for executeWithRelayer
     /// @param batchedCall The batched call data
-    /// @param validator Custom validator address for simulation
     /// @param validatorData The validator data containing pubKeyHash, validUntil, and signature
     /// @return pubKeyHash The extracted public key hash
     /// @return dataHash The computed data hash for event emission
-    function _validateAndExtractRelayerDataForSimulation(
+    function _validateAndExtractRelayerData1(
         BatchedCall calldata batchedCall,
-        address validator,
         bytes calldata validatorData
-    ) internal returns (bytes32 pubKeyHash, bytes32 dataHash) {
+    ) internal returns (bytes32 pubKeyHash, bytes32 dataHash, uint256 verficationGas) {
         // Step 1: Validate and consume nonce
-        if (!validateAndUpdateNonce(batchedCall.nonce)) {
-            // revert Errors.InvalidNonce(batchedCall.nonce);
-        }
+        if (!validateAndUpdateNonce(batchedCall.nonce))
+            revert InvalidNonce(batchedCall.nonce);
 
         // Minimum length check: 32 bytes (pubKeyHash) + 6 bytes (validUntil) = 38 bytes
         if (validatorData.length < 38) {
-            // revert ISmartWallet.InvalidValidatorDataLength(
-            //     validatorData.length,
-            //     38
-            // );
+            revert InvalidValidatorDataLength(
+                validatorData.length,
+                38
+            );
         }
-
         // Step 2: Extract validation components from validatorData
         uint48 validUntil;
         (pubKeyHash, validUntil) = DecodeLib.decodeSignatureComponents(
@@ -111,16 +115,22 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
         );
 
         // Step 3: Verify transaction hasn't expired
-        if (_isExpired(validUntil)) {
-            // revert Errors.ExpiryPassed(validUntil);
-        }
+        if (_isExpired(validUntil))
+            revert ExpiryPassed(validUntil);
 
         // Step 4: Verify validator exists and is not expired
-        address actualValidator = getVerifiedValidator(pubKeyHash);
-        if (actualValidator == address(0)) {
-            // revert Errors.InvalidKeyHash(pubKeyHash);
-        }
+        address validator = getVerifiedValidator(pubKeyHash);
+        if (validator == address(0))
+            revert InvalidKeyHash(pubKeyHash);
 
+        if(validator == Static.ECDSA_VALIDATOR_ADDRESS) {
+            validator = 0x57313F56B9c8c400efE42d4f4A811a8404BDE273;
+            verficationGas = 3000;
+        } else {
+            validator = 0x91f9f193C858e6e67C56F259261c3c2045cAa115;
+            verficationGas = 7700;
+        }
+       
         // Step 5: Compute the data hash based on nonce type
         uint256 nonceKey = batchedCall.nonce >> 64;
         bytes32 intentHash = batchedCall.hash(validUntil, IMPLEMENTATION);
@@ -134,7 +144,7 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
                     address(this)
                 )
             ) {
-                // revert Errors.InvalidNonceKey(nonceKey);
+                revert InvalidNonceKey(nonceKey);
             }
             // Hash without chain ID for cross-chain compatibility
             dataHash = hashTypedDataSansChainId(intentHash);
@@ -143,7 +153,7 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
             dataHash = hashTypedData(intentHash);
         }
 
-        // Step 7: Validate the signature (use passed validator parameter for gas estimation)
+        /// Step 7: Validate the signature
         if (
             !_validateSignature(
                 validator,
@@ -151,59 +161,7 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator {
                 dataHash,
                 validatorData[38:]
             )
-        ) {
-            // revert Errors.InvalidSignature();
-        }
-    }
-
-    /// @notice Compute intrinsic calldata-expansion gas: 16 per non-zero byte, 4 per zero byte
-    /// @param data The memory blob you want to cost
-    /// @return gasCost The total intrinsic gas for that calldata
-    function _intrinsicGas(
-        bytes memory data
-    ) internal pure returns (uint256 gasCost) {
-        uint256 len = data.length;
-        uint256 zeroCount;
-        assembly {
-            // pointer to first byte of `data` in memory
-            let ptr := add(data, 0x20)
-            let end := add(ptr, len)
-            let word
-
-            // scan 32 bytes at a time
-            for {
-
-            } lt(ptr, end) {
-                ptr := add(ptr, 0x20)
-            } {
-                word := mload(ptr)
-                // count zeros in this 32-byte word
-                for {
-                    let j := 0
-                } lt(j, 0x20) {
-                    j := add(j, 0x01)
-                } {
-                    zeroCount := add(zeroCount, iszero(byte(j, word)))
-                }
-            }
-
-            // adjust for any overshoot past the end
-            let overshoot := sub(ptr, end)
-            if gt(overshoot, 0) {
-                // subtract erroneous zero counts beyond `len`
-                for {
-                    let i := 0
-                } lt(i, overshoot) {
-                    i := add(i, 0x01)
-                } {
-                    let b := byte(sub(0x1f, i), word)
-                    zeroCount := sub(zeroCount, iszero(b))
-                }
-            }
-        }
-
-        // every byte costs 16; zero bytes save 12
-        gasCost = len * 16 - zeroCount * 12;
+        ) revert InvalidSignature();
     }
 }
 

@@ -3,10 +3,10 @@ pragma solidity ^0.8.23;
 
 import {Script, console} from "lib/forge-std/src/Script.sol";
 import {DeployInitHelper} from "./DeployInitHelper.s.sol";
-import {IDeployFactory} from "../utils/IDeployFactory.s.sol";
+import {IDeployFactory} from "./IDeployFactory.s.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
-import {SmartWalletSimulator} from "../utils/SmartWalletSimulator.s.sol";
+import {SmartWalletSimulator} from "../estimategas/SmartWalletSimulator.s.sol";
 
 /// @title DeployInit
 /// @notice A script for deploying, initializing, and setting the access controls
