@@ -1,231 +1,168 @@
-/**
- * Send User Operation script for OKX Smart Wallet
- * Migrated and adapted from SmartAccount project
- */
-
 import { ethers } from "ethers";
 import { network } from "hardhat";
-import { contracts } from "./utils/contracts";
-import { userOpUtils, UserOperation } from "./utils/userOp";
-import { calldataUtils, Call, InitialOwner } from "./utils/calldata";
+import { userOpUtils } from "./utils/userOp";
+import { calldataUtils, Call } from "./utils/calldata";
 
-// Use require for hardhat to match project style
 const hre = require("hardhat");
 
+// ── Wallet configuration ───────────────────────────────────────────────────
+const SALT = 1100n;
+const PUB_KEY_X =
+  "0x2080e77dc16162c7debbdeaa0bbf2de797d66bb9c42b327f58637699fbe2336a";
+const PUB_KEY_Y =
+  "0xca68486eae03fa39c8567ffd461b254a00171a746eaaee435a91fb06ef53e67c";
+const CHAINLESS_NONCE_KEY = 196n;
+const ENTRYPOINT =
+  process.env.ENTRY_POINT || "0x0000000071727De22E5E9d8BAf0edAc6f37da032";
+
 async function main() {
-  // Get signers
   const [deployer] = await hre.ethers.getSigners();
   const bundler = deployer;
 
-  console.log("🚀 OKX Smart Wallet - Send User Operation");
-  console.log("=========================================");
-  console.log("Deployer address:", deployer.address);
+  console.log("Deployer:", deployer.address);
   console.log("Network:", network.name);
 
-  const chainId = (await hre.ethers.provider.getNetwork()).chainId;
+  const { chainId } = await hre.ethers.provider.getNetwork();
   console.log("Chain ID:", chainId.toString());
 
-  // Fund deployer for local testing
   if (chainId === 31337n) {
     await network.provider.send("hardhat_setBalance", [
       deployer.address,
       "0x1000000000000000000000000",
     ]);
-    console.log("💰 Funded deployer account for local testing");
   }
 
-  try {
-    // Get contract instances
-    console.log("\n📄 Loading contract instances...");
-    const entrypoint = await contracts.getEntryPoint(deployer);
-    const factory = await contracts.getSmartWalletFactory(deployer);
-    const smartWalletImpl = await contracts.getSmartWallet(undefined, deployer);
-    const helper = await contracts.getHelper(deployer);
+  // ── Load contracts ─────────────────────────────────────────────────────
+  const entrypoint = await hre.ethers.getContractAt(
+    "account-abstraction/core/EntryPoint.sol:EntryPoint",
+    ENTRYPOINT,
+    deployer
+  );
+  const factory = await hre.ethers.getContractAt(
+    "SmartWalletFactory",
+    process.env.SMART_WALLET_FACTORY!,
+    deployer
+  );
+  const smartWalletImpl = await hre.ethers.getContractAt(
+    "SmartWallet",
+    process.env.SMART_WALLET!,
+    deployer
+  );
+  const helper = await hre.ethers.getContractAt(
+    "Helper",
+    process.env.HELPER!,
+    deployer
+  );
 
-    console.log("✅ Contracts loaded successfully");
-    console.log("- EntryPoint:", contracts.ADDRESSES.ENTRYPOINT_ADDRESS);
-    console.log("- Factory:", await factory.getAddress());
-    console.log(
-      "- SmartWallet Implementation:",
-      await smartWalletImpl.getAddress()
-    );
-    console.log("- Helper:", await helper.getAddress());
+  console.log("EntryPoint:", await entrypoint.getAddress());
+  console.log("Factory:", await factory.getAddress());
+  console.log("SmartWallet Impl:", await smartWalletImpl.getAddress());
 
-    // Setup wallet configuration
-    console.log("\n⚙️ Setting up wallet configuration...");
+  // ── Build initial owners ───────────────────────────────────────────────
+  const passkeyKeyHash = calldataUtils.generateKeyHashFromPubKey(PUB_KEY_X, PUB_KEY_Y);
+  const ecdsaKeyHash = calldataUtils.generateKeyHashFromAddress(deployer.address);
+  const initialOwners = [
+    { keyHash: passkeyKeyHash, validator: "0x0000000000000000000000000000000000000002" },
+    { keyHash: ecdsaKeyHash,   validator: "0x0000000000000000000000000000000000000001" },
+  ];
 
-    const salt = "1100"; // Salt for deterministic address generation
+  // ── Predict sender address ─────────────────────────────────────────────
+  const sender: string = await factory.getFunction("getAddress")(initialOwners, SALT);
+  console.log("Sender:", sender);
 
-    const pubKeyX =
-      "0x2080e77dc16162c7debbdeaa0bbf2de797d66bb9c42b327f58637699fbe2336a";
-    const pubKeyY =
-      "0xca68486eae03fa39c8567ffd461b254a00171a746eaaee435a91fb06ef53e67c";
-    // Create initial owner with ECDSA validator
-    const initialOwners: InitialOwner[] = [
-      calldataUtils.createPasskeyOwner(
-        pubKeyX,
-        pubKeyY,
-        "0x0000000000000000000000000000000000000002"
-      ),
-      calldataUtils.createECDSAOwner(
-        deployer.address,
-        "0x0000000000000000000000000000000000000001"
-      ),
-    ];
-    console.log("Initial owner keyHash:", initialOwners[0].keyHash);
-    console.log("Initial owner validator:", initialOwners[0].validator);
+  const accountExists = (await hre.ethers.provider.getCode(sender)) !== "0x";
+  console.log("Account exists:", accountExists);
 
-    // Generate initCode and predict sender address
-    console.log("\n🔍 Generating initCode and predicting sender...");
-    let { sender, initCode } = await calldataUtils.generateInitCode(
-      await factory.getAddress(),
-      initialOwners,
-      salt
-    );
+  const nonce = await entrypoint.getNonce(sender, 0);
+  console.log("Nonce:", nonce.toString());
 
-    /// sender = deployer.address;
-    // Check if account already exists by examining code at predicted address
-    const bytecode = await hre.ethers.provider.getCode(sender);
-    const accountExists = bytecode !== "0x";
-    console.log("initCode : ", initCode);
-
-    console.log("Account exists:", accountExists ? "✅ Yes" : "❌ No");
-    if (accountExists) {
-      console.log("Account bytecode length:", bytecode.length);
-    }
-
-    // Get nonce
-    const nonce = await entrypoint.getNonce(sender, 0);
-    console.log("Nonce:", nonce.toString());
-
-    // Fund the account for local testing
-    if (!accountExists && true) {
-      const tx = await deployer.sendTransaction({
-        to: sender,
-        value: hre.ethers.parseEther("0.0001"),
-      });
-      await tx.wait();
-      console.log("💰 Funded predicted account with 0.01 ETH");
-    }
-
-    // Create execution calls
-    console.log("\n📝 Creating execution calls...");
-
-    const calls: Call[] = [
-      // Simple ETH transfer as an example
-      {
-        target: deployer.address ,
-        value: 1n,
-        data: "0x",
-      },
-    ];
-
-    console.log("Number of calls:", calls.length);
-    calls.forEach((call, i) => {
-      console.log(`Call ${i + 1}:`, {
-        target: call.target,
-        value: hre.ethers.formatEther(call.value) + " ETH",
-        dataLength: hre.ethers.dataLength(call.data),
-      });
+  // ── Prefund sender if account does not yet exist ───────────────────────
+  if (!accountExists) {
+    const tx = await deployer.sendTransaction({
+      to: sender,
+      value: hre.ethers.parseEther("0.0001"),
     });
-
-    // Generate execution calldata
-    const executeCalldata = calldataUtils.generateExecuteUserOpCalldata(calls);
-    console.log(
-      "Execute calldata length:",
-      hre.ethers.dataLength(executeCalldata)
-    );
-
-    // Create User Operation
-    console.log("\n🔨 Creating User Operation...");
-    const userOp = userOpUtils.createUserOperation({
-      sender,
-      nonce,
-      initCode: accountExists ? "0x" : initCode,
-      callData: executeCalldata,
-      verificationGasLimit: 2000000,
-      callGasLimit: 400000,
-      maxPriorityFeePerGas: hre.ethers.parseUnits("1", "wei"),
-      maxFeePerGas: hre.ethers.parseUnits("1", "wei"),
-      preVerificationGas: 21000n,
-    });
-
-    console.log("UserOp created:");
-    console.log("- Sender:", userOp.sender);
-    console.log("- Nonce:", userOp.nonce);
-    console.log(
-      "- InitCode:",
-      userOp.initCode === "0x"
-        ? "None"
-        : `${hre.ethers.dataLength(userOp.initCode)} bytes`
-    );
-    console.log("- CallData length:", hre.ethers.dataLength(userOp.callData));
-
-    // Sign the User Operation
-    console.log("\n✍️ Signing User Operation...");
-
-    // const verifyType = 1;
-    let uopHash = await entrypoint.getUserOpHash(userOp);
-    console.log("uopHash : ", uopHash);
-    if(nonce == 196){
-       uopHash = await smartWalletImpl.getUserOpHashWithoutChainId(userOp);
-    }
-    
-    uopHash = await helper.getUserOpHashWithUntilForEOA(uopHash, 0, await smartWalletImpl.getAddress());
-    // Success returns 0.
-    console.log("uopHash : ", uopHash);
-
-    let sig = await deployer.signMessage(ethers.getBytes(uopHash));
-    userOp.signature = ethers.solidityPacked(
-      ["bytes32","uint48", "bytes"],
-      [initialOwners[1].keyHash, 0, sig]
-    );
-    console.log("userOp.signature : ", userOp.signature);
-
-    // Log final UserOperation
-    console.log("\n📋 Final User Operation:");
-    console.log(
-      JSON.stringify(
-        {
-          sender: userOp.sender,
-          nonce: userOp.nonce,
-          initCode: userOp.initCode,
-          callData: userOp.callData,
-          accountGasLimits: userOp.accountGasLimits,
-          preVerificationGas: userOp.preVerificationGas,
-          gasFees: userOp.gasFees,
-          paymasterAndData: userOp.paymasterAndData,
-          signature: userOp.signature,
-        },
-        null,
-        2
-      )
-    );
-
-    console.log("\n✅ User Operation prepared successfully!");
-    console.log(
-      "\n⚠️  NOTE: This script creates a UserOp but doesn't send it to EntryPoint."
-    );
-    console.log(
-      "To actually execute, you would call entrypoint.handleOps([userOp], bundler.address)"
-    );
-
-    // Uncomment the following lines to actually send the transaction:
-    console.log("\n🚀 Sending User Operation to EntryPoint...");
-
-    // const txinfo = entrypoint.handleOps([userOp], bundler.address);
-    // console.log("txinfo : ", txinfo);
-    const tx =await entrypoint.handleOps([userOp], bundler.address);
     await tx.wait();
-    console.log("✅ Transaction sent:", tx.hash);
-  } catch (error) {
-    console.error("\n❌ Error occurred:");
-    console.error(error);
-    throw error;
   }
+
+  // ── Build initCode ─────────────────────────────────────────────────────
+  const factoryCalldata = factory.interface.encodeFunctionData("createAccount", [
+    initialOwners,
+    SALT,
+  ]);
+  const initCode = accountExists
+    ? "0x"
+    : ethers.solidityPacked(
+        ["address", "bytes"],
+        [await factory.getAddress(), factoryCalldata]
+      );
+  console.log("initCode length:", ethers.dataLength(initCode));
+
+  // ── Build calldata (simple ETH transfer to deployer) ──────────────────
+  const calls: Call[] = [
+    {
+      target: deployer.address,
+      value: 1n,
+      data: "0x",
+    },
+  ];
+  const executeCalldata = calldataUtils.generateExecuteUserOpCalldata(calls);
+
+  // ── Create UserOp ──────────────────────────────────────────────────────
+  const userOp = userOpUtils.createUserOperation({
+    sender,
+    nonce,
+    initCode,
+    callData: executeCalldata,
+    verificationGasLimit: 2000000,
+    callGasLimit: 400000,
+    maxPriorityFeePerGas: 1n,
+    maxFeePerGas: 1n,
+    preVerificationGas: 21000n,
+  });
+
+  // ── Compute userOpHash ─────────────────────────────────────────────────
+  let uopHash = await entrypoint.getUserOpHash(userOp);
+  if (nonce === CHAINLESS_NONCE_KEY) {
+    uopHash = await smartWalletImpl.getUserOpHashWithoutChainId(userOp);
+  }
+  // getUserOpHashWithUntilForEOA = keccak256(abi.encode(hash, validUntil, impl))
+  // signMessage then applies EIP-191 prefix on top
+  uopHash = await helper.getUserOpHashWithUntilForEOA(
+    uopHash,
+    0,
+    await smartWalletImpl.getAddress()
+  );
+  console.log("uopHash:", uopHash);
+
+  // ── EOA sign ───────────────────────────────────────────────────────────
+  // deployer.signMessage applies EIP-191 prefix to the 32-byte hash
+  const sig = await deployer.signMessage(ethers.getBytes(uopHash));
+
+  // layout: ecdsaKeyHash (32) | validUntil (6) | sig (65)
+  userOp.signature = ethers.solidityPacked(
+    ["bytes32", "uint48", "bytes"],
+    [ecdsaKeyHash, 0, sig]
+  );
+
+  // ── Submit ─────────────────────────────────────────────────────────────
+  console.log("\nUserOp:", JSON.stringify({
+    sender:             userOp.sender,
+    nonce:              userOp.nonce,
+    initCode:           userOp.initCode,
+    callData:           userOp.callData,
+    accountGasLimits:   userOp.accountGasLimits,
+    preVerificationGas: userOp.preVerificationGas,
+    gasFees:            userOp.gasFees,
+    paymasterAndData:   userOp.paymasterAndData,
+    signature:          userOp.signature,
+  }, null, 2));
+
+  const tx = await entrypoint.handleOps([userOp], bundler.address);
+  await tx.wait();
+  console.log("Transaction sent:", tx.hash);
 }
 
-// Execute the script
 main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
