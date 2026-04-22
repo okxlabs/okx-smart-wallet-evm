@@ -97,29 +97,19 @@ async function main() {
     const structHash = encoder.hash(value);
     /// wallet extensions like metamask , okx sign it
       
-    //   function transferWithAuthorization(
-    //     address from,
-    //     address to,
-    //     uint256 value,
-    //     uint256 validAfter,
-    //     uint256 validBefore,
-    //     bytes32 nonce,
-    //     uint8   v,
-    //     bytes32 r,
-    //     bytes32 s
-    // ) external
-       const bool = await erc3009.transferWithAuthorization(
-        deployer.address,
-        deployer.address,
-        1,
-        0,
-        expired,
-        nonce,
-        sig.v,
-        sig.r,
-        sig.s
-      );
-      console.log(bool);
+
+    const bool = await erc3009.transferWithAuthorization(
+      deployer.address,
+      deployer.address,
+      1,
+      0,
+      expired,
+      nonce,
+      sig.v,
+      sig.r,
+      sig.s
+    );
+    console.log(bool);
 
   } catch (error) {
     console.error("Error:", error);
