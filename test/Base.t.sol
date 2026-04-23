@@ -146,7 +146,7 @@ contract Base is Test {
         _passkeyValidator = new PasskeyValidator();
 
         // Deploy SmartWallet, Factory, and Simulator using DeployInitHelper
-        (_smartWallet, _factory, ) = DeployInitHelper.deployContracts(
+        (_smartWallet, _factory) = DeployInitHelper.deployContracts(
             deployFactory,
             deployFactorySalt
         );

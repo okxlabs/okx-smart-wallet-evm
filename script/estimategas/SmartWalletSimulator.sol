@@ -5,7 +5,7 @@ import {SmartWallet} from "src/SmartWallet.sol";
 import {BatchedCall} from "src/Types.sol";
 import {Static} from "src/libraries/Static.sol";
 import {ChainlessLib} from "src/libraries/ChainlessLib.sol";
-import {ISmartWalletSimulator} from "./ISmartWalletSimulator.s.sol";
+import {ISmartWalletSimulator} from "./ISmartWalletSimulator.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {DecodeLib} from "src/libraries/DecodeLib.sol";
 import {CalculateCallDataGas} from "./CalculateCallDataGas.sol";
@@ -25,6 +25,16 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator layout at 0x
     uint256 constant PROXY_OVERHEAD = 5200;
     uint256 constant EXTERNAL_CALL = 2600;          // validator is external call
     uint256 constant ADJUST = 5000;                 // adjust final result
+
+
+    address immutable public simulateECDSAValidator;
+    address immutable public simulatePasskeyValidator;
+
+    constructor(address _simulateECDSAValidator, address _simulatePasskeyValidator) {
+        simulateECDSAValidator = _simulateECDSAValidator;
+        simulatePasskeyValidator = _simulatePasskeyValidator;
+    }
+
 
     /// @notice Simulates SmartWallet's executeWithRelayer, measuring gas costs for validation and execution, then reverts with detailed metrics.
     /// @dev Always reverts with `ISmartWalletSimulator.SimulateExecution` containing execution gas, intrinsic gas, and total gas metrics.
@@ -124,11 +134,13 @@ contract SmartWalletSimulator is SmartWallet, ISmartWalletSimulator layout at 0x
             revert InvalidKeyHash(pubKeyHash);
 
         if(validator == Static.ECDSA_VALIDATOR_ADDRESS) {
-            validator = 0x57313F56B9c8c400efE42d4f4A811a8404BDE273;
+            validator = simulateECDSAValidator;
             verficationGas = 3000;
-        } else {
-            validator = 0x91f9f193C858e6e67C56F259261c3c2045cAa115;
+        } else if (validator == Static.PASSKEY_VALIDATOR_ADDRESS) {
+            validator = simulatePasskeyValidator;
             verficationGas = 7700;
+        } else {
+            revert InvalidValidator(validator);
         }
        
         // Step 5: Compute the data hash based on nonce type

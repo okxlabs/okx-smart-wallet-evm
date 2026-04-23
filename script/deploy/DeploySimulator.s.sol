@@ -2,14 +2,14 @@
 pragma solidity ^0.8.23;
 
 import {Script, console} from "lib/forge-std/src/Script.sol";
-import {DeployInitHelper} from "./DeployInitHelper.s.sol";
 import {IDeployFactory} from "./IDeployFactory.s.sol";
-import {SmartWallet} from "src/SmartWallet.sol";
-import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
+import {SimulatePasskeyValidator} from "script/estimategas/SimulatePasskeyValidator.sol";
+import {SimulateECDSAValidator} from "script/estimategas/SimulateECDSAValidator.sol";
+import {SmartWalletSimulator} from "script/estimategas/SmartWalletSimulator.sol";
 
 /// @title DeployInit
 /// @notice A script for deploying, initializing, and setting the access controls
-contract DeployInit is Script {
+contract DeploySimulator is Script {
     function run() external {
         vm.startBroadcast(vm.envUint("DEPLOYER_PRIVATE_KEY"));
 
@@ -27,23 +27,37 @@ contract DeployInit is Script {
         console.logBytes32(deployFactorySalt);
 
         // Deploy the contracts using DeployInitHelper
-        (
-            SmartWallet smartWallet_,
-            SmartWalletFactory factory_
-        ) = DeployInitHelper.deployContracts(deployFactory, deployFactorySalt);
+        // deploy SmartWallet
+        address simulateECDSAValidator = deployFactory.deploy(
+            type(SimulateECDSAValidator).creationCode,
+            deployFactorySalt
+        );
+
+        address simulatePasskeyValidator = deployFactory.deploy(
+            type(SimulatePasskeyValidator).creationCode,
+            deployFactorySalt
+        );
+        
+        address smartWalletSimulator = deployFactory.deploy(
+            abi.encodePacked(
+                type(SmartWalletSimulator).creationCode,
+                abi.encode(simulateECDSAValidator, simulatePasskeyValidator)
+            ),
+            deployFactorySalt
+        );
 
         vm.stopBroadcast();
 
         // Post-deployment verification
         console.log("=== Deployment Verification ===");
-        require(factory_.IMPLEMENTATION() == address(smartWallet_), "Factory implementation not set correctly");
-        console.log("SmartWallet implementation address verified on SmartWalletFactory!");
         
         // Log deployment summary for verification commands
         console.log("=== Deployment Summary ===");
         console.log("Deployer:", deployOwner);
-        console.log("SmartWallet Implementation address:", address(smartWallet_));
-        console.log("SmartWalletFactory address:", address(factory_));
+        console.log("simulateECDSAValidator:", simulateECDSAValidator);
+        console.log("simulatePasskeyValidator:", simulatePasskeyValidator);
+        console.log("smartWalletSimulator:", smartWalletSimulator);
+        
         console.log("DeployInit script completed successfully");
     }
 }

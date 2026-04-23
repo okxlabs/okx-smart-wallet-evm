@@ -8,7 +8,7 @@ import {ECDSAValidator} from "./validators/ECDSAValidator.sol";
 import {PasskeyValidator} from "./validators/PasskeyValidator.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
-import {HelperLib} from "script/utils/Helper.s.sol";
+import {HelperLib} from "script/sendTransaction/utils/Helper.s.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 import {Static} from "src/libraries/Static.sol";

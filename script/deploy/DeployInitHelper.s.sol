@@ -4,7 +4,6 @@ pragma solidity ^0.8.23;
 import {SmartWalletEntry} from "src/SmartWalletEntry.sol";
 import {IDeployFactory} from "./IDeployFactory.s.sol";
 import {SmartWalletFactory} from "src/SmartWalletFactory.sol";
-import {SmartWalletSimulator} from "../estimategas/SmartWalletSimulator.s.sol";
 
 library DeployInitHelper {
     function deployContracts(
@@ -14,8 +13,7 @@ library DeployInitHelper {
         internal
         returns (
             SmartWalletEntry smartWalletImpl,
-            SmartWalletFactory factoryImpl,
-            SmartWalletSimulator simulatorImpl
+            SmartWalletFactory factoryImpl
         )
     {
         // deploy SmartWallet
@@ -31,14 +29,6 @@ library DeployInitHelper {
                     type(SmartWalletFactory).creationCode,
                     abi.encode(address(smartWalletImpl))
                 ),
-                deployFactorySalt
-            )
-        );
-
-        // deploy SmartWalletSimulator
-        simulatorImpl = SmartWalletSimulator(
-            deployFactory.deploy(
-                type(SmartWalletSimulator).creationCode,
                 deployFactorySalt
             )
         );

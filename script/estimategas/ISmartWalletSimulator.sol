@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import {BatchedCall} from "../../src/Types.sol";
+import {BatchedCall} from "src/Types.sol";
 
 interface ISmartWalletSimulator {
     // ERRORS
@@ -10,6 +10,8 @@ interface ISmartWalletSimulator {
         uint256 intrinsicGas,
         uint256 totalGas
     );
+
+    error InvalidValidator(address validator);
 
     /// @notice Simulate a sponsored transaction, measuring gas costs for validation and execution, then reverts with detailed metrics.
     /// @dev Always reverts with `Errors.SimulateExecution` containing execution gas, intrinsic gas (base + calldata), and total gas metrics.
