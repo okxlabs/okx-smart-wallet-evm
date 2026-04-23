@@ -8,7 +8,7 @@ import {ISmartWalletFactory} from "src/interfaces/ISmartWalletFactory.sol";
 import {IERC4337Account} from "src/interfaces/IERC4337Account.sol";
 import {InitialOwner, Call} from "src/Types.sol";
 import {Static} from "src/libraries/Static.sol";
-import {HelperLib} from "./utils/Helper.s.sol";
+import {HelperLib} from "../utils/Helper.s.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
@@ -68,6 +68,7 @@ contract SendUopWithPasskey is Script {
         }
 
         PackedUserOperation memory userOp = _buildUserOp(
+            deployer,
             sender,
             nonce,
             accountExists,
@@ -108,6 +109,7 @@ contract SendUopWithPasskey is Script {
     }
 
     function _buildUserOp(
+        address deployer,
         address sender,
         uint256 nonce,
         bool accountExists,
@@ -126,11 +128,7 @@ contract SendUopWithPasskey is Script {
         console.log("initCode length:", initCode.length);
 
         Call[] memory calls = new Call[](1);
-        calls[0] = Call({
-            target: TOKEN_ADDRESS,
-            value: 1,
-            data: new bytes(0)
-        });
+        calls[0] = Call({target: deployer, value: 1, data: bytes("")});
         bytes memory callData = abi.encodePacked(
             IERC4337Account.executeUserOp.selector,
             abi.encode(calls)

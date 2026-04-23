@@ -1,8 +1,7 @@
 import { ethers } from "ethers";
 import { network } from "hardhat";
-import { userOpUtils } from "./utils/userOp";
-import { calldataUtils, Call } from "./utils/calldata";
-import { passkeySign } from "./utils/passkeySign";
+import { calldataUtils, Call } from "../utils/calldata";
+import { passkeySign } from "../utils/passkeySign";
 
 const hre = require("hardhat");
 
@@ -17,13 +16,10 @@ const PUB_KEY_X =
   "0x2080e77dc16162c7debbdeaa0bbf2de797d66bb9c42b327f58637699fbe2336a";
 const PUB_KEY_Y =
   "0xca68486eae03fa39c8567ffd461b254a00171a746eaaee435a91fb06ef53e67c";
-const TOKEN_ADDRESS = "0x6250C0459A6565F904B71E2D53C3d2BbB582357c";
 const CHAINLESS_NONCE_KEY = 196n;
-const ENTRYPOINT = process.env.ENTRY_POINT || "0x0000000071727De22E5E9d8BAf0edAc6f37da032";
 
 async function main() {
   const [deployer] = await hre.ethers.getSigners();
-  const bundler = deployer;
 
   console.log("Deployer:", deployer.address);
   console.log("Network:", network.name);
@@ -39,11 +35,6 @@ async function main() {
   }
 
   // ── Load contracts ─────────────────────────────────────────────────────
-  const entrypoint = await hre.ethers.getContractAt(
-    "account-abstraction/core/EntryPoint.sol:EntryPoint",
-    ENTRYPOINT,
-    deployer
-  );
   const factory = await hre.ethers.getContractAt(
     "SmartWalletFactory",
     process.env.SMART_WALLET_FACTORY!,
@@ -60,8 +51,6 @@ async function main() {
     deployer
   );
 
-  console.log("EntryPoint:", await entrypoint.getAddress());
-  console.log("Factory:", await factory.getAddress());
   console.log("SmartWallet Impl:", await smartWalletImpl.getAddress());
 
   // ── Build initial owners ───────────────────────────────────────────────
@@ -72,76 +61,64 @@ async function main() {
     { keyHash: ecdsaKeyHash,   validator: "0x0000000000000000000000000000000000000001" },
   ];
 
-  // ── Predict sender address ─────────────────────────────────────────────
-  const sender: string = await factory.getFunction("getAddress")(initialOwners, SALT);
-  console.log("Sender:", sender);
+  // ── Derive user wallet address (consistent with sendUop.ts) ───────────
+  const userWallet: string =
+    process.env.USER_WALLET ||
+    (await factory.getFunction("getAddress")(initialOwners, SALT));
+  const aa = smartWalletImpl.attach(userWallet);
+  console.log("User wallet:", userWallet);
 
-  const accountExists = (await hre.ethers.provider.getCode(sender)) !== "0x";
-  console.log("Account exists:", accountExists);
-
-  const nonce = await entrypoint.getNonce(sender, 0);
-  console.log("Nonce:", nonce.toString());
-
-  // ── Prefund sender if account does not yet exist ───────────────────────
-  if (!accountExists) {
+  // ── Prefund if needed ──────────────────────────────────────────────────
+  const walletBalance = await hre.ethers.provider.getBalance(userWallet);
+  if (walletBalance === 0n) {
     const tx = await deployer.sendTransaction({
-      to: sender,
-      value: hre.ethers.parseEther("0.0001"),
+      to: userWallet,
+      value: hre.ethers.parseEther("0.00001"),
     });
     await tx.wait();
+    console.log("Funded user wallet with 0.00001 ETH");
   }
 
-  // ── Build initCode ─────────────────────────────────────────────────────
-  const factoryCalldata = factory.interface.encodeFunctionData("createAccount", [
-    initialOwners,
-    SALT,
-  ]);
-  const initCode = accountExists
-    ? "0x"
-    : ethers.solidityPacked(
-        ["address", "bytes"],
-        [await factory.getAddress(), factoryCalldata]
-      );
-  console.log("initCode length:", ethers.dataLength(initCode));
+  // getNonce returns uint64 sequential for the given key.
+  // Full packed nonce for key=0: (0n << 64n) | sequential = sequential
+  const nonce: bigint = await aa.getNonce(0);
+  console.log("Nonce:", nonce.toString());
 
-  // ── Build calldata ─────────────────────────────────────────────────────
+  // ── Build calls ────────────────────────────────────────────────────────
   const calls: Call[] = [
     {
-      target: TOKEN_ADDRESS,
-      value: 0n,
-      data: "0x40c10f190000000000000000000000003bceebfcee7d45eb78ff2e24a4007ff065d96c980000000000000000000000000000000000000000000000000de0b6b3a7640000",
+      target: deployer.address,
+      value: 1n,
+      data: "0x",
     },
   ];
-  const executeCalldata = calldataUtils.generateExecuteUserOpCalldata(calls);
 
-  // ── Create UserOp ──────────────────────────────────────────────────────
-  const userOp = userOpUtils.createUserOperation({
-    sender,
+  const batchedCall = {
+    calls,
     nonce,
-    initCode,
-    callData: executeCalldata,
-    verificationGasLimit: 2000000,
-    callGasLimit: 400000,
-    maxPriorityFeePerGas: 1n,
-    maxFeePerGas: 1n,
-    preVerificationGas: 21000n,
-  });
+  };
 
-  // ── Compute userOpHash ─────────────────────────────────────────────────
-  let uopHash = await entrypoint.getUserOpHash(userOp);
-  if (nonce === CHAINLESS_NONCE_KEY) {
-    uopHash = await smartWalletImpl.getUserOpHashWithoutChainId(userOp);
-  }
-  uopHash = await helper.getUserOpHashWithUntil(
-    uopHash,
+  // ── Compute hash to sign ───────────────────────────────────────────────
+  const intentHash = await helper.getBatchCallHash(
+    batchedCall,
     0,
     await smartWalletImpl.getAddress()
   );
-  console.log("uopHash:", uopHash);
+  console.log("intentHash:", intentHash);
+
+  // Use chainless (sans-chain-id) typed data hash when nonce key is CHAINLESS_NONCE_KEY
+  let typedDataHash: string;
+  if ((nonce >> 64n) === CHAINLESS_NONCE_KEY) {
+    typedDataHash = await smartWalletImpl.hashTypedDataSansChainId(intentHash);
+  } else {
+    typedDataHash = await aa.hashTypedData(intentHash);
+  }
+  console.log("typedDataHash:", typedDataHash);
 
   // ── Merkle proof (empty — root == leaf) ───────────────────────────────
   const proofs: string[] = [];
-  const rootHash = await helper.getMerkleProofRootHash(proofs, uopHash);
+  const rootHash = await helper.getMerkleProofRootHash(proofs, typedDataHash);
+  console.log("rootHash:", rootHash);
 
   // ── Passkey sign ───────────────────────────────────────────────────────
   // getPasskeyMessageHash returns [clientDataJson, message, messageHash]
@@ -169,25 +146,14 @@ async function main() {
     proofs
   );
   // layout: passkeyKeyHash (32) | validUntil (6) | validatorData
-  userOp.signature = ethers.solidityPacked(
+  const signature = ethers.solidityPacked(
     ["bytes32", "uint48", "bytes"],
     [passkeyKeyHash, 0, validatorData]
   );
 
-  // ── Submit ─────────────────────────────────────────────────────────────
-  console.log("\nUserOp:", JSON.stringify({
-    sender:            userOp.sender,
-    nonce:             userOp.nonce,
-    initCode:          userOp.initCode,
-    callData:          userOp.callData,
-    accountGasLimits:  userOp.accountGasLimits,
-    preVerificationGas: userOp.preVerificationGas,
-    gasFees:           userOp.gasFees,
-    paymasterAndData:  userOp.paymasterAndData,
-    signature:         userOp.signature,
-  }, null, 2));
-
-  const tx = await entrypoint.handleOps([userOp], bundler.address);
+  // ── Submit via executeWithRelayer ──────────────────────────────────────
+  const tx = await aa.executeWithRelayer(batchedCall, signature);
+  console.log("tx hash:", tx.hash);
   await tx.wait();
   console.log("Transaction sent:", tx.hash);
 }

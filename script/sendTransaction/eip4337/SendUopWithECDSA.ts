@@ -1,7 +1,7 @@
 import { ethers } from "ethers";
 import { network } from "hardhat";
-import { userOpUtils } from "./utils/userOp";
-import { calldataUtils, Call } from "./utils/calldata";
+import { userOpUtils } from "../utils/userOp";
+import { calldataUtils, Call } from "../utils/calldata";
 
 const hre = require("hardhat");
 
