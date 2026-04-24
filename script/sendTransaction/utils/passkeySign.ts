@@ -5,7 +5,7 @@ import crypto from "crypto";
 
 function sign(messageData: string) {
   let keyPair = ecPem(null, "prime256v1");
-  keyPair.setPrivateKey(process.env.PASSKEY_PK, "hex");
+  keyPair.setPrivateKey(process.env.PASSKEY_PRIVATE_KEY, "hex");
 
   let message = Buffer.from(ethers.getBytes(messageData));
 
