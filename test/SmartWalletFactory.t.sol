@@ -7,25 +7,19 @@ import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 
 contract FactoryTest is Base {
-    function setUp() public override {
-        super.setUp();
-    }
-
     function test_CreateWallet_WithFactory_Success() external {
         vm.prank(_alice);
 
         ISmartWallet wallet = ISmartWallet(
             _deployAccountSingleOwner(
-                keccak256(abi.encodePacked(_alice)),
+                _makeKeyHash(_alice),
                 address(_ecdsaValidator),
                 0
             )
         );
 
         assertEq(
-            IOwnerManager(address(wallet)).hasOwner(
-                keccak256(abi.encodePacked(_alice))
-            ),
+            IOwnerManager(address(wallet)).hasOwner(_makeKeyHash(_alice)),
             true
         );
     }
@@ -34,13 +28,13 @@ contract FactoryTest is Base {
         vm.prank(_alice);
 
         address wallet = _deployAccountSingleOwner(
-            keccak256(abi.encodePacked(_alice)),
+            _makeKeyHash(_alice),
             address(_ecdsaValidator),
             0
         );
 
         InitialOwner[] memory initialOwners = _createSingleOwner(
-            keccak256(abi.encodePacked(_alice)),
+            _makeKeyHash(_alice),
             address(_ecdsaValidator)
         );
 
@@ -52,8 +46,8 @@ contract FactoryTest is Base {
     function test_GetAddress_PredictedBeforeDeployment_Success() external {
         // Prepare initial owners
         bytes32[] memory keyHashes = new bytes32[](2);
-        keyHashes[0] = keccak256(abi.encodePacked(_alice));
-        keyHashes[1] = keccak256(abi.encodePacked(_bob));
+        keyHashes[0] = _makeKeyHash(_alice);
+        keyHashes[1] = _makeKeyHash(_bob);
 
         address[] memory validators = new address[](2);
         validators[0] = address(_ecdsaValidator);
@@ -100,21 +94,15 @@ contract FactoryTest is Base {
 
         // Step 5: Verify the account is properly initialized
         assertTrue(
-            IOwnerManager(deployedAddress).hasOwner(
-                keccak256(abi.encodePacked(_alice))
-            )
+            IOwnerManager(deployedAddress).hasOwner(_makeKeyHash(_alice))
         );
-        assertTrue(
-            IOwnerManager(deployedAddress).hasOwner(
-                keccak256(abi.encodePacked(_bob))
-            )
-        );
+        assertTrue(IOwnerManager(deployedAddress).hasOwner(_makeKeyHash(_bob)));
     }
 
     function test_GetAddress_PredictedWithDifferentSalts_Success() external {
         // Use same initial owners but different salts
         InitialOwner[] memory initialOwners = _createSingleOwner(
-            keccak256(abi.encodePacked(_alice)),
+            _makeKeyHash(_alice),
             address(_ecdsaValidator)
         );
 
@@ -143,7 +131,7 @@ contract FactoryTest is Base {
         vm.startPrank(_aliceWallet);
 
         address deployed1 = _deployAccountSingleOwner(
-            keccak256(abi.encodePacked(_alice)),
+            _makeKeyHash(_alice),
             address(_ecdsaValidator),
             0
         );
@@ -154,7 +142,7 @@ contract FactoryTest is Base {
         );
 
         address deployed2 = _deployAccountSingleOwner(
-            keccak256(abi.encodePacked(_alice)),
+            _makeKeyHash(_alice),
             address(_ecdsaValidator),
             1
         );
@@ -165,7 +153,7 @@ contract FactoryTest is Base {
         );
 
         address deployed3 = _deployAccountSingleOwner(
-            keccak256(abi.encodePacked(_alice)),
+            _makeKeyHash(_alice),
             address(_ecdsaValidator),
             999
         );
@@ -236,7 +224,7 @@ contract FactoryTest is Base {
         // First deployment
         vm.prank(_alice);
         address firstDeployment = _deployAccountSingleOwner(
-            keccak256(abi.encodePacked(_alice)),
+            _makeKeyHash(_alice),
             address(_ecdsaValidator),
             salt
         );
@@ -244,7 +232,7 @@ contract FactoryTest is Base {
         // Try to deploy again with same parameters
         vm.prank(_bob); // Different caller
         address secondDeployment = _deployAccountSingleOwner(
-            keccak256(abi.encodePacked(_alice)),
+            _makeKeyHash(_alice),
             address(_ecdsaValidator),
             salt
         );
@@ -258,9 +246,7 @@ contract FactoryTest is Base {
 
         // Verify the account still has the original configuration
         assertTrue(
-            IOwnerManager(firstDeployment).hasOwner(
-                keccak256(abi.encodePacked(_alice))
-            )
+            IOwnerManager(firstDeployment).hasOwner(_makeKeyHash(_alice))
         );
     }
 
@@ -268,7 +254,7 @@ contract FactoryTest is Base {
         uint256 salt = 0;
         InitialOwner[] memory initialOwners = new InitialOwner[](1);
         initialOwners[0] = InitialOwner({
-            keyHash: keccak256(abi.encodePacked(_alice)),
+            keyHash: _makeKeyHash(_alice),
             validator: address(_ecdsaValidator)
         });
 

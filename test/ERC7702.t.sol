@@ -69,7 +69,7 @@ contract ERC7702Test is Base {
 
     /// @notice Non-address(this) keyHash has no validator on uninitialized 7702 EOA.
     function test_ERC7702_NonAddressThisKeyHash_ReturnsZeroValidator() public {
-        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        bytes32 bobKeyHash = _makeKeyHash(_bob);
         address validator = IOwnerManager(eoaWallet).getVerifiedValidator(
             bobKeyHash
         );
@@ -80,7 +80,7 @@ contract ERC7702Test is Base {
 
     /// @notice 7702 EOA can execute addOwner via self-call using built-in address(this) owner.
     function test_ERC7702_BuiltInOwner_Execute_SelfCallAddOwner() public {
-        bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(_bob));
+        bytes32 newOwnerKeyHash = _makeKeyHash(_bob);
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
             target: eoaWallet,

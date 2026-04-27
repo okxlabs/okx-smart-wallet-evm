@@ -526,7 +526,7 @@ contract AdminPermissionsTest is Base {
     // ============ Edge Cases ============
 
     function test_RemoveOwner_ByAdmin_LastAdmin_Success() public {
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 aliceKeyHash = _makeKeyHash(_alice);
         bytes32 adminKeyHash = keccak256(abi.encodePacked(adminUser));
 
         // Try to remove the original admin (alice) when adminUser is the only other admin

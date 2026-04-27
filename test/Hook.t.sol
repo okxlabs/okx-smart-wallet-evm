@@ -136,7 +136,7 @@ contract HookTest is Base {
         mockToken = new MockERC20();
 
         // Calculate Alice's keyHash - this should be the EOA address
-        aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        aliceKeyHash = _makeKeyHash(_alice);
 
         // Fund Alice with tokens for testing
         bool success = mockToken.transfer(_aliceWallet, 1000 ether);
@@ -1368,7 +1368,7 @@ contract HookTest is Base {
 
         // Verify this works for a wallet with a single owner
         InitialOwner[] memory singleOwner = _createSingleOwner(
-            keccak256(abi.encodePacked(_bob)),
+            _makeKeyHash(_bob),
             address(_ecdsaValidator)
         );
         address freshWallet = _factory.createAccount(singleOwner, 1);
@@ -1575,7 +1575,7 @@ contract HookTest is Base {
 
     function test_AddressThis_WorksEvenWithOtherExpiredOwners() public {
         // Add an owner with expiration
-        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        bytes32 bobKeyHash = _makeKeyHash(_bob);
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({

@@ -28,8 +28,8 @@ contract ChainlessExecutionTest is Base {
         super.setUp();
 
         // Setup test key hashes - use EOA addresses, not smart wallet addresses
-        aliceKeyHash = keccak256(abi.encodePacked(_alice));
-        bobKeyHash = keccak256(abi.encodePacked(_bob));
+        aliceKeyHash = _makeKeyHash(_alice);
+        bobKeyHash = _makeKeyHash(_bob);
 
         // Create test account with Alice as initial owner with admin privileges
         testAccount = _deployAccountSingleOwner(
@@ -126,7 +126,7 @@ contract ChainlessExecutionTest is Base {
      */
     function test_ChainlessUserOp_FullExecutionFlow_Success() external {
         // Create comprehensive test with multiple operations
-        bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(_bob));
+        bytes32 newOwnerKeyHash = _makeKeyHash(_bob);
         Call[] memory calls = new Call[](1);
 
         // 1. Add new owner

@@ -4,10 +4,6 @@ pragma solidity ^0.8.23;
 import {Base} from "./Base.t.sol";
 
 contract ERC7201Test is Base {
-    function setUp() public override {
-        super.setUp();
-    }
-
     /// @notice Test the namespaceAndVersion function
     function test_NamespaceAndVersion_Success() external view {
         assertEq(_smartWallet.namespace(), "SmartWallet.ERC7201.CustomStorage");

@@ -95,7 +95,7 @@ contract ExecutionTest is Base {
 
     function test_Execute_ByAddedOwner_Success() public {
         // Add Charlie as an owner to the wallet
-        bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
+        bytes32 charlieKeyHash = _makeKeyHash(_charlie);
         _addOwnerToAccount(
             _alice,
             _aliceWallet,
@@ -185,7 +185,7 @@ contract ExecutionTest is Base {
         ISmartWallet(_aliceWallet).execute(calls);
 
         // Add Charlie as owner
-        bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
+        bytes32 charlieKeyHash = _makeKeyHash(_charlie);
         _addOwnerToAccount(
             _alice,
             _aliceWallet,
@@ -235,7 +235,7 @@ contract ExecutionTest is Base {
     {
         // Create charlie's wallet using factory
         address charlieWallet = _deployAccountSingleOwner(
-            keccak256(abi.encodePacked(_charlie)),
+            _makeKeyHash(_charlie),
             address(_ecdsaValidator),
             1 // Different salt
         );
@@ -772,7 +772,7 @@ contract ExecutionTest is Base {
 
     function test_RevertWhen_ExecuteWithRelayer_NonAdminSelfExecute() public {
         // Add Bob as a non-admin owner to the wallet
-        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        bytes32 bobKeyHash = _makeKeyHash(_bob);
         uint256 bobSettings = 0; // Non-admin settings
         _addOwnerToAccount(
             _alice, // Alice adds Bob as owner
@@ -875,7 +875,7 @@ contract ExecutionTest is Base {
         // Alice is an admin owner of this wallet
 
         // Add charlie as a new owner through executeWithRelayer
-        bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(_charlie));
+        bytes32 newOwnerKeyHash = _makeKeyHash(_charlie);
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
             target: _aliceWallet, // Self-call to add owner
@@ -1040,7 +1040,7 @@ contract ExecutionTest is Base {
         _setCodeToEoa(address(_smartWallet), eoaWallet);
 
         // Step 2: Check validator for a different keyHash (not address(this))
-        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        bytes32 bobKeyHash = _makeKeyHash(_bob);
         address validator = IOwnerManager(eoaWallet).getVerifiedValidator(
             bobKeyHash
         );
@@ -1072,7 +1072,7 @@ contract ExecutionTest is Base {
         _setCodeToEoa(address(_smartWallet), eoaWallet);
 
         // Step 2: Prepare chainless addOwner call
-        bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(_bob));
+        bytes32 newOwnerKeyHash = _makeKeyHash(_bob);
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
             target: eoaWallet, // Self-call required for chainless

@@ -289,7 +289,7 @@ contract IsValidSignatureTest is Base {
         view
     {
         bytes32 zeroHash = bytes32(0);
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 aliceKeyHash = _makeKeyHash(_alice);
         uint48 validUntil = 0; // No expiry
         bytes memory sig = _signDigestWithValidation(
             zeroHash,
@@ -318,7 +318,7 @@ contract IsValidSignatureTest is Base {
         view
     {
         bytes32 maxHash = bytes32(type(uint256).max);
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 aliceKeyHash = _makeKeyHash(_alice);
         uint48 validUntil = 0; // No expiry
         bytes memory sig = _signDigestWithValidation(
             maxHash,
@@ -493,7 +493,7 @@ contract IsValidSignatureTest is Base {
         public
     {
         // Add validator using _bob to avoid EIP-7702 fallback collision
-        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        bytes32 bobKeyHash = _makeKeyHash(_bob);
 
         uint256 settings = OwnerManager(_aliceWallet).packSettings(
             false,
@@ -547,7 +547,7 @@ contract IsValidSignatureTest is Base {
         bytes32 hash2 = keccak256("test2");
 
         // Use validator-based signatures to test signature replay attack protection
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 aliceKeyHash = _makeKeyHash(_alice);
         uint48 validUntil = 0; // No expiry
 
         // Create signatures for both hashes using standard pattern
@@ -776,7 +776,7 @@ contract IsValidSignatureTest is Base {
         view
     {
         bytes32 hash = keccak256("test");
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 aliceKeyHash = _makeKeyHash(_alice);
         uint48 validUntil = 0; // No expiry
 
         // Use helper function to get the digest for isValidSignature
@@ -1081,7 +1081,7 @@ contract IsValidSignatureTest is Base {
         bytes32 hash = keccak256("test_wallet_owner_signing");
 
         // Get alice's keyHash
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 aliceKeyHash = _makeKeyHash(_alice);
 
         // Create signature with custom validator format (keyHash + validUntil + validator signature)
         // The signature needs to sign the MessageSignLib hash format

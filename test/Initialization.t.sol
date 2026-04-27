@@ -8,14 +8,10 @@ import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 
 contract InitializationTest is Base {
-    function setUp() public override {
-        super.setUp();
-    }
-
     function test_RevertWhen_Initialize_CalledTwice() public {
         // Deploy a wallet through factory
         InitialOwner[] memory initialOwners = _createSingleOwner(
-            keccak256(abi.encodePacked(_alice)),
+            _makeKeyHash(_alice),
             address(_ecdsaValidator)
         );
         address wallet = _factory.createAccount(initialOwners, 1);
@@ -30,7 +26,7 @@ contract InitializationTest is Base {
     function test_Initialize_ProperlySetsStorage_Success() public {
         // Deploy a wallet through factory and check that it modifies storage
         InitialOwner[] memory initialOwners = _createSingleOwner(
-            keccak256(abi.encodePacked(_bob)),
+            _makeKeyHash(_bob),
             address(_ecdsaValidator)
         );
 
@@ -48,8 +44,8 @@ contract InitializationTest is Base {
     function test_Initialize_SetsInitialOwnersCorrectly_Success() public {
         // Create initial owners
         bytes32[] memory keyHashes = new bytes32[](2);
-        keyHashes[0] = keccak256(abi.encodePacked(_alice));
-        keyHashes[1] = keccak256(abi.encodePacked(_bob));
+        keyHashes[0] = _makeKeyHash(_alice);
+        keyHashes[1] = _makeKeyHash(_bob);
         address[] memory validators = new address[](2);
         validators[0] = address(_ecdsaValidator);
         validators[1] = address(_ecdsaValidator);
@@ -62,8 +58,8 @@ contract InitializationTest is Base {
         address wallet = _factory.createAccount(initialOwners, 0);
 
         // Verify owners were set correctly
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
-        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        bytes32 aliceKeyHash = _makeKeyHash(_alice);
+        bytes32 bobKeyHash = _makeKeyHash(_bob);
 
         (address aliceValidator, , , , ) = IOwnerManager(wallet)
             .getOwnerSettings(aliceKeyHash);
@@ -77,8 +73,8 @@ contract InitializationTest is Base {
     function test_Initialize_EmitsWalletInitializedEvent_Success() public {
         // Create initial owners
         bytes32[] memory keyHashes = new bytes32[](2);
-        keyHashes[0] = keccak256(abi.encodePacked(_alice));
-        keyHashes[1] = keccak256(abi.encodePacked(_bob));
+        keyHashes[0] = _makeKeyHash(_alice);
+        keyHashes[1] = _makeKeyHash(_bob);
         address[] memory validators = new address[](2);
         validators[0] = address(_ecdsaValidator);
         validators[1] = address(_ecdsaValidator);
@@ -103,7 +99,7 @@ contract InitializationTest is Base {
 
     function test_RevertWhen_Initialize_ZeroValidator() public {
         InitialOwner[] memory initialOwners = _createSingleOwner(
-            keccak256(abi.encodePacked(_alice)),
+            _makeKeyHash(_alice),
             address(0) // Zero address should revert
         );
 
@@ -119,7 +115,7 @@ contract InitializationTest is Base {
     function test_RevertWhen_Implementation_CannotBeInitialized() public {
         // Attempt to call initialize directly on the implementation
         InitialOwner[] memory initialOwners = _createSingleOwner(
-            keccak256(abi.encodePacked(_bob)),
+            _makeKeyHash(_bob),
             address(_ecdsaValidator)
         );
 

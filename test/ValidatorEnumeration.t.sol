@@ -9,21 +9,17 @@ contract ValidatorEnumerationTest is Base {
     function test_ValidatorEnumeration_Functions_Success() public {
         // Alice starts with 1 validator from initialization
         assertEq(IOwnerManager(_aliceWallet).ownerCount(), 1);
-        assertTrue(
-            IOwnerManager(_aliceWallet).hasOwner(
-                keccak256(abi.encodePacked(_alice))
-            )
-        );
+        assertTrue(IOwnerManager(_aliceWallet).hasOwner(_makeKeyHash(_alice)));
 
         // Alice already has a validator from initialization
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 aliceKeyHash = _makeKeyHash(_alice);
 
         assertEq(IOwnerManager(_aliceWallet).ownerCount(), 1);
         assertTrue(IOwnerManager(_aliceWallet).hasOwner(aliceKeyHash));
         assertEq(IOwnerManager(_aliceWallet).ownerAt(0), aliceKeyHash);
 
         // Add second validator (charlie)
-        bytes32 charlieKeyHash = keccak256(abi.encodePacked(_charlie));
+        bytes32 charlieKeyHash = _makeKeyHash(_charlie);
         _addOwnerToAccount(
             _alice,
             _aliceWallet,
@@ -36,7 +32,7 @@ contract ValidatorEnumerationTest is Base {
         assertTrue(IOwnerManager(_aliceWallet).hasOwner(charlieKeyHash));
 
         // Add third validator
-        bytes32 daveKeyHash = keccak256(abi.encodePacked(_dave));
+        bytes32 daveKeyHash = _makeKeyHash(_dave);
         _addOwnerToAccount(
             _alice,
             _aliceWallet,
@@ -88,8 +84,8 @@ contract ValidatorEnumerationTest is Base {
 
     function test_ValidatorEnumeration_WithValidatorSettings_Success() public {
         // Add validators with different settings
-        bytes32 keyHash1 = keccak256(abi.encodePacked(_charlie));
-        bytes32 keyHash2 = keccak256(abi.encodePacked(_dave));
+        bytes32 keyHash1 = _makeKeyHash(_charlie);
+        bytes32 keyHash2 = _makeKeyHash(_dave);
 
         // Add first validator with settings
         uint256 settings1 = OwnerManager(_aliceWallet).packSettings(
