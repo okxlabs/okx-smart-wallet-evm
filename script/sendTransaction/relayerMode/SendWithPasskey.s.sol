@@ -22,7 +22,6 @@ contract SendWithPasskey is Script {
         0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551;
     uint256 constant P256_N_DIV_2 = P256_N / 2;
 
-    uint256 constant SALT = 1100;
     uint256 constant PUB_KEY_X =
         0x2080e77dc16162c7debbdeaa0bbf2de797d66bb9c42b327f58637699fbe2336a;
     uint256 constant PUB_KEY_Y =
@@ -33,19 +32,11 @@ contract SendWithPasskey is Script {
         uint256 deployerPk = vm.envUint("DEPLOYER_PRIVATE_KEY");
         uint256 passkeyPk  = vm.envUint("PASSKEY_PRIVATE_KEY");
         address deployer   = vm.addr(deployerPk);
-        address factory    = vm.envAddress("SMART_WALLET_FACTORY");
         address walletImpl = vm.envAddress("SMART_WALLET");
 
-        console.log("Deployer:", deployer);
-        console.log("Chain id:", block.chainid);
-
         // ── Derive user wallet ─────────────────────────────────────────────
-        InitialOwner[] memory initialOwners = _buildInitialOwners(deployer);
+        InitialOwner[] memory initialOwners = _buildInitialOwners();
         address userWallet = vm.envOr("USER_WALLET", address(0));
-        if (userWallet == address(0)) {
-            userWallet = ISmartWalletFactory(factory).getAddress(initialOwners, SALT);
-        }
-        console.log("User wallet:", userWallet);
 
         // ── Read nonce ─────────────────────────────────────────────────────
         uint256 nonce = uint256(INonceManager(userWallet).getNonce(0));
@@ -58,8 +49,6 @@ contract SendWithPasskey is Script {
 
         // ── Compute intentHash ─────────────────────────────────────────────
         bytes32 intentHash = BatchedCallLib.hash(batchedCall, 0, walletImpl);
-        console.log("intentHash:");
-        console.logBytes32(intentHash);
 
         // ── Compute typedDataHash ──────────────────────────────────────────
         bytes32 typedDataHash;
@@ -68,14 +57,10 @@ contract SendWithPasskey is Script {
         } else {
             typedDataHash = SmartWallet(payable(userWallet)).hashTypedData(intentHash);
         }
-        console.log("typedDataHash:");
-        console.logBytes32(typedDataHash);
 
         // ── Merkle proof (empty — root == leaf) ───────────────────────────
         bytes32[] memory proofs = new bytes32[](0);
         bytes32 rootHash = MerkleProof.processProof(proofs, typedDataHash);
-        console.log("rootHash:");
-        console.logBytes32(rootHash);
 
         // ── Build signature ────────────────────────────────────────────────
         bytes memory signature = _signWithPasskey(
@@ -98,19 +83,12 @@ contract SendWithPasskey is Script {
 
     // ── Internal helpers ───────────────────────────────────────────────────
 
-    function _buildInitialOwners(
-        address deployer
-    ) internal pure returns (InitialOwner[] memory initialOwners) {
-        initialOwners = new InitialOwner[](2);
+    function _buildInitialOwners() internal pure returns (InitialOwner[] memory initialOwners) {
+        initialOwners = new InitialOwner[](1);
         // Passkey owner (validator = address(2))
         initialOwners[0] = InitialOwner({
             keyHash: keccak256(abi.encodePacked(PUB_KEY_X, PUB_KEY_Y)),
             validator: Static.PASSKEY_VALIDATOR_ADDRESS
-        });
-        // ECDSA owner (validator = address(1))
-        initialOwners[1] = InitialOwner({
-            keyHash: keccak256(abi.encodePacked(deployer)),
-            validator: Static.ECDSA_VALIDATOR_ADDRESS
         });
     }
 
