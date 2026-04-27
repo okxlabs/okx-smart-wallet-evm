@@ -68,53 +68,57 @@ External validator contracts implementing `IValidator` are also supported for cu
 | `DecodeLib` | Calldata decoding helpers |
 | `Static` | Shared sentinel addresses and constants |
 
+## Deployments
+
+| Contract | Address |
+|----------|---------|
+| `SmartWalletFactory` | `0xDd3FEa01cD550C9EFfC893f346690b9A649f35EF` |
+| `SmartWalletEntry` | `0xe40ccB2D94975c51bff0C004eFDfd9B3a5796fA4` |
+
+
 ## Usage
 
-### Prepare environment
+### Prerequisites
 
-Requirements:
-- Node.js (v18 or higher)
-- npm or yarn package manager
-- Foundry toolkit for Solidity development
+- [Foundry](https://book.getfoundry.sh/) — Solidity development toolkit
+- Node.js v18+ and `yarn`
 
-Setup:
+### Setup
+
 ```bash
 git submodule update --init --recursive
-npm install  # or yarn install
+yarn install
 ```
 
-### Testing
+### Build
 
-Run the test suite with Foundry:
 ```bash
+yarn build
+# or: forge build src script
+```
+
+### Test
+
+```bash
+# Run full test suite
 forge test
-```
 
-For detailed test output:
-```bash
+# Verbose output
 forge test -vvvv
+
+# Coverage report
+yarn coverage
 ```
-This will run through all test scenarios including wallet deployment, initialization, direct execution, and relayer-based transactions.
-
-
-## Deployment
-
-| Constract | address |
-|---------|-------------|
-| SmartWalletFactory | 0xDd3FEa01cD550C9EFfC893f346690b9A649f35EF |
-| SmartWalletEntry | 0xe40ccB2D94975c51bff0C004eFDfd9B3a5796fA4 |
 
 
 ## Security Considerations
 
-- Multi-layered validation system with external validator support
-- Built-in support for ECDSA and Passkey (WebAuthn) validation
-- Cross-chain replay protection with Merkle proof signatures
-- Comprehensive nonce management prevents replay attacks
-- Admin privilege controls with expiration mechanisms
-- Hook-based validation for additional security checks
-- Owner permission system with granular access controls
-- Upgradeable implementation with authorized upgrade controls
+- Signatures are bound to `keyHash` (not raw address) — validator and owner are decoupled
+- Cross-chain replay protection via `ChainlessLib` and Merkle proof signatures
+- Nonce manager prevents transaction replay
+- Admin privileges support per-owner expiry and hook-based validation
+- ERC-7201 storage namespacing prevents slot collisions across upgrades
+- UUPS upgrade path is access-controlled via `BaseAuthorization`
 
 ## Documentation
 
