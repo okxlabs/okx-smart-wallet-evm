@@ -87,27 +87,32 @@ As our AA wallet service expands, we've designed a architecture to improve maint
 Shows the overall contract architecture and relationships between the product, service and contract layers.
 
 Contract Infrastructure
+![img](../diagrams/contract-infrastructure.png)
 
 ### Account Creation Flow
 
 Illustrates the account creation options including a Smart Wallet contract deployment, or delegation via EIP-7702.
 
 Account Creation Flow
+![img](../diagrams/account-creation-flow.png)
 
 ### Owner and Validation Types
 
 Multiple types of ownership are supported, each mapped to its specific validator and dynamically routed. The system automatically routes authentication requests based on the owner type, allowing the wallet to support diverse user preferences while maintaining security through appropriate validation mechanisms for each authentication type.
 
 Owner Validation Types
+![img](../diagrams/owner-validation-types.png)
 
 ### Execution Flow
 
 Shows the three execution modes and their flows: direct execution, relayer execution, and ERC-4337 execution paths via the Smart Wallet.
 
 Execution Flow
+![img](../diagrams/execution-flow.png)
 
 ### Recovery Flow
 
 Illustrates the account recovery process including recovery trigger, verification, and ownership addition.
 
 Recovery Flow
+![img](../diagrams/recovery-flow.png)
