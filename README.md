@@ -76,7 +76,7 @@ External validator contracts implementing `IValidator` are also supported for cu
 | `Static`               | Shared sentinel addresses and constants                           |
 
 
-## Deployments & audits
+## Deployments & Audits
 
 > Ethereum / X Layer / Base / Optimism / Arbitrum / BSC / Polygon 
 
@@ -86,7 +86,7 @@ External validator contracts implementing `IValidator` are also supported for cu
 | `SmartWalletFactory` | `0xDd3FEa01cD550C9EFfC893f346690b9A649f35EF` |
 | `SmartWalletEntry`   | `0xe40ccB2D94975c51bff0C004eFDfd9B3a5796fA4` |
 
-audits can be found in `[audits/](./documents/audits)`.
+- [Audits](./documents/audits/)
 
 ## Usage
 
