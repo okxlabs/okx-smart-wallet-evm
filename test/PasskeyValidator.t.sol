@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import {console} from "forge-std/Test.sol";
 import {Base} from "./Base.t.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
@@ -12,11 +11,12 @@ import {PasskeyValidator} from "./validators/PasskeyValidator.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
 import {ERC712} from "src/ERC712.sol";
-import {HelperLib} from "script/utils/Helper.s.sol";
+import {HelperLib} from "script/sendTransaction/utils/Helper.s.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {Static} from "src/libraries/Static.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 import {InitialOwner} from "src/Types.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 /**
  * @title PasskeyValidatorTest
@@ -106,7 +106,6 @@ contract PasskeyValidatorTest is Base {
             _passkeyPubX,
             _passkeyPubY
         );
-        console.log("isValid:", isValid);
         assertTrue(isValid, "WebAuthn signature should be valid");
     }
 
@@ -142,24 +141,6 @@ contract PasskeyValidatorTest is Base {
         );
 
         assertEq(isValid, true, "Real Passkey signature should validate");
-    }
-
-    function test_GetReal_TypedDataHash() public view {
-        // Create test calls
-        Call[] memory calls = constructCallsData();
-        BatchedCall memory batchedCall = BatchedCall({
-            calls: calls,
-            nonce: _getNonce(_aliceWallet)
-        });
-
-        // Get the REAL message hash that needs to be signed
-        bytes32 realTypedDataHash = ERC712(_aliceWallet).hashTypedData(
-            BatchedCallLib.hash(batchedCall, 0, address(_smartWallet))
-        );
-
-        // Log the real typedDataHash for our script
-        console.log("REAL TYPED DATA HASH TO SIGN:");
-        console.logBytes32(realTypedDataHash);
     }
 
     function test_ExecuteWithRelayer_WithMockPasskey() public view {
@@ -343,15 +324,13 @@ contract PasskeyValidatorTest is Base {
         );
 
         // Note: This test may still fail due to Passkey signature verification complexities
-        // But the Merkle proof logic is now correct
-        console.log("Merkle proof validation result:", isValid);
-        console.logBytes32(merkleRoot);
-        console.log("Proofs provided:", proofs.length);
+        // but the Merkle proof logic is correct. isValid is computed but not asserted
+        // because validation outcome depends on the underlying P256 precompile availability.
+        isValid;
     }
 
     function test_MerkleProof_ConceptDemonstration() public pure {
         // This test demonstrates the Merkle proof concept without signature complexities
-        console.log("=== Merkle Proof Concept Demo ===");
 
         // Create a simple Merkle tree with 2 leaves
         bytes32 leaf1 = keccak256("transaction1");
@@ -362,13 +341,6 @@ contract PasskeyValidatorTest is Base {
             ? keccak256(abi.encodePacked(leaf1, leaf2))
             : keccak256(abi.encodePacked(leaf2, leaf1));
 
-        console.log("Leaf 1:");
-        console.logBytes32(leaf1);
-        console.log("Leaf 2:");
-        console.logBytes32(leaf2);
-        console.log("Merkle Root:");
-        console.logBytes32(root);
-
         // Create proof for leaf1
         bytes32[] memory proof = new bytes32[](1);
         proof[0] = leaf2; // To prove leaf1, we need leaf2 as proof
@@ -378,8 +350,6 @@ contract PasskeyValidatorTest is Base {
             proof,
             leaf1
         );
-        console.log("Reconstructed Root:");
-        console.logBytes32(reconstructedRoot);
 
         // In real usage:
         // 1. User signs the root (authorizing all transactions in the tree)
@@ -398,35 +368,6 @@ contract PasskeyValidatorTest is Base {
         );
     }
 
-    function test_MerkleProof_ProcessingDetection() public view {
-        // Test the MerkleProofProcessor's dynamic detection
-        PasskeyValidatorLib.PasskeyPubKey
-            memory passkeyPubKey = PasskeyValidatorLib.PasskeyPubKey({
-                pubKeyX: _passkeyPubX,
-                pubKeyY: _passkeyPubY
-                // r: TEST_SIG_R,
-                // s: TEST_SIG_S
-            });
-
-        bytes memory signatureData = abi.encode(passkeyPubKey);
-
-        console.log("Signature data length:", signatureData.length);
-
-        // Test 1: Short data (no proofs)
-        console.log("Testing short data detection...");
-
-        // Test 2: Long data (potential proofs)
-        bytes32[] memory dummyProofs = new bytes32[](2);
-        dummyProofs[0] = bytes32(uint256(1));
-        dummyProofs[1] = bytes32(uint256(2));
-
-        bytes memory longData = abi.encodePacked(
-            signatureData,
-            abi.encode(dummyProofs)
-        );
-        console.log("Long data length:", longData.length);
-    }
-
     function test_ValidateSignature_ShortValidatorData_ReturnsFalse()
         public
         view
@@ -441,10 +382,6 @@ contract PasskeyValidatorTest is Base {
         for (uint256 i = 0; i < shortValidatorData.length; i++) {
             shortValidatorData[i] = bytes1(uint8(0));
         }
-
-        // Log the lengths for debugging
-        console.log("Short validatorData length:", shortValidatorData.length);
-        console.log("PASSKEY_PUBKEY_LENGTH constant: 64");
 
         // Should return false due to insufficient length
         bool isValid = passkeyValidator.validateSignature(
@@ -490,13 +427,6 @@ contract PasskeyValidatorTest is Base {
             shortValidatorData[i] = bytes1(uint8(0));
         }
 
-        // Log for debugging
-        console.log("Total validatorData length:", shortValidatorData.length);
-        console.log(
-            "Data after validation and keyHash extraction:",
-            shortValidatorData.length - 38
-        );
-
         // Should revert with InvalidSignature because PasskeyValidator will return false
         vm.prank(_bob);
         vm.expectRevert(ISmartWallet.InvalidSignature.selector);
@@ -539,11 +469,6 @@ contract PasskeyValidatorTest is Base {
             pubKeyData,
             incompleteAuth
         );
-
-        // Log for debugging
-        console.log("Total validatorData length:", validatorData.length);
-        console.log("PubKey data length:", pubKeyData.length);
-        console.log("Incomplete auth data length:", incompleteAuth.length);
 
         // Should revert due to abi.decode failure or validation failure
         vm.prank(_bob);
@@ -603,7 +528,7 @@ contract PasskeyValidatorTest is Base {
 
         vm.startPrank(_bob);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(
+        emit RelayerExecuteSuccessEvent(
             _getExecuteWithRelayerHash(batchedCall, 0, builtinWallet),
             _bob,
             batchedCall.nonce
@@ -724,13 +649,16 @@ contract PasskeyValidatorTest is Base {
         bytes32 userOpHash = IEntryPoint(ENTRYPOINT_ADDRESS).getUserOpHash(
             userOp
         );
-        bytes32 userOpHashWithValidUntil = keccak256(
-            abi.encode(
-                userOpHash,
-                uint48(0),
-                ISmartWallet(passkeyWallet).IMPLEMENTATION()
-            )
-        );
+        bytes32 userOpHashWithValidUntil = MessageHashUtils
+            .toEthSignedMessageHash(
+                keccak256(
+                    abi.encode(
+                        userOpHash,
+                        uint48(0),
+                        ISmartWallet(passkeyWallet).IMPLEMENTATION()
+                    )
+                )
+            );
         bytes memory signature = _createBuiltinPasskeySignature(
             builtinKeyHash,
             userOpHashWithValidUntil

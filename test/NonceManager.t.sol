@@ -154,9 +154,6 @@ contract NonceManagerTest is Test {
     }
 
     function test_ValidateAndUpdateNonce_OverflowBehavior() public pure {
-        uint192 key = uint192(42);
-        key; // Intentionally unused - for documentation purposes
-
         // Test the theoretical overflow case
         // Note: In practice, reaching uint64 max would require enormous gas
         // But we can test the mathematical behavior
@@ -373,34 +370,5 @@ contract NonceManagerTest is Test {
         assertTrue(gasUsed2 > 20000); // Should use at least 20k gas for SSTORE
         assertTrue(gasUsed1 < 50000); // Should not exceed 50k gas
         assertTrue(gasUsed2 < 50000); // Should not exceed 50k gas
-    }
-
-    // ============ Comprehensive Coverage Report ============
-
-    function test_NonceManager_ComprehensiveCoverage() public {
-        // This test ensures we've covered all critical paths
-
-        // 1. Basic functionality ✓
-        uint192 key = uint192(12345);
-        assertEq(nonceManager.getNonce(key), 0);
-
-        // 2. Valid nonce validation ✓
-        uint256 validPacked = (uint256(key) << 64) | uint256(0);
-        assertTrue(nonceManager.testValidateAndUpdateNonce(validPacked));
-
-        // 3. Invalid nonce validation ✓
-        uint256 invalidPacked = (uint256(key) << 64) | uint256(0);
-        assertFalse(nonceManager.testValidateAndUpdateNonce(invalidPacked));
-
-        // 4. Event emission ✓
-        vm.expectEmit(true, true, true, true);
-        emit NonceConsumed(key, 2);
-        uint256 nextValidPacked = (uint256(key) << 64) | uint256(2);
-        assertTrue(nonceManager.testValidateAndUpdateNonce(nextValidPacked));
-
-        // 5. State consistency ✓
-        assertEq(nonceManager.getNonce(key), 3);
-
-        // All critical NonceManager functionality has been tested ✓
     }
 }

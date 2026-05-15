@@ -3,16 +3,27 @@ pragma solidity ^0.8.29;
 
 import {Call} from "../Types.sol";
 library DecodeLib {
+    /// @notice Error thrown when the call data is invalid
+    error InvalidCallData();
     /// @notice Decode `Call[]` from function params (WITHOUT selector)
     /// @dev Expects input like `bytes params = callData[4:]` or `abi.encode(calls)`
     function decodeCalls(
         bytes calldata callData
     ) internal pure returns (Call[] calldata calls) {
+        /// @dev call data length should be greater than 32
+        if (callData.length < 32) revert InvalidCallData();
+
+        uint256 relOffset;
         assembly ("memory-safe") {
-            let dataPointer := add(
-                callData.offset,
-                calldataload(callData.offset)
-            )
+            relOffset := calldataload(callData.offset)
+        }
+
+        /// @dev calls offset should be less than call data length
+        /// @dev to avoid overflow attack
+        if (relOffset > callData.length - 32) revert InvalidCallData();
+
+        assembly ("memory-safe") {
+            let dataPointer := add(callData.offset, relOffset)
 
             // Extract Calls
             calls.offset := add(dataPointer, 32)

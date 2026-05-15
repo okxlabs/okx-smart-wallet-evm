@@ -7,8 +7,8 @@ import {Static} from "./libraries/Static.sol";
 /// @title ERC7201
 abstract contract ERC7201 is IERC7201 {
     /// @inheritdoc IERC7201
-    function namespaceAndVersion() external pure returns (string memory) {
-        return Static.ERC7201_NAMESPACE_AND_VERSION;
+    function namespace() external pure returns (string memory) {
+        return Static.ERC7201_NAMESPACE;
     }
 
     /// @notice The calculated storage root of the contract according to ERC7201

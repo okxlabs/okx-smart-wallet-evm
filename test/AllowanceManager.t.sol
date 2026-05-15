@@ -8,8 +8,6 @@ import {IAllowanceManager} from "../src/interfaces/IAllowanceManager.sol";
 import {ISmartWallet} from "../src/interfaces/ISmartWallet.sol";
 import {Call, BatchedCall} from "../src/Types.sol";
 import {Static} from "../src/libraries/Static.sol";
-import {BatchedCallLib} from "../src/libraries/BatchedCallLib.sol";
-import {ERC712} from "../src/ERC712.sol";
 
 // Contract that rejects ETH transfers
 contract ETHRejectingContract {
@@ -47,6 +45,9 @@ contract RevertingToken {
 }
 
 contract AllowanceManagerTest is Base {
+    uint256 constant INITIAL_TOKEN_BALANCE = 1000 * 10 ** 18;
+    uint256 constant INITIAL_ETH_BALANCE = 100 ether;
+
     SmartWallet public aliceSmartWallet;
     MockERC20 public mockToken;
     MockERC20 public mockToken2;
@@ -54,37 +55,6 @@ contract AllowanceManagerTest is Base {
     address public recipient;
     address public unauthorized;
 
-    event ApproveToken(
-        address indexed owner,
-        address indexed token,
-        address indexed spender,
-        uint256 amount
-    );
-
-    event TransferFromNative(
-        address indexed owner,
-        address indexed spender,
-        address indexed recipient,
-        uint256 amount
-    );
-
-    event TransferFromToken(
-        address indexed owner,
-        address indexed spender,
-        address indexed token,
-        address recipient,
-        uint256 amount
-    );
-
-    event NativeAllowanceUpdated(address indexed spender, uint256 newAllowance);
-
-    event TokenAllowanceUpdated(
-        address indexed token,
-        address indexed spender,
-        uint256 newAllowance
-    );
-
-    // Helper function to execute allowance manager calls through Alice's smart wallet
     function _executeApprove(bytes memory data) internal {
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -96,7 +66,6 @@ contract AllowanceManagerTest is Base {
         ISmartWallet(address(aliceSmartWallet)).execute(calls);
     }
 
-    // Helper function to execute allowance manager calls through relayer
     function _executeApproveWithRelayer(bytes memory data) internal {
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -104,23 +73,17 @@ contract AllowanceManagerTest is Base {
             value: 0,
             data: data
         });
-
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: _getNonce(address(aliceSmartWallet))
         });
-
-        // Signature format: pubKeyHash (32) + validUntil (6) + signatures
-        uint48 validUntil = uint48(block.timestamp + 1 hours); // 1 hour from now
-        bytes32 typedDataHash = ERC712(address(aliceSmartWallet)).hashTypedData(
-            BatchedCallLib.hash(batchedCall, validUntil, address(_smartWallet))
+        bytes memory validatorData = _constructRelayerSignature(
+            address(aliceSmartWallet),
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
         );
-        bytes memory validatorData = abi.encodePacked(
-            keccak256(abi.encodePacked(_alice)), // pubKeyHash (32 bytes)
-            validUntil, // validUntil (6 bytes)
-            _signHash(_alicePk, typedDataHash) // signatures
-        );
-
         vm.prank(relayer);
         ISmartWallet(address(aliceSmartWallet)).executeWithRelayer(
             batchedCall,
@@ -128,7 +91,6 @@ contract AllowanceManagerTest is Base {
         );
     }
 
-    // Helper function to approve native ETH allowance
     function _approveNative(address spenderAddr, uint256 amount) internal {
         IAllowanceManager.ApprovalInfo[]
             memory approvals = new IAllowanceManager.ApprovalInfo[](1);
@@ -146,7 +108,6 @@ contract AllowanceManagerTest is Base {
         );
     }
 
-    // Helper function to approve token allowance
     function _approveToken(
         address token,
         address spenderAddr,
@@ -168,7 +129,6 @@ contract AllowanceManagerTest is Base {
         );
     }
 
-    // Helper function to approve native ETH allowance with relayer
     function _approveNativeWithRelayer(
         address spenderAddr,
         uint256 amount
@@ -189,7 +149,6 @@ contract AllowanceManagerTest is Base {
         );
     }
 
-    // Helper function to approve token allowance with relayer
     function _approveTokenWithRelayer(
         address token,
         address spenderAddr,
@@ -211,7 +170,6 @@ contract AllowanceManagerTest is Base {
         );
     }
 
-    // Helper function to call transferFromNative directly as spender
     function _transferFromNativeCallAsSpender(
         address _recipient,
         uint256 _amount
@@ -223,7 +181,6 @@ contract AllowanceManagerTest is Base {
         );
     }
 
-    // Helper function to call transferFromToken directly as spender
     function _transferFromTokenCallAsSpender(
         address _token,
         address _recipient,
@@ -239,81 +196,58 @@ contract AllowanceManagerTest is Base {
 
     function setUp() public override {
         super.setUp();
-        // Set up additional test addresses
         spender = makeAddr("spender");
         recipient = makeAddr("recipient");
         unauthorized = makeAddr("unauthorized");
-
-        // Set up relayer
         relayer = makeAddr("relayer");
 
-        // Deploy mock tokens
         mockToken = new MockERC20();
         mockToken2 = new MockERC20();
-
-        // Use the smart wallet from Base setup
         aliceSmartWallet = SmartWallet(payable(_aliceWallet));
 
-        // Transfer tokens to Alice's smart wallet
-        bool success1 = mockToken.transfer(
-            address(aliceSmartWallet),
-            1000 * 10 ** 18
+        assertTrue(
+            mockToken.transfer(address(aliceSmartWallet), INITIAL_TOKEN_BALANCE)
         );
-        bool success2 = mockToken2.transfer(
-            address(aliceSmartWallet),
-            1000 * 10 ** 18
+        assertTrue(
+            mockToken2.transfer(
+                address(aliceSmartWallet),
+                INITIAL_TOKEN_BALANCE
+            )
         );
-        assertTrue(success1, "Token transfer failed");
-        assertTrue(success2, "Token2 transfer failed");
-
-        // Fund Alice's smart wallet with ETH
-        vm.deal(address(aliceSmartWallet), 100 ether);
+        vm.deal(address(aliceSmartWallet), INITIAL_ETH_BALANCE);
     }
 
     // ============ Native ETH Tests ============
 
-    function test_ApproveNative_Success() public {
-        uint256 amount = 1 ether;
+    function test_RevertWhen_ApproveNative_DirectCallByNonOwner() public {
+        IAllowanceManager.ApprovalInfo[]
+            memory approvals = new IAllowanceManager.ApprovalInfo[](1);
+        approvals[0] = IAllowanceManager.ApprovalInfo(
+            Static.NATIVE_ETH,
+            spender,
+            1 ether
+        );
+        bytes4 err = BaseAuthorization.NotFromSelf.selector;
 
-        // Test 1: Should fail for unauthorized user - trying to call directly
         vm.prank(unauthorized);
-        vm.expectRevert(
-            abi.encodeWithSelector(BaseAuthorization.NotFromSelf.selector)
-        );
-        IAllowanceManager.ApprovalInfo[]
-            memory approvals1 = new IAllowanceManager.ApprovalInfo[](1);
-        approvals1[0] = IAllowanceManager.ApprovalInfo({
-            token: Static.NATIVE_ETH,
-            spender: spender,
-            amount: amount
-        });
-        aliceSmartWallet.batchApproveToken(approvals1);
+        vm.expectRevert(abi.encodeWithSelector(err));
+        aliceSmartWallet.batchApproveToken(approvals);
 
-        // Test 2: Should fail for external address (Bob)
         vm.prank(_bob);
-        vm.expectRevert(
-            abi.encodeWithSelector(BaseAuthorization.NotFromSelf.selector)
-        );
-        IAllowanceManager.ApprovalInfo[]
-            memory approvals2 = new IAllowanceManager.ApprovalInfo[](1);
-        approvals2[0] = IAllowanceManager.ApprovalInfo({
-            token: Static.NATIVE_ETH,
-            spender: spender,
-            amount: amount
-        });
-        aliceSmartWallet.batchApproveToken(approvals2);
+        vm.expectRevert(abi.encodeWithSelector(err));
+        aliceSmartWallet.batchApproveToken(approvals);
+    }
 
-        // Test 3: Should succeed for wallet owner (Alice) through execute
+    function test_ApproveNative_ByOwnerViaExecute_Success() public {
+        uint256 amount = 1 ether;
         vm.expectEmit(true, true, true, true);
-        emit ApproveToken(
+        emit IAllowanceManager.ApproveToken(
             address(aliceSmartWallet),
             Static.NATIVE_ETH,
             spender,
             amount
         );
-
         _approveNative(spender, amount);
-
         assertEq(
             aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, spender),
             amount
@@ -330,7 +264,7 @@ contract AllowanceManagerTest is Base {
         uint256 initialBalance = recipient.balance;
 
         vm.expectEmit(true, true, true, true);
-        emit TransferFromNative(
+        emit IAllowanceManager.TransferFromNative(
             address(aliceSmartWallet),
             spender,
             recipient,
@@ -432,7 +366,7 @@ contract AllowanceManagerTest is Base {
 
         // Test 3: Should succeed for wallet owner (Alice) through execute
         vm.expectEmit(true, true, true, true);
-        emit ApproveToken(
+        emit IAllowanceManager.ApproveToken(
             address(aliceSmartWallet),
             address(mockToken),
             spender,
@@ -457,7 +391,7 @@ contract AllowanceManagerTest is Base {
         uint256 initialBalance = mockToken.balanceOf(recipient);
 
         vm.expectEmit(true, true, true, true);
-        emit TransferFromToken(
+        emit IAllowanceManager.TransferFromToken(
             address(aliceSmartWallet),
             spender,
             address(mockToken),
@@ -566,7 +500,7 @@ contract AllowanceManagerTest is Base {
     function test_MultipleTokens_Success() public {
         // mockToken2 is already deployed in setUp()
         // Just mint tokens to wallet
-        mockToken2.mint(address(aliceSmartWallet), 1000 * 10 ** 18);
+        mockToken2.mint(address(aliceSmartWallet), INITIAL_TOKEN_BALANCE);
 
         uint256 amount1 = 100 * 10 ** 18;
         uint256 amount2 = 200 * 10 ** 18;
@@ -776,7 +710,7 @@ contract AllowanceManagerTest is Base {
         FailingToken failingToken = new FailingToken();
 
         // Mint tokens directly to the wallet
-        failingToken.mint(address(aliceSmartWallet), 1000 * 10 ** 18);
+        failingToken.mint(address(aliceSmartWallet), INITIAL_TOKEN_BALANCE);
 
         // Approve allowance for the failing token through execute
         _approveToken(address(failingToken), spender, allowanceAmount);
@@ -803,7 +737,7 @@ contract AllowanceManagerTest is Base {
         RevertingToken revertingToken = new RevertingToken();
 
         // Mint tokens directly to the wallet
-        revertingToken.mint(address(aliceSmartWallet), 1000 * 10 ** 18);
+        revertingToken.mint(address(aliceSmartWallet), INITIAL_TOKEN_BALANCE);
 
         // Approve allowance for the reverting token through execute
         _approveToken(address(revertingToken), spender, allowanceAmount);
@@ -833,7 +767,7 @@ contract AllowanceManagerTest is Base {
         uint256 amount = 1 ether;
 
         vm.expectEmit(true, true, true, true);
-        emit ApproveToken(
+        emit IAllowanceManager.ApproveToken(
             address(aliceSmartWallet),
             Static.NATIVE_ETH,
             spender,
@@ -852,7 +786,7 @@ contract AllowanceManagerTest is Base {
         uint256 amount = 100 * 10 ** 18;
 
         vm.expectEmit(true, true, true, true);
-        emit ApproveToken(
+        emit IAllowanceManager.ApproveToken(
             address(aliceSmartWallet),
             address(mockToken),
             spender,
@@ -891,21 +825,21 @@ contract AllowanceManagerTest is Base {
 
         // Expect events for each approval
         vm.expectEmit(true, true, true, true);
-        emit ApproveToken(
+        emit IAllowanceManager.ApproveToken(
             address(aliceSmartWallet),
             address(mockToken),
             spender,
             100 * 10 ** 18
         );
         vm.expectEmit(true, true, true, true);
-        emit ApproveToken(
+        emit IAllowanceManager.ApproveToken(
             address(aliceSmartWallet),
             address(mockToken2),
             spender,
             200 * 10 ** 18
         );
         vm.expectEmit(true, true, true, true);
-        emit ApproveToken(
+        emit IAllowanceManager.ApproveToken(
             address(aliceSmartWallet),
             Static.NATIVE_ETH,
             recipient,
@@ -955,14 +889,14 @@ contract AllowanceManagerTest is Base {
 
         // Expect events for each approval
         vm.expectEmit(true, true, true, true);
-        emit ApproveToken(
+        emit IAllowanceManager.ApproveToken(
             address(aliceSmartWallet),
             address(mockToken),
             spender,
             100 * 10 ** 18
         );
         vm.expectEmit(true, true, true, true);
-        emit ApproveToken(
+        emit IAllowanceManager.ApproveToken(
             address(aliceSmartWallet),
             Static.NATIVE_ETH,
             recipient,
@@ -1015,7 +949,7 @@ contract AllowanceManagerTest is Base {
         );
 
         vm.expectEmit(true, true, true, true);
-        emit ApproveToken(
+        emit IAllowanceManager.ApproveToken(
             address(aliceSmartWallet),
             address(mockToken),
             spender,
@@ -1056,14 +990,14 @@ contract AllowanceManagerTest is Base {
         );
 
         vm.expectEmit(true, true, true, true);
-        emit ApproveToken(
+        emit IAllowanceManager.ApproveToken(
             address(aliceSmartWallet),
             address(mockToken),
             spender,
             150 * 10 ** 18
         );
         vm.expectEmit(true, true, true, true);
-        emit ApproveToken(
+        emit IAllowanceManager.ApproveToken(
             address(aliceSmartWallet),
             Static.NATIVE_ETH,
             recipient,
@@ -1247,7 +1181,7 @@ contract AllowanceManagerTest is Base {
     function test_MultipleTokens_WithRelayer() public {
         // mockToken2 is already deployed in setUp()
         // Just mint tokens to wallet
-        mockToken2.mint(address(aliceSmartWallet), 1000 * 10 ** 18);
+        mockToken2.mint(address(aliceSmartWallet), INITIAL_TOKEN_BALANCE);
 
         uint256 amount1 = 100 * 10 ** 18;
         uint256 amount2 = 200 * 10 ** 18;

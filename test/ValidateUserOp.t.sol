@@ -8,7 +8,7 @@ import {ECDSAValidator} from "./validators/ECDSAValidator.sol";
 import {PasskeyValidator} from "./validators/PasskeyValidator.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
-import {HelperLib} from "script/utils/Helper.s.sol";
+import {HelperLib} from "script/sendTransaction/utils/Helper.s.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 import {Static} from "src/libraries/Static.sol";
@@ -16,6 +16,7 @@ import {ERC4337Account} from "src/ERC4337Account.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {Call} from "src/Types.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 // Mock contract moved from end of file
 contract MockEntryPoint {
@@ -108,7 +109,7 @@ contract ValidateUserOpTest is Base {
         // Test the complete ERC-4337 flow: handleOps -> validateUserOp -> executeUserOp
 
         // Create a new account with alice as owner
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 aliceKeyHash = _makeKeyHash(_alice);
         address account = _deployAccountSingleOwner(
             aliceKeyHash,
             address(1), // Built-in ECDSA validator
@@ -204,8 +205,8 @@ contract ValidateUserOpTest is Base {
         // Test handleOps with chainless nonce for cross-chain operations
 
         // Create a new account
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
-        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        bytes32 aliceKeyHash = _makeKeyHash(_alice);
+        bytes32 bobKeyHash = _makeKeyHash(_bob);
         address account = _deployAccountSingleOwner(
             aliceKeyHash,
             address(1),
@@ -309,7 +310,7 @@ contract ValidateUserOpTest is Base {
         uint48 expiredValidUntil = uint48(block.timestamp - 1);
 
         // Create signature with expired validUntil
-        bytes32 keyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 keyHash = _makeKeyHash(_alice);
         bytes32 finalHash = _getValidateUserOpHash(
             userOp,
             userOpHash,
@@ -384,7 +385,7 @@ contract ValidateUserOpTest is Base {
         uint48 futureValidUntil = uint48(block.timestamp + 1 hours);
 
         // Create signature with future validUntil
-        bytes32 keyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 keyHash = _makeKeyHash(_alice);
         bytes32 finalHash = _getValidateUserOpHash(
             userOp,
             userOpHash,
@@ -494,7 +495,7 @@ contract ValidateUserOpTest is Base {
     function test_ValidateUserOp_WithEoaSignerAndChainlessNonce_Success()
         external
     {
-        bytes32 _bobKeyHash = keccak256(abi.encodePacked(_bob));
+        bytes32 _bobKeyHash = _makeKeyHash(_bob);
 
         TestTemps memory t;
         PackedUserOperation memory userOp;
@@ -551,7 +552,7 @@ contract ValidateUserOpTest is Base {
     function test_ValidateUserOp_WithEoaSignerAndChainlessNonce_UopHashError_ReturnsSigValidationFailed()
         external
     {
-        bytes32 _bobKeyHash = keccak256(abi.encodePacked(_bob));
+        bytes32 _bobKeyHash = _makeKeyHash(_bob);
 
         TestTemps memory t;
         PackedUserOperation memory userOp;
@@ -726,13 +727,16 @@ contract ValidateUserOpTest is Base {
         t.missingAccountFunds = 1000;
         vm.deal(address(account), 2 ether);
 
-        bytes32 passkeyHashWithValidUntil = keccak256(
-            abi.encode(
-                t.userOpHash,
-                uint48(0),
-                ISmartWallet(account).IMPLEMENTATION()
-            )
-        );
+        bytes32 passkeyHashWithValidUntil = MessageHashUtils
+            .toEthSignedMessageHash(
+                keccak256(
+                    abi.encode(
+                        t.userOpHash,
+                        uint48(0),
+                        ISmartWallet(account).IMPLEMENTATION()
+                    )
+                )
+            );
         (, , bytes32 messageHash) = HelperLib.getPasskeyMessageHash(
             passkeyHashWithValidUntil
         );
@@ -912,7 +916,7 @@ contract ValidateUserOpTest is Base {
             userOpHash,
             account
         );
-        bytes32 wrongKeyHash = keccak256(abi.encodePacked(_bob));
+        bytes32 wrongKeyHash = _makeKeyHash(_bob);
         // Replace the keyHash in the signature (first 32 bytes)
         assembly {
             mstore(add(validSignature, 32), wrongKeyHash)
@@ -1020,7 +1024,7 @@ contract ValidateUserOpTest is Base {
         external
     {
         // Create addOwner call
-        bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(_bob));
+        bytes32 newOwnerKeyHash = _makeKeyHash(_bob);
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
             target: _aliceWallet, // use existing _aliceWallet account
@@ -1117,7 +1121,7 @@ contract ValidateUserOpTest is Base {
         external
     {
         // Create account with ECDSA validator
-        bytes32 _bobKeyHash = keccak256(abi.encodePacked(_bob));
+        bytes32 _bobKeyHash = _makeKeyHash(_bob);
         bytes32[] memory keyHashes = new bytes32[](2);
         keyHashes[0] = _aliceWalletKeyHash;
         keyHashes[1] = _bobKeyHash;
@@ -1218,7 +1222,7 @@ contract ValidateUserOpTest is Base {
         vm.deal(account, 2 ether);
 
         // Create multiple supported calls in one batch
-        bytes32 newOwnerKeyHash = keccak256(abi.encodePacked(_bob));
+        bytes32 newOwnerKeyHash = _makeKeyHash(_bob);
         Call[] memory calls = new Call[](1);
 
         // 1. addOwner call

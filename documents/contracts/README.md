@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Smart Wallet system consists of several core smart contracts that work together to provide a unified Account Abstraction solution. This document provides detailed information about each contract's structure, functionality, relationships, and integration patterns.
+The Smart Wallet system consists of several core smart contracts that work together to provide a Account Abstraction solution. This document provides detailed information about each contract's structure, functionality, relationships, and integration patterns.
 
 ## Contract Architecture
 

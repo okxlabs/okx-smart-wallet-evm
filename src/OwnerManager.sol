@@ -100,20 +100,30 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
         _removeValidator(keyHash);
     }
 
-    // External View Functions
-
+    /// External View Functions
+    /// @notice Get the total number of registered owners, including expired ones
+    /// @return The total number of registered owners
     function ownerCount() external view override returns (uint256) {
         return _ownerKeys.length();
     }
 
+    /// @notice Get the keyHash of the registered owner at the specified index,
+    ///         including expired ones
+    /// @param index The index of the owner to retrieve
+    /// @return The keyHash of the registered owner at the given index
     function ownerAt(uint256 index) external view override returns (bytes32) {
         return _ownerKeys.at(index);
     }
 
+    /// @notice Get all registered owner keyHashes, including expired ones
+    /// @return Array of all registered owner keyHashes
     function getOwnerKeys() external view override returns (bytes32[] memory) {
         return _ownerKeys.values();
     }
 
+    /// @notice Check if a keyHash is a registered owner, including expired ones
+    /// @param keyHash The keyHash to check
+    /// @return True if the keyHash is a registered owner, including expired ones, false otherwise
     function hasOwner(bytes32 keyHash) public view override returns (bool) {
         return _ownerKeys.contains(keyHash);
     }

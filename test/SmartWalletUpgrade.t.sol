@@ -77,7 +77,7 @@ contract SmartWalletUpgradeTest is Base {
     
     function test_UpgradeToAndCall_PreservesOwnersThroughRelayer_Success() public {
         // Add an additional owner before upgrade
-        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        bytes32 bobKeyHash = _makeKeyHash(_bob);
         uint256 settings = OwnerManager(_aliceWallet).packSettings(true, 0, address(0));
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), settings);
         
@@ -106,7 +106,7 @@ contract SmartWalletUpgradeTest is Base {
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, validatorData);
         
         // Verify owners are preserved after upgrade
-        assertTrue(IOwnerManager(_aliceWallet).hasOwner(keccak256(abi.encodePacked(_alice))));
+        assertTrue(IOwnerManager(_aliceWallet).hasOwner(_makeKeyHash(_alice)));
         assertTrue(IOwnerManager(_aliceWallet).hasOwner(bobKeyHash));
     }
     
@@ -196,7 +196,7 @@ contract SmartWalletUpgradeTest is Base {
     
     function test_RevertWhen_NonAdminOwner_UpgradeThroughRelayer() public {
         // Add bob as a non-admin owner
-        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        bytes32 bobKeyHash = _makeKeyHash(_bob);
         uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(0));
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), settings);
         
@@ -249,7 +249,7 @@ contract SmartWalletUpgradeTest is Base {
         
         // Use wrong key to sign (bob's key but claim it's alice's)
         // This creates a signature with alice's keyHash but signed with bob's key
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 aliceKeyHash = _makeKeyHash(_alice);
         bytes32 hash = _getExecuteWithRelayerHash(batchedCall, uint48(0), _aliceWallet);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(_bobPk, hash);
         bytes memory invalidValidatorData = abi.encodePacked(aliceKeyHash, uint48(0), r, s, v);
