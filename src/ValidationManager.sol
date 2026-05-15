@@ -22,7 +22,7 @@ abstract contract ValidationManager {
     ///      3. External validator (any other address): Calls the validator contract
     /// @param validator Address of the validator to use (1 for ECDSA, 2 for Passkey, or external contract)
     /// @param keyHash The public key hash to look up
-    /// @param typedDataHash EIP-712 typed data hash of the data to be validated
+    /// @param typedDataHash typed data hash to be validated
     /// @param validationData Signature data specific to the validator type
     /// @return bool True if validation succeeds, false otherwise
     /// @custom:security Ensure validator contracts are properly verified and authorized before use

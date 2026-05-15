@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import {console} from "forge-std/console.sol";
 import {Base, MockERC20} from "./Base.t.sol";
 import {ISmartWallet} from "../src/interfaces/ISmartWallet.sol";
 import {IOwnerManager} from "../src/interfaces/IOwnerManager.sol";
@@ -137,7 +136,7 @@ contract HookTest is Base {
         mockToken = new MockERC20();
 
         // Calculate Alice's keyHash - this should be the EOA address
-        aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        aliceKeyHash = _makeKeyHash(_alice);
 
         // Fund Alice with tokens for testing
         bool success = mockToken.transfer(_aliceWallet, 1000 ether);
@@ -1261,8 +1260,6 @@ contract HookTest is Base {
         (, address hook, , , ) = IOwnerManager(_aliceWallet).getOwnerSettings(
             aliceKeyHash
         );
-        console.log("Hook address after proper setup:", hook);
-
         // Now try to execute a call that should trigger the hook
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -1316,9 +1313,6 @@ contract HookTest is Base {
             expiration,
             contractHook
         );
-        console.log("Contract settings:", contractSettings);
-        console.log("Contract hook address:", contractHook);
-
         // Now try to execute a call that should trigger the hook
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -1372,9 +1366,12 @@ contract HookTest is Base {
             "address(this) should always return ECDSA validator"
         );
 
-        // Verify this works even if the wallet has no other owners
-        InitialOwner[] memory noOwners = new InitialOwner[](0);
-        address freshWallet = _factory.createAccount(noOwners, 0);
+        // Verify this works for a wallet with a single owner
+        InitialOwner[] memory singleOwner = _createSingleOwner(
+            _makeKeyHash(_bob),
+            address(_ecdsaValidator)
+        );
+        address freshWallet = _factory.createAccount(singleOwner, 1);
         bytes32 freshSelfKeyHash = keccak256(abi.encodePacked(freshWallet));
         address freshValidator = IOwnerManager(freshWallet)
             .getVerifiedValidator(freshSelfKeyHash);
@@ -1578,7 +1575,7 @@ contract HookTest is Base {
 
     function test_AddressThis_WorksEvenWithOtherExpiredOwners() public {
         // Add an owner with expiration
-        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        bytes32 bobKeyHash = _makeKeyHash(_bob);
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({

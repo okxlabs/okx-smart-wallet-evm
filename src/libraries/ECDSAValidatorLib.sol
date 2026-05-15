@@ -41,6 +41,9 @@ library ECDSAValidatorLib {
 
         // Recover signer and verify against keyHash
         (address recoveredSigner, , ) = messageHash.tryRecover(signature);
+        if (recoveredSigner == address(0)) {
+            return false;
+        }
         return keccak256(abi.encodePacked(recoveredSigner)) == keyHash;
     }
 }

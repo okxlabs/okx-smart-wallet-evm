@@ -16,14 +16,17 @@ interface ISmartWallet is IERC165 {
     error InvalidValidatorDataLength(uint256 actual, uint256 required);
     error DelegateAndRevert(bool success, bytes ret);
     error UnauthorizedInitialization();
+    error InitialOwnersLengthIsZero();
 
     // EVENTS
     event WalletInitialized();
-    event ExecuteSuccessEvent(
+    event RelayerExecuteSuccessEvent(
         bytes32 indexed intentHash,
         address sender,
         uint256 nonce
     );
+
+    event ExecuteSuccessEvent(bytes32 indexed intentHash, address caller);
 
     /// @notice Initializes the wallet with initial owners during proxy deployment
     /// @dev Only callable once via initializer modifier, sets up initial owners with admin privileges

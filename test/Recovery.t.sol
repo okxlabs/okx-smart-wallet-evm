@@ -258,7 +258,7 @@ contract RecoveryTest is Base {
     function test_RevertWhen_Recover_RequiresRecoverySignerOwnership() public {
         // Create account WITHOUT RecoverySigner as owner
         recoveredAccount = _deployAccountSingleOwner(
-            keccak256(abi.encodePacked(_alice)),
+            _makeKeyHash(_alice),
             address(_ecdsaValidator),
             0
         );
@@ -294,7 +294,7 @@ contract RecoveryTest is Base {
     function test_Recovery_SettingsMatchExpected_Success() public {
         // Create an account first
         recoveredAccount = _deployAccountSingleOwner(
-            keccak256(abi.encodePacked(_alice)),
+            _makeKeyHash(_alice),
             address(_ecdsaValidator),
             0
         );

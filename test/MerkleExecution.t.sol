@@ -217,12 +217,13 @@ contract MerkleExecutionTest is Base {
         bytes32 messageHash
     ) internal pure returns (bytes memory) {
         bytes32 keyHash = keccak256(abi.encodePacked(signer));
-        bytes memory signature = _constructSignature(privateKey, messageHash);
-
-        // For simple ECDSA validation: keyHash + validUntil + signature
-        // ECDSAValidator will see validatorData.length <= 103 and do simple validation
-        uint48 validUntil = 0; // 0 means no expiration
-        return abi.encodePacked(keyHash, validUntil, signature);
+        uint48 validUntil = 0;
+        return
+            abi.encodePacked(
+                keyHash,
+                validUntil,
+                _signHash(privateKey, messageHash)
+            );
     }
 
     function _constructMerkleValidatorData(
@@ -233,13 +234,11 @@ contract MerkleExecutionTest is Base {
     ) internal pure returns (bytes memory) {
         bytes32 keyHash = keccak256(abi.encodePacked(signer));
 
-        bytes memory signature = _constructSignature(privateKey, hashToSign);
-
         return
             abi.encodePacked(
                 keyHash,
-                uint48(0), // validUntil (0 means no expiry)
-                signature,
+                uint48(0),
+                _signHash(privateKey, hashToSign),
                 abi.encode(proofs)
             );
     }
@@ -266,7 +265,7 @@ contract MerkleExecutionTest is Base {
         // Execute with merkle validation
         vm.startPrank(_bob); // Bob is the relayer
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(
+        emit RelayerExecuteSuccessEvent(
             _getExecuteWithRelayerHash(batchedCall, 0, _aliceWallet),
             _bob,
             0
@@ -408,7 +407,7 @@ contract MerkleExecutionTest is Base {
         // First execution should succeed
         vm.startPrank(_bob);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(
+        emit RelayerExecuteSuccessEvent(
             _getExecuteWithRelayerHash(batchedCall, 0, _aliceWallet),
             _bob,
             0
@@ -520,7 +519,7 @@ contract MerkleExecutionTest is Base {
 
         vm.startPrank(_bob);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(
+        emit RelayerExecuteSuccessEvent(
             _getExecuteWithRelayerHash(batchedCall, 0, _aliceWallet),
             _bob,
             0
@@ -570,7 +569,7 @@ contract MerkleExecutionTest is Base {
 
         // Phase 3: Create and Sign Merkle Root
         bytes32 root = _computeMerkleRoot(leafA, leafB);
-        bytes memory sig = _constructSignature(_alicePk, root);
+        bytes memory sig = _signHash(_alicePk, root);
 
         // Phase 4: Execute on Chain A
         vm.chainId(31337);
@@ -608,7 +607,7 @@ contract MerkleExecutionTest is Base {
         proofs[0] = proof;
 
         bytes memory validatorData = abi.encodePacked(
-            keccak256(abi.encodePacked(_alice)),
+            _makeKeyHash(_alice),
             uint48(0),
             sig,
             abi.encode(proofs)

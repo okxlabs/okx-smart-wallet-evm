@@ -21,7 +21,7 @@ contract InitializationAuthTest is Base {
     function test_Initialize_FactoryCanInitialize_Success() public {
         // Factory deploys and initializes a wallet
         InitialOwner[] memory initialOwners = _createSingleOwner(
-            keccak256(abi.encodePacked(_alice)),
+            _makeKeyHash(_alice),
             address(_ecdsaValidator)
         );
 
@@ -30,7 +30,7 @@ contract InitializationAuthTest is Base {
 
         // Verify owner was set correctly
         (address validator, , , , ) = IOwnerManager(wallet).getOwnerSettings(
-            keccak256(abi.encodePacked(_alice))
+            _makeKeyHash(_alice)
         );
         assertEq(validator, address(_ecdsaValidator));
     }
@@ -46,7 +46,7 @@ contract InitializationAuthTest is Base {
 
         // Try to initialize from unauthorized address (not factory, not self)
         InitialOwner[] memory initialOwners = _createSingleOwner(
-            keccak256(abi.encodePacked(_alice)),
+            _makeKeyHash(_alice),
             address(_ecdsaValidator)
         );
 
@@ -61,7 +61,7 @@ contract InitializationAuthTest is Base {
 
         // Bob (as the EOA with wallet code) cannot initialize himself anymore
         InitialOwner[] memory initialOwners = _createSingleOwner(
-            keccak256(abi.encodePacked(_bob)),
+            _makeKeyHash(_bob),
             address(_ecdsaValidator)
         );
 
@@ -79,7 +79,7 @@ contract InitializationAuthTest is Base {
         address wallet = LibClone.deployERC1967(0, address(_smartWallet));
 
         InitialOwner[] memory initialOwners = _createSingleOwner(
-            keccak256(abi.encodePacked(_alice)),
+            _makeKeyHash(_alice),
             address(_ecdsaValidator)
         );
 
@@ -104,7 +104,7 @@ contract InitializationAuthTest is Base {
         );
 
         InitialOwner[] memory initialOwners = _createSingleOwner(
-            keccak256(abi.encodePacked(_alice)),
+            _makeKeyHash(_alice),
             address(_ecdsaValidator)
         );
 
@@ -114,7 +114,7 @@ contract InitializationAuthTest is Base {
 
         // Verify initialization succeeded
         (address validator4, , , , ) = IOwnerManager(wallet).getOwnerSettings(
-            keccak256(abi.encodePacked(_alice))
+            _makeKeyHash(_alice)
         );
         assertEq(validator4, address(_ecdsaValidator));
     }
@@ -134,7 +134,7 @@ contract InitializationAuthTest is Base {
         );
 
         InitialOwner[] memory initialOwners = _createSingleOwner(
-            keccak256(abi.encodePacked(_alice)),
+            _makeKeyHash(_alice),
             address(_ecdsaValidator)
         );
 
@@ -150,7 +150,7 @@ contract InitializationAuthTest is Base {
 
         // Deploy through factory
         InitialOwner[] memory legitOwners = _createSingleOwner(
-            keccak256(abi.encodePacked(_alice)),
+            _makeKeyHash(_alice),
             address(_ecdsaValidator)
         );
 
@@ -179,14 +179,14 @@ contract InitializationAuthTest is Base {
 
         // Verify legitimate owner was set
         (address validator5, , , , ) = IOwnerManager(wallet).getOwnerSettings(
-            keccak256(abi.encodePacked(_alice))
+            _makeKeyHash(_alice)
         );
         assertEq(validator5, address(_ecdsaValidator));
     }
 
     function test_GetImmutableFactory() public {
         InitialOwner[] memory initialOwners = _createSingleOwner(
-            keccak256(abi.encodePacked(_alice)),
+            _makeKeyHash(_alice),
             address(_ecdsaValidator)
         );
 

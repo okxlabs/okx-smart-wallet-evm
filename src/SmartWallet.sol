@@ -5,6 +5,7 @@ import {ERC712} from "./ERC712.sol";
 import {ERC7201} from "./ERC7201.sol";
 import {ISmartWallet} from "./interfaces/ISmartWallet.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
 import {OwnerManager} from "./OwnerManager.sol";
 import {NonceManager} from "./NonceManager.sol";
@@ -17,7 +18,7 @@ import {IHook} from "./interfaces/IHook.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {ERC4337Account} from "./ERC4337Account.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
-import {BatchedCallLib} from "./libraries/BatchedCallLib.sol";
+import {CallLib, BatchedCallLib} from "./libraries/BatchedCallLib.sol";
 import {AllowanceManager} from "./AllowanceManager.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 import {DecodeLib} from "./libraries/DecodeLib.sol";
@@ -75,6 +76,9 @@ abstract contract SmartWallet is
         // isAdmin = true, expiration = 0 (never expires), hook = address(0)
         uint256 settings = packSettings(true, 0, address(0));
         uint256 len = initialOwners.length;
+        if (len == 0) {
+            revert InitialOwnersLengthIsZero();
+        }
         for (uint256 i = 0; i < len; i++) {
             bytes32 keyHash = initialOwners[i].keyHash;
             address validator = initialOwners[i].validator;
@@ -90,6 +94,7 @@ abstract contract SmartWallet is
     /// @param calls Array of Call structs containing destination address, value, and calldata
     function execute(Call[] calldata calls) external onlyOwner {
         _batchCall(calls, keccak256(abi.encodePacked(msg.sender)));
+        emit ExecuteSuccessEvent(CallLib.hash(calls), msg.sender);
     }
 
     /// @dev This function is executable only by the EntryPoint contract, and is the main pathway for UserOperations to be executed.
@@ -128,7 +133,11 @@ abstract contract SmartWallet is
 
         _batchCall(batchedCall.calls, pubKeyHash);
 
-        emit ExecuteSuccessEvent(dataHash, msg.sender, batchedCall.nonce);
+        emit RelayerExecuteSuccessEvent(
+            dataHash,
+            msg.sender,
+            batchedCall.nonce
+        );
     }
 
     /// @notice Executes multiple contract calls in a single transaction
@@ -277,8 +286,8 @@ abstract contract SmartWallet is
         }
 
         // Step 6: Add validUntil and IMPLEMENTATION to hash after chainless processing
-        userOpHash = keccak256(
-            abi.encode(userOpHash, validUntil, IMPLEMENTATION)
+        userOpHash = MessageHashUtils.toEthSignedMessageHash(
+            keccak256(abi.encode(userOpHash, validUntil, IMPLEMENTATION))
         );
 
         // Step 7: Validate signature
@@ -311,12 +320,11 @@ abstract contract SmartWallet is
         // 7702 Post upgrade compatibility: try validate signature for EOA sigs
         // Make sure the _signature can be decoded
         if (signature.length == 65) {
-            bytes32 typedDataHash = hashTypedData(_hash);
-            (address recovered, , ) = ECDSA.tryRecover(
-                typedDataHash,
-                signature
-            );
-            if (recovered == address(this)) return Static.MAGIC_VALUE;
+            (address recovered, , ) = ECDSA.tryRecover(_hash, signature);
+            return
+                recovered == address(this)
+                    ? Static.MAGIC_VALUE
+                    : Static.INVALID_VALUE;
         }
 
         // Extract pubKeyHash, validUntil and signature from the input

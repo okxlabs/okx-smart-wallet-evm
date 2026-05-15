@@ -153,7 +153,7 @@ contract AdminPermissionsTest is Base {
         // Non-admin should be able to make external calls
         vm.startPrank(_bob);
         vm.expectEmit(true, true, true, true);
-        emit ExecuteSuccessEvent(
+        emit RelayerExecuteSuccessEvent(
             _getExecuteWithRelayerHash(batchedCall, 0, _aliceWallet),
             _bob,
             0
@@ -526,7 +526,7 @@ contract AdminPermissionsTest is Base {
     // ============ Edge Cases ============
 
     function test_RemoveOwner_ByAdmin_LastAdmin_Success() public {
-        bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
+        bytes32 aliceKeyHash = _makeKeyHash(_alice);
         bytes32 adminKeyHash = keccak256(abi.encodePacked(adminUser));
 
         // Try to remove the original admin (alice) when adminUser is the only other admin
