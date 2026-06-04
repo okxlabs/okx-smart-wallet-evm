@@ -6,23 +6,32 @@ This documentation provides technical details for developers who want to underst
 
 ## Documentation Structure
 
-### [Architecture](./architecture/README.md)
+### [Architecture](./architecture.md)
+
 - Detailed architectural principles and trade-offs
 - Component relationships and data flow
 - Technical decision rationale
 
-### [Contracts](./contracts/README.md)
+### [Contracts](./contracts.md)
+
 - Complete interface specifications
 - Detailed function analysis
 - Data structures and storage patterns
 
-### [Examples](./examples/README.md)
+### [Examples](./examples.md)
+
 - Integration patterns and code references
 
 ### [Diagrams](./diagrams/README.md)
+
 - Visual representations of system architecture
 - Process flow charts and execution flows
 - Owner validation mapping and contract relationships
 - System interaction maps and data flow diagrams
+
+### [Audits](./audits)
+- blocksec
+- certik
+- okx security
 
 

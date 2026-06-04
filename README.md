@@ -86,7 +86,7 @@ External validator contracts implementing `IValidator` are also supported for cu
 | `SmartWalletFactory` | `0xDd3FEa01cD550C9EFfC893f346690b9A649f35EF` |
 | `SmartWalletEntry`   | `0xe40ccB2D94975c51bff0C004eFDfd9B3a5796fA4` |
 
-- [Audits](./documents/audits/)
+- [Audits](./docs/audits/)
 
 ## Usage
 
@@ -141,4 +141,4 @@ forge script script/deploy.s.sol
 
 ## Documentation
 
-This README provides a high-level overview and quick start guide. For detailed technical documentation, implementation specifics, and usage patterns, see the [Technical Documentation](./documents/README.md) folder.
+This README provides a high-level overview and quick start guide. For detailed technical documentation, implementation specifics, and usage patterns, see the [Technical Documentation](./docs/README.md) folder.
