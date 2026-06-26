@@ -1,0 +1,125 @@
+# 现有代码库基线
+
+本文件由阶段 1.0 在 `codebase_mode=existing_code_change` 时生成。
+记录变更前的代码库目录结构，以便下游阶段保留现有代码风格与结构。
+
+```json
+{
+  "codebase_mode": "existing_code_change",
+  "inventory": {
+    "mode": "existing_code_change",
+    "base_commit_sha": "1054b7b800fa3cdcec8f38f2c86e437bbfeeb8fe",
+    "previous_flow_docs_present": {
+      "docs/process/SOURCE_MANIFEST.md": false,
+      "docs/process/REQUIREMENTS.md": false,
+      "docs/process/OLI_RUN_CONFIG.md": false
+    },
+    "foundry_toml_present": true,
+    "remappings_present": false,
+    "foundry_lock_present": true,
+    "gitmodules_present": true,
+    "solidity_file_count": 63,
+    "solidity_files_sample": [
+      "script/IDeployFactory.s.sol",
+      "script/deploy.s.sol",
+      "src/AllowanceManager.sol",
+      "src/BaseAuthorization.sol",
+      "src/ERC4337Account.sol",
+      "src/ERC712.sol",
+      "src/ERC7201.sol",
+      "src/ExecutionManager.sol",
+      "src/FallbackHandler.sol",
+      "src/NonceManager.sol",
+      "src/OwnerManager.sol",
+      "src/SmartWallet.sol",
+      "src/SmartWalletEntry.sol",
+      "src/SmartWalletFactory.sol",
+      "src/Types.sol",
+      "src/ValidationManager.sol",
+      "src/interfaces/IAllowanceManager.sol",
+      "src/interfaces/IERC4337Account.sol",
+      "src/interfaces/IERC7201.sol",
+      "src/interfaces/IHook.sol",
+      "src/interfaces/INonceManager.sol",
+      "src/interfaces/IOwnerManager.sol",
+      "src/interfaces/ISmartWallet.sol",
+      "src/interfaces/ISmartWalletFactory.sol",
+      "src/interfaces/IValidator.sol",
+      "src/libraries/BatchedCallLib.sol",
+      "src/libraries/CallLib.sol",
+      "src/libraries/ChainlessLib.sol",
+      "src/libraries/DecodeLib.sol",
+      "src/libraries/ECDSAValidatorLib.sol",
+      "src/libraries/MerkleProofProcessor.sol",
+      "src/libraries/MessageSignLib.sol",
+      "src/libraries/PasskeyValidatorLib.sol",
+      "src/libraries/Static.sol",
+      "test/AdminPermissions.t.sol",
+      "test/AllowanceManager.t.sol",
+      "test/Base.t.sol",
+      "test/ChainlessExecution.t.sol",
+      "test/DecodeLib.t.sol",
+      "test/ERC712.t.sol",
+      "test/ERC7201.t.sol",
+      "test/ERC7702.t.sol",
+      "test/Execution.t.sol",
+      "test/FallbackHandler.t.sol",
+      "test/Hook.t.sol",
+      "test/Initialization.t.sol",
+      "test/InitializationAuth.t.sol",
+      "test/IsValidSignature.t.sol",
+      "test/MerkleExecution.t.sol",
+      "test/NonceManager.t.sol",
+      "test/PasskeyValidator.t.sol",
+      "test/Recovery.t.sol",
+      "test/SmartWalletFactory.t.sol",
+      "test/SmartWalletUpgrade.t.sol",
+      "test/ValidateUserOp.t.sol",
+      "test/Validation.t.sol",
+      "test/Validator.t.sol",
+      "test/ValidatorEnumeration.t.sol",
+      "test/utils/DeployInitHelper.s.sol",
+      "test/utils/EIP2470.s.sol",
+      "test/utils/Helper.s.sol",
+      "test/validators/ECDSAValidator.sol",
+      "test/validators/PasskeyValidator.sol"
+    ],
+    "solidity_roots": [
+      {
+        "path": "src",
+        "solidity_files": 32
+      }
+    ],
+    "configured_foundry_paths": {
+      "src": "src",
+      "out": "out",
+      "libs": [
+        "lib"
+      ]
+    },
+    "inferred_foundry_paths": {
+      "src": "src",
+      "test": "test",
+      "script": "script",
+      "out": "out",
+      "libs": [
+        "lib"
+      ]
+    }
+  },
+  "foundry": {
+    "status": "existing",
+    "config": "valid",
+    "layout_source": "foundry.toml",
+    "source_path": "src",
+    "test_path": "test",
+    "script_path": "script",
+    "libs_path": "lib"
+  },
+  "baseline_build_status": {
+    "status": "failed",
+    "mode": "existing_code_change",
+    "error": "^^\n\nError (6275): Source \"lib/solady/src/utils/UUPSUpgradeable.sol\" not found: File not found. Searched the following locations: \"/Oli_home/Oli/engine/works/REQ-1782379833036-a7a0fc-0625_093033/stages/1.0/current/okx-smart-wallet-dev\".\nParserError: Source \"lib/solady/src/utils/UUPSUpgradeable.sol\" not found: File not found. Searched the following locations: \"/Oli_home/Oli/engine/works/REQ-1782379833036-a7a0fc-0625_093033/stages/1.0/current/okx-smart-wallet-dev\".\n  --> test/Validation.t.sol:10:1:\n   |\n10 | import {UUPSUpgradeable} from \"solady/utils/UUPSUpgradeable.sol\";\n   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nError (6275): Source \"lib/account-abstraction/contracts/interfaces/PackedUserOperation.sol\" not found: File not found. Searched the following locations: \"/Oli_home/Oli/engine/works/REQ-1782379833036-a7a0fc-0625_093033/stages/1.0/current/okx-smart-wallet-dev\".\nParserError: Source \"lib/account-abstraction/contracts/interfaces/PackedUserOperation.sol\" not found: File not found. Searched the following locations: \"/Oli_home/Oli/engine/works/REQ-1782379833036-a7a0fc-0625_093033/stages/1.0/current/okx-smart-wallet-dev\".\n  --> test/Validator.t.sol:13:1:\n   |\n13 | import {PackedUserOperation} from \"account-abstraction/interfaces/PackedUserOperation.sol\";\n   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nError (6275): Source \"lib/forge-std/src/Vm.sol\" not found: File not found. Searched the following locations: \"/Oli_home/Oli/engine/works/REQ-1782379833036-a7a0fc-0625_093033/stages/1.0/current/okx-smart-wallet-dev\".\nParserError: Source \"lib/forge-std/src/Vm.sol\" not found: File not found. Searched the following locations: \"/Oli_home/Oli/engine/works/REQ-1782379833036-a7a0fc-0625_093033/stages/1.0/current/okx-smart-wallet-dev\".\n --> test/utils/EIP2470.s.sol:4:1:\n  |\n4 | import {Vm} from \"lib/forge-std/src/Vm.sol\";\n  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nError (6275): Source \"lib/openzeppelin-contracts/contracts/utils/Base64.sol\" not found: File not found. Searched the following locations: \"/Oli_home/Oli/engine/works/REQ-1782379833036-a7a0fc-0625_093033/stages/1.0/current/okx-smart-wallet-dev\".\nParserError: Source \"lib/openzeppelin-contracts/contracts/utils/Base64.sol\" not found: File not found. Searched the following locations: \"/Oli_home/Oli/engine/works/REQ-1782379833036-a7a0fc-0625_093033/stages/1.0/current/okx-smart-wallet-dev\".\n --> test/utils/Helper.s.sol:4:1:\n  |\n4 | import {Base64} from \"openzeppelin-contracts/contracts/utils/Base64.sol\";\n  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nError (6275): Source \"lib/webauthn-sol/src/WebAuthn.sol\" not found: File not found. Searched the following locations: \"/Oli_home/Oli/engine/works/REQ-1782379833036-a7a0fc-0625_093033/stages/1.0/current/okx-smart-wallet-dev\".\nParserError: Source \"lib/webauthn-sol/src/WebAuthn.sol\" not found: File not found. Searched the following locations: \"/Oli_home/Oli/engine/works/REQ-1782379833036-a7a0fc-0625_093033/stages/1.0/current/okx-smart-wallet-dev\".\n --> test/utils/Helper.s.sol:5:1:\n  |\n5 | import {WebAuthn} from \"webauthn-sol/WebAuthn.sol\";\n  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n\nError (6275): Source \"lib/openzeppelin-contracts/contracts/utils/cryptography/MerkleProof.sol\" not found: File not found. Searched the following locations: \"/Oli_home/Oli/engine/works/REQ-1782379833036-a7a0fc-0625_093033/stages/1.0/current/okx-smart-wallet-dev\".\nParserError: Source \"lib/openzeppelin-contracts/contracts/utils/cryptography/MerkleProof.sol\" not found: File not found. Searched the following locations: \"/Oli_home/Oli/engine/works/REQ-1782379833036-a7a0fc-0625_093033/stages/1.0/current/okx-smart-wallet-dev\".\n --> test/utils/Helper.s.sol:6:1:\n  |\n6 | import {MerkleProof} from \"@openzeppelin/contracts/utils/cryptography/MerkleProof.sol\";\n  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^"
+  }
+}
+```
