@@ -3,11 +3,10 @@ pragma solidity ^0.8.29;
 
 import {ITransferWithAuthorization} from "./interfaces/ITransferWithAuthorization.sol";
 import {ISmartWallet} from "./interfaces/ISmartWallet.sol";
-import {IHook} from "./interfaces/IHook.sol";
+import {IHookTransferAuthorization} from "./interfaces/IHookTransferAuthorization.sol";
 import {OwnerManager} from "./OwnerManager.sol";
 import {ValidationManager} from "./ValidationManager.sol";
 import {ERC712} from "./ERC712.sol";
-import {Call} from "./Types.sol";
 import {Static} from "./libraries/Static.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -245,6 +244,12 @@ abstract contract TransferWithAuthorization is
     ///      low-level call that bubbles up any recipient revert. No self-call guard is applied: the native
     ///      path always carries empty calldata (constructed here, not caller-supplied), so targeting
     ///      address(this) is a plain ETH deposit with no privileged dispatch surface.
+    ///
+    ///      The hook is invoked through the dedicated `IHookTransferAuthorization` callbacks, which pass
+    ///      the authorizing `keyHash` and the typed transfer fields (token / to / value) directly. A hook
+    ///      configured on a TWA-capable key MUST implement this interface — a non-conforming hook makes
+    ///      settlement revert (fail-closed). This surface is intentionally distinct from the execute-path
+    ///      `IHook.preCheck`/`postCheck(Call[], executor)`.
     function _settleWithHook(
         bytes32 keyHash,
         address token,
@@ -256,17 +261,14 @@ abstract contract TransferWithAuthorization is
 
         bytes memory ret;
         if (hookAddress != address(0)) {
-            Call[] memory calls = new Call[](1);
-            if (isNative) {
-                calls[0] = Call({target: to, value: value, data: ""});
-            } else {
-                calls[0] = Call({
-                    target: token,
-                    value: 0,
-                    data: abi.encodeCall(IERC20.transfer, (to, value))
-                });
-            }
-            ret = IHook(hookAddress).preCheck(calls, msg.sender);
+            ret = IHookTransferAuthorization(hookAddress)
+                .preTransferWithAuthorization(
+                    keyHash,
+                    token,
+                    to,
+                    value,
+                    msg.sender
+                );
         }
 
         if (isNative) {
@@ -281,7 +283,10 @@ abstract contract TransferWithAuthorization is
         }
 
         if (hookAddress != address(0)) {
-            IHook(hookAddress).postCheck(ret, msg.sender);
+            IHookTransferAuthorization(hookAddress).postTransferWithAuthorization(
+                ret,
+                msg.sender
+            );
         }
     }
 

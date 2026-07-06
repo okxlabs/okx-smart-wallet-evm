@@ -8,9 +8,8 @@ import {BaseAuthorization} from "src/BaseAuthorization.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
-import {IHook} from "src/interfaces/IHook.sol";
+import {IHookTransferAuthorization} from "src/interfaces/IHookTransferAuthorization.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
-import {Call} from "src/Types.sol";
 import {MessageSignLib} from "src/libraries/MessageSignLib.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
 import {Static} from "src/libraries/Static.sol";
@@ -19,42 +18,52 @@ import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-/// @dev Minimal hook that blocks any spend by reverting in preCheck. Used to prove the TWA settle path
-///      invokes the key-selected hook and that a hook revert rolls back the consumed nonce.
-contract RevertingHook is IHook {
+/// @dev Minimal hook that blocks any spend by reverting in the TWA pre-callback. Used to prove the TWA
+///      settle path invokes the key-selected hook and that a hook revert rolls back the consumed nonce.
+contract RevertingHook is IHookTransferAuthorization {
     error HookBlocked();
 
-    function preCheck(Call[] calldata, address) external payable returns (bytes memory) {
+    function preTransferWithAuthorization(bytes32, address, address, uint256, address)
+        external
+        payable
+        returns (bytes memory)
+    {
         revert HookBlocked();
     }
 
-    function postCheck(bytes calldata, address) external payable {}
+    function postTransferWithAuthorization(bytes calldata, address) external payable {}
 }
 
-contract RecordingHook is IHook {
-    uint256 public preCheckCount;
-    uint256 public postCheckCount;
-    address public lastTarget;
+/// @dev TWA-aware recording hook: records the authorizing keyHash + typed transfer fields the account
+///      forwards through the dedicated IHookTransferAuthorization callbacks.
+contract RecordingHook is IHookTransferAuthorization {
+    uint256 public preCount;
+    uint256 public postCount;
+    bytes32 public lastKeyHash;
+    address public lastToken;
+    address public lastTo;
     uint256 public lastValue;
-    bytes32 public lastDataHash;
-    address public lastPreExecutor;
-    address public lastPostExecutor;
+    address public lastCaller;
     bytes32 public lastPostRetHash;
 
-    function preCheck(Call[] calldata calls, address executor) external payable returns (bytes memory preCheckRet) {
-        preCheckCount++;
-        lastPreExecutor = executor;
-        require(calls.length == 1, "unexpected call count");
-        lastTarget = calls[0].target;
-        lastValue = calls[0].value;
-        lastDataHash = keccak256(calls[0].data);
-        return abi.encode(lastTarget, lastValue, lastDataHash, executor);
+    function preTransferWithAuthorization(bytes32 keyHash, address token, address to, uint256 value, address caller)
+        external
+        payable
+        returns (bytes memory)
+    {
+        preCount++;
+        lastKeyHash = keyHash;
+        lastToken = token;
+        lastTo = to;
+        lastValue = value;
+        lastCaller = caller;
+        return abi.encode(keyHash, token, to, value, caller);
     }
 
-    function postCheck(bytes calldata preCheckRet, address executor) external payable {
-        postCheckCount++;
-        lastPostExecutor = executor;
-        lastPostRetHash = keccak256(preCheckRet);
+    function postTransferWithAuthorization(bytes calldata preRet, address caller) external payable {
+        postCount++;
+        lastCaller = caller;
+        lastPostRetHash = keccak256(preRet);
     }
 }
 
@@ -626,7 +635,7 @@ contract TransferWithAuthorizationTest is Base {
         assertFalse(itwa.transferAuthorizationState(nonce), "nonce not consumed on revert");
     }
 
-    function test_recordingHookReceivesExactErc20CallAndExecutor() public {
+    function test_recordingHookReceivesErc20FieldsAndKeyHash() public {
         RecordingHook hook = new RecordingHook();
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(hook));
@@ -636,27 +645,24 @@ contract TransferWithAuthorizationTest is Base {
         uint256 value = 7 ether;
         bytes memory sig = _executeSignature(_bobPk, bobKeyHash, address(token), _charlie, value, 9_000, 11_000, nonce);
 
+        uint256 charlieBefore = token.balanceOf(_charlie);
         vm.prank(_relayer);
         itwa.executeTransferWithAuthorization(address(token), _charlie, value, 9_000, 11_000, nonce, sig);
 
-        bytes32 expectedRetHash = keccak256(
-            abi.encode(
-                address(token), uint256(0), keccak256(abi.encodeCall(IERC20.transfer, (_charlie, value))), _relayer
-            )
-        );
-        assertEq(hook.preCheckCount(), 1, "preCheck count");
-        assertEq(hook.postCheckCount(), 1, "postCheck count");
-        assertEq(hook.lastTarget(), address(token), "target token");
-        assertEq(hook.lastValue(), 0, "erc20 call value");
-        assertEq(
-            hook.lastDataHash(), keccak256(abi.encodeCall(IERC20.transfer, (_charlie, value))), "transfer calldata"
-        );
-        assertEq(hook.lastPreExecutor(), _relayer, "pre executor is relayer");
-        assertEq(hook.lastPostExecutor(), _relayer, "post executor is relayer");
+        bytes32 expectedRetHash =
+            keccak256(abi.encode(bobKeyHash, address(token), _charlie, value, _relayer));
+        assertEq(hook.preCount(), 1, "pre count");
+        assertEq(hook.postCount(), 1, "post count");
+        assertEq(hook.lastKeyHash(), bobKeyHash, "authorizing keyHash");
+        assertEq(hook.lastToken(), address(token), "token");
+        assertEq(hook.lastTo(), _charlie, "recipient");
+        assertEq(hook.lastValue(), value, "value");
+        assertEq(hook.lastCaller(), _relayer, "caller is relayer");
         assertEq(hook.lastPostRetHash(), expectedRetHash, "post ret");
+        assertEq(token.balanceOf(_charlie) - charlieBefore, value, "transfer settled");
     }
 
-    function test_recordingHookReceivesExactNativeCallAndExecutor() public {
+    function test_recordingHookReceivesNativeFieldsAndKeyHash() public {
         RecordingHook hook = new RecordingHook();
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(hook));
@@ -669,13 +675,13 @@ contract TransferWithAuthorizationTest is Base {
         vm.prank(_relayer);
         itwa.executeTransferWithAuthorization(_nativeAsset, _charlie, value, 9_000, 11_000, nonce, sig);
 
-        bytes32 expectedRetHash = keccak256(abi.encode(_charlie, value, keccak256(bytes("")), _relayer));
-        assertEq(hook.preCheckCount(), 1, "preCheck count");
-        assertEq(hook.postCheckCount(), 1, "postCheck count");
-        assertEq(hook.lastTarget(), _charlie, "native target");
-        assertEq(hook.lastValue(), value, "native value");
-        assertEq(hook.lastDataHash(), keccak256(bytes("")), "empty data");
-        assertEq(hook.lastPostRetHash(), expectedRetHash, "post ret");
+        assertEq(hook.preCount(), 1, "pre count");
+        assertEq(hook.postCount(), 1, "post count");
+        assertEq(hook.lastKeyHash(), bobKeyHash, "authorizing keyHash");
+        assertEq(hook.lastToken(), _nativeAsset, "native sentinel token");
+        assertEq(hook.lastTo(), _charlie, "recipient");
+        assertEq(hook.lastValue(), value, "value");
+        assertEq(hook.lastCaller(), _relayer, "caller is relayer");
     }
 
     function test_nonAdminNativeSelfTarget_succeedsNetZero() public {
