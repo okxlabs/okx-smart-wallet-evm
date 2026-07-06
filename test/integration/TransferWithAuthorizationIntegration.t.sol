@@ -9,7 +9,7 @@ import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
-import {IHook} from "src/interfaces/IHook.sol";
+import {IHookTransferAuthorization} from "src/interfaces/IHookTransferAuthorization.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
@@ -50,39 +50,48 @@ contract IntegrationFeeOnTransferERC20 {
     }
 }
 
-/// @dev Records the exact call shape and executor a settle forwards to a per-key hook.
-contract IntegrationRecordingHook is IHook {
+/// @dev Records the authorizing keyHash + typed fields a settle forwards to a per-key hook.
+contract IntegrationRecordingHook is IHookTransferAuthorization {
     uint256 public preCount;
     uint256 public postCount;
-    address public lastTarget;
+    bytes32 public lastKeyHash;
+    address public lastToken;
+    address public lastTo;
     uint256 public lastValue;
-    bytes32 public lastDataHash;
-    address public lastExecutor;
+    address public lastCaller;
 
-    function preCheck(Call[] calldata calls, address executor) external payable returns (bytes memory) {
+    function preTransferWithAuthorization(bytes32 keyHash, address token, address to, uint256 value, address caller)
+        external
+        payable
+        returns (bytes memory)
+    {
         preCount++;
-        lastExecutor = executor;
-        require(calls.length == 1, "unexpected call count");
-        lastTarget = calls[0].target;
-        lastValue = calls[0].value;
-        lastDataHash = keccak256(calls[0].data);
-        return abi.encode(lastTarget, lastValue, lastDataHash, executor);
+        lastKeyHash = keyHash;
+        lastToken = token;
+        lastTo = to;
+        lastValue = value;
+        lastCaller = caller;
+        return abi.encode(keyHash, token, to, value, caller);
     }
 
-    function postCheck(bytes calldata, address) external payable {
+    function postTransferWithAuthorization(bytes calldata, address) external payable {
         postCount++;
     }
 }
 
-/// @dev A per-key hook that blocks every spend by reverting in preCheck.
-contract IntegrationBlockingHook is IHook {
+/// @dev A per-key hook that blocks every spend by reverting in the TWA pre-callback.
+contract IntegrationBlockingHook is IHookTransferAuthorization {
     error PolicyBlocked();
 
-    function preCheck(Call[] calldata, address) external payable returns (bytes memory) {
+    function preTransferWithAuthorization(bytes32, address, address, uint256, address)
+        external
+        payable
+        returns (bytes memory)
+    {
         revert PolicyBlocked();
     }
 
-    function postCheck(bytes calldata, address) external payable {}
+    function postTransferWithAuthorization(bytes calldata, address) external payable {}
 }
 
 /// @dev A contract recipient that rejects any native transfer.
@@ -506,10 +515,11 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         );
         assertEq(bobHook.preCount(), 1, "hooked-key settle invokes its hook once");
         assertEq(bobHook.postCount(), 1, "post hook once");
-        assertEq(bobHook.lastTarget(), address(token), "hook saw token target");
-        assertEq(bobHook.lastValue(), 0, "hook saw zero call value for erc20 leg");
-        assertEq(bobHook.lastDataHash(), keccak256(abi.encodeCall(IERC20.transfer, (_dave, vB))), "hook saw exact calldata");
-        assertEq(bobHook.lastExecutor(), _relayerB, "hook executor is the relayer");
+        assertEq(bobHook.lastKeyHash(), bobKeyHash, "hook saw authorizing keyHash");
+        assertEq(bobHook.lastToken(), address(token), "hook saw token");
+        assertEq(bobHook.lastTo(), _dave, "hook saw recipient");
+        assertEq(bobHook.lastValue(), vB, "hook saw transfer value");
+        assertEq(bobHook.lastCaller(), _relayerB, "hook caller is the relayer");
 
         // control: a normal external-token payment whose recipient is the account itself is not a self-call
         uint256 vSelf = 1 ether;
