@@ -77,6 +77,10 @@ contract IntegrationRecordingHook is IHookTransferAuthorization {
     function postTransferWithAuthorization(bytes calldata, address) external payable {
         postCount++;
     }
+
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return interfaceId == type(IHookTransferAuthorization).interfaceId;
+    }
 }
 
 /// @dev A per-key hook that blocks every spend by reverting in the TWA pre-callback.
@@ -92,6 +96,10 @@ contract IntegrationBlockingHook is IHookTransferAuthorization {
     }
 
     function postTransferWithAuthorization(bytes calldata, address) external payable {}
+
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return interfaceId == type(IHookTransferAuthorization).interfaceId;
+    }
 }
 
 /// @dev A contract recipient that rejects any native transfer.
@@ -492,7 +500,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         // register bob as a non-admin key constrained by a recording hook
         IntegrationRecordingHook bobHook = new IntegrationRecordingHook();
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(bobHook));
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(bobHook), true);
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), settings);
 
         // alice (admin, no hook) settles: bob's hook must not be touched
@@ -706,7 +714,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
 
         IntegrationBlockingHook blockingHook = new IntegrationBlockingHook();
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
-        uint256 blockedSettings = OwnerManager(_aliceWallet).packSettings(false, 0, address(blockingHook));
+        uint256 blockedSettings = OwnerManager(_aliceWallet).packSettings(false, 0, address(blockingHook), true);
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), blockedSettings);
 
         bytes32 nonce = keccak256("recover-hook");

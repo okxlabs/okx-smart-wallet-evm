@@ -32,6 +32,10 @@ contract RevertingHook is IHookTransferAuthorization {
     }
 
     function postTransferWithAuthorization(bytes calldata, address) external payable {}
+
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return interfaceId == type(IHookTransferAuthorization).interfaceId;
+    }
 }
 
 /// @dev TWA-aware recording hook: records the authorizing keyHash + typed transfer fields the account
@@ -64,6 +68,32 @@ contract RecordingHook is IHookTransferAuthorization {
         postCount++;
         lastCaller = caller;
         lastPostRetHash = keccak256(preRet);
+    }
+
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return interfaceId == type(IHookTransferAuthorization).interfaceId;
+    }
+}
+
+/// @dev A hook that implements the TWA callbacks but does NOT advertise the interface via ERC-165.
+///      Used to prove that even with the sigHookFlag set, a hook that fails the supportsInterface
+///      probe is skipped rather than invoked.
+contract NonAdvertisingHook is IHookTransferAuthorization {
+    uint256 public preCount;
+
+    function preTransferWithAuthorization(bytes32, address, address, uint256, address)
+        external
+        payable
+        returns (bytes memory)
+    {
+        preCount++;
+        return "";
+    }
+
+    function postTransferWithAuthorization(bytes calldata, address) external payable {}
+
+    function supportsInterface(bytes4) external pure returns (bool) {
+        return false;
     }
 }
 
@@ -616,7 +646,7 @@ contract TransferWithAuthorizationTest is Base {
     function test_hookInvoked_blocksSettle_and_nonceUnconsumed() public {
         RevertingHook hook = new RevertingHook();
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(hook)); // non-admin + hook
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(hook), true); // non-admin + new TWA hook
 
         // Register bob as a hook-constrained, externally-validated key (admin alice authorizes via execute).
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), settings);
@@ -638,7 +668,7 @@ contract TransferWithAuthorizationTest is Base {
     function test_recordingHookReceivesErc20FieldsAndKeyHash() public {
         RecordingHook hook = new RecordingHook();
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(hook));
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(hook), true);
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), settings);
 
         bytes32 nonce = keccak256("hook-record-erc20");
@@ -665,7 +695,7 @@ contract TransferWithAuthorizationTest is Base {
     function test_recordingHookReceivesNativeFieldsAndKeyHash() public {
         RecordingHook hook = new RecordingHook();
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(hook));
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(hook), true);
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), settings);
 
         bytes32 nonce = keccak256("hook-record-native");
@@ -682,6 +712,51 @@ contract TransferWithAuthorizationTest is Base {
         assertEq(hook.lastTo(), _charlie, "recipient");
         assertEq(hook.lastValue(), value, "value");
         assertEq(hook.lastCaller(), _relayer, "caller is relayer");
+    }
+
+    /// @dev Legacy compatibility: a key whose hook is installed with sigHookFlag == 0 settles normally
+    ///      WITHOUT invoking the TWA callbacks, even though the hook fully implements them. This is the
+    ///      behavior that keeps existing owners working when the new interface ships.
+    function test_legacyHookFlagUnset_skipsTwaCallbacks_andSettles() public {
+        RecordingHook hook = new RecordingHook();
+        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        // 3-arg packSettings => sigHookFlag defaults to 0 (legacy hook).
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(hook));
+        _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), settings);
+
+        bytes32 nonce = keccak256("hook-legacy-skip");
+        uint256 value = 3 ether;
+        bytes memory sig = _executeSignature(_bobPk, bobKeyHash, address(token), _charlie, value, 9_000, 11_000, nonce);
+
+        uint256 charlieBefore = token.balanceOf(_charlie);
+        vm.prank(_relayer);
+        itwa.executeTransferWithAuthorization(address(token), _charlie, value, 9_000, 11_000, nonce, sig);
+
+        assertEq(hook.preCount(), 0, "legacy hook must not be invoked");
+        assertEq(hook.postCount(), 0, "legacy hook must not be invoked");
+        assertEq(token.balanceOf(_charlie) - charlieBefore, value, "transfer still settles");
+        assertTrue(itwa.transferAuthorizationState(nonce), "nonce consumed");
+    }
+
+    /// @dev With the flag set but the hook failing the ERC-165 probe, the TWA callbacks are skipped and
+    ///      settlement proceeds — the supportsInterface gate, not just the flag, governs invocation.
+    function test_flagSetButInterfaceNotAdvertised_skipsCallbacks_andSettles() public {
+        NonAdvertisingHook hook = new NonAdvertisingHook();
+        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(hook), true);
+        _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), settings);
+
+        bytes32 nonce = keccak256("hook-no-iface-skip");
+        uint256 value = 2 ether;
+        bytes memory sig = _executeSignature(_bobPk, bobKeyHash, address(token), _charlie, value, 9_000, 11_000, nonce);
+
+        uint256 charlieBefore = token.balanceOf(_charlie);
+        vm.prank(_relayer);
+        itwa.executeTransferWithAuthorization(address(token), _charlie, value, 9_000, 11_000, nonce, sig);
+
+        assertEq(hook.preCount(), 0, "hook without advertised interface must not be invoked");
+        assertEq(token.balanceOf(_charlie) - charlieBefore, value, "transfer still settles");
+        assertTrue(itwa.transferAuthorizationState(nonce), "nonce consumed");
     }
 
     function test_nonAdminNativeSelfTarget_succeedsNetZero() public {
@@ -771,6 +846,7 @@ contract TransferWithAuthorizationTest is Base {
 
     function testFuzz_executeErc20MovesExactValue(address to, uint96 amount, uint256 nonceSeed, address caller) public {
         vm.assume(to != _aliceWallet);
+        vm.assume(to != address(0)); // ERC20 rejects the zero recipient (ERC20InvalidReceiver)
         uint256 value = bound(uint256(amount), 0, token.balanceOf(_aliceWallet));
         bytes32 nonce = keccak256(abi.encode("fuzz-exec", nonceSeed, to, value));
         bytes memory sig =
