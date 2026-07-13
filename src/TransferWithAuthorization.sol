@@ -9,7 +9,7 @@ import {ValidationManager} from "./ValidationManager.sol";
 import {ERC712} from "./ERC712.sol";
 import {Static} from "./libraries/Static.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import {IERC165} from "./interfaces/IHook.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 

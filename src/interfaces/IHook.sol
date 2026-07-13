@@ -2,6 +2,7 @@
 pragma solidity ^0.8.29;
 
 import {Call} from "../Types.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 interface IHook {
     /// @notice Called before execution of calls to perform pre-execution checks
