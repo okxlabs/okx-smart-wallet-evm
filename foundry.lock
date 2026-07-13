@@ -14,12 +14,6 @@
       "rev": "723f8cab09cdae1aca9ec9cc1cfa040c2d4b06c1"
     }
   },
-  "lib/smart-wallet-recovery": {
-    "branch": {
-      "name": "dev",
-      "rev": "75f22a96d877e53db2471e547eb1d95a43a18eaf"
-    }
-  },
   "lib/solady": {
     "rev": "a5bb996e91aae5b0c068087af7594d92068b12f1"
   },
