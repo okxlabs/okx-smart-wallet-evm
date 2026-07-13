@@ -16,6 +16,5 @@ remappings = [
     "solady/=lib/solady/src/",
     "account-abstraction/=lib/account-abstraction/contracts/",
     "webauthn-sol/=lib/webauthn-sol/src/",
-    "smart-wallet-recovery/=lib/smart-wallet-recovery/packages/evm-recovery-signers/src/",
 ]
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

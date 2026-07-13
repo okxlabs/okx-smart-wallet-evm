@@ -74,4 +74,4 @@ ABI 文件：[../../docs/delivery/abi/ITransferWithAuthorization.abi.json](../..
 
 - 所有部署、链上浏览器验证和生产密钥操作均为操作员手动执行。本流程不会向任何实时网络广播交易，也不会访问生产密钥。
 - 目标链：以太坊主网，Cancun 版本（需要 EIP-1153 瞬态存储）。
-- `lib/smart-wallet-recovery` 为私有内部子模块，完整构建需要内部 GitLab 访问权限。CI 环境请使用 `forge build src script` 或 `--skip 'test/Recovery.t.sol'`。
+- 构建命令：`forge build`。（原私有内部子模块 `lib/smart-wallet-recovery` 及其集成测试 `test/Recovery.t.sol` 已移除，不再需要内部 GitLab 访问权限。）
