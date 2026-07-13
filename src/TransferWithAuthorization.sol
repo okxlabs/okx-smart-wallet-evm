@@ -9,6 +9,7 @@ import {ValidationManager} from "./ValidationManager.sol";
 import {ERC712} from "./ERC712.sol";
 import {Static} from "./libraries/Static.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC165} from "./interfaces/IHook.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
@@ -246,21 +247,34 @@ abstract contract TransferWithAuthorization is
     ///      address(this) is a plain ETH deposit with no privileged dispatch surface.
     ///
     ///      The hook is invoked through the dedicated `IHookTransferAuthorization` callbacks, which pass
-    ///      the authorizing `keyHash` and the typed transfer fields (token / to / value) directly. A hook
-    ///      configured on a TWA-capable key MUST implement this interface — a non-conforming hook makes
-    ///      settlement revert (fail-closed). This surface is intentionally distinct from the execute-path
-    ///      `IHook.preCheck`/`postCheck(Call[], executor)`.
+    ///      the authorizing `keyHash` and the typed transfer fields (token / to / value) directly. This
+    ///      surface is intentionally distinct from the execute-path `IHook.preCheck`/`postCheck(Call[],
+    ///      executor)`.
+    ///
+    ///      The callbacks are gated so legacy hooks are NOT broken: they run only when the key opts into
+    ///      the new hook interfaces (`checkHookFlag`) AND the hook advertises `IHookTransferAuthorization`
+    ///      via ERC-165 `supportsInterface`. A legacy-hook key (flag == 0) settles without invoking the
+    ///      TWA callbacks — it never configured a TWA policy, so nothing is bypassed. To gain TWA limits
+    ///      an owner re-installs a hook with the signature-hook flag set. This mirrors the compatibility
+    ///      rule used by the `isValidSignature` signature hook.
     function _settleWithHook(
         bytes32 keyHash,
         address token,
         address to,
         uint256 value
     ) private {
-        address hookAddress = getHook(_ownerSettings[keyHash]);
+        uint256 settings = _ownerSettings[keyHash];
+        address hookAddress = getHook(settings);
         bool isNative = token == NATIVE_ASSET;
 
+        bool hookActive = hookAddress != address(0) &&
+            checkHookFlag(settings) &&
+            IERC165(hookAddress).supportsInterface(
+                type(IHookTransferAuthorization).interfaceId
+            );
+
         bytes memory ret;
-        if (hookAddress != address(0)) {
+        if (hookActive) {
             ret = IHookTransferAuthorization(hookAddress)
                 .preTransferWithAuthorization(
                     keyHash,
@@ -282,11 +296,9 @@ abstract contract TransferWithAuthorization is
             IERC20(token).safeTransfer(to, value);
         }
 
-        if (hookAddress != address(0)) {
-            IHookTransferAuthorization(hookAddress).postTransferWithAuthorization(
-                ret,
-                msg.sender
-            );
+        if (hookActive) {
+            IHookTransferAuthorization(hookAddress)
+                .postTransferWithAuthorization(ret, msg.sender);
         }
     }
 

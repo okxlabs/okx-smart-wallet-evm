@@ -201,9 +201,13 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
     }
 
     // Public Pure Functions (Settings Management)
-    // Bit layout: [255-208: UNUSED] [207-200: isAdmin] [199-160: expiration] [159-0: hook]
+    // Bit layout: [255-216: UNUSED] [215-208: sigHookFlag] [207-200: isAdmin] [199-160: expiration] [159-0: hook]
 
-    /// @notice Pack settings into uint256
+    /// @notice Pack settings into uint256 with sigHookFlag defaulted to 0 (legacy hook)
+    /// @dev Kept for backward compatibility. Keys packed through this overload are treated as
+    ///      legacy hooks: the new signature-verification / TWA hook interfaces are NOT invoked
+    ///      for them (see `checkHookFlag`). Use the 4-argument overload to opt a key into the
+    ///      new hook interfaces.
     /// @param adminFlag Admin flag
     /// @param expiration Unix timestamp (0 = never expires)
     /// @param hook Hook address (address(0) = no hook)
@@ -213,7 +217,28 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
         uint40 expiration,
         address hook
     ) public pure returns (uint256) {
+        return packSettings(adminFlag, expiration, hook, false);
+    }
+
+    /// @notice Pack settings into uint256, explicitly setting the signature-hook flag
+    /// @dev `sigHookFlag == true` marks the configured hook as a NEW hook that implements the
+    ///      additional signature-verification (`ISignatureHook`) and/or TWA
+    ///      (`IHookTransferAuthorization`) interfaces. Those interfaces are only invoked when this
+    ///      flag is set AND the hook advertises support via ERC-165 `supportsInterface`. Legacy
+    ///      hooks (flag == false) preserve the pre-existing behavior exactly.
+    /// @param adminFlag Admin flag
+    /// @param expiration Unix timestamp (0 = never expires)
+    /// @param hook Hook address (address(0) = no hook)
+    /// @param sigHookFlag Whether the hook opts into the new signature/TWA hook interfaces
+    /// @return packed Packed settings value
+    function packSettings(
+        bool adminFlag,
+        uint40 expiration,
+        address hook,
+        bool sigHookFlag
+    ) public pure returns (uint256) {
         return
+            (uint256(sigHookFlag ? 1 : 0) << 208) |
             (uint256(adminFlag ? 1 : 0) << 200) |
             (uint256(expiration) << 160) |
             uint256(uint160(hook));
@@ -238,6 +263,17 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
     /// @return isAdmin True if signer has admin privileges
     function isAdmin(uint256 settings) public pure returns (bool) {
         return ((settings >> 200) & 0xff) == 1;
+    }
+
+    /// @notice Whether the key's hook opts into the new signature/TWA hook interfaces (bits 208-215)
+    /// @dev flag == 0 marks a legacy hook: the new `ISignatureHook.checkSignature` /
+    ///      `IHookTransferAuthorization` callbacks are skipped entirely, preserving pre-existing
+    ///      behavior. flag == 1 marks a new hook whose support is then confirmed via ERC-165
+    ///      `supportsInterface` before the new interface is called.
+    /// @param settings Packed settings value
+    /// @return True if the signature-hook flag is set
+    function checkHookFlag(uint256 settings) public pure returns (bool) {
+        return ((settings >> 208) & 0xff) == 1;
     }
 
     // Internal Functions
