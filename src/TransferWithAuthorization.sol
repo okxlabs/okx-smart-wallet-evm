@@ -9,7 +9,7 @@ import {ValidationManager} from "./ValidationManager.sol";
 import {ERC712} from "./ERC712.sol";
 import {Static} from "./libraries/Static.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC165} from "./interfaces/IHook.sol";
+import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
@@ -247,29 +247,26 @@ abstract contract TransferWithAuthorization is
     ///      address(this) is a plain ETH deposit with no privileged dispatch surface.
     ///
     ///      The hook is invoked through the dedicated `IHookTransferAuthorization` callbacks, which pass
-    ///      the authorizing `keyHash` and the typed transfer fields (token / to / value) directly. This
+    ///      the authorizing `keyHash` and the typed transfer fields (token / to / value) directly. The
+    ///      callbacks run only when the configured hook advertises `IHookTransferAuthorization` via
+    ///      ERC-165. The probe is `ERC165Checker.supportsERC165InterfaceUnchecked` — a gas-capped
+    ///      staticcall that returns false (rather than reverting) for a hook that is not a contract or does
+    ///      not implement `supportsInterface` — so a legacy hook that does not advertise this interface is
+    ///      skipped and settlement proceeds (nothing is bypassed: it never configured a TWA policy). This
     ///      surface is intentionally distinct from the execute-path `IHook.preCheck`/`postCheck(Call[],
     ///      executor)`.
-    ///
-    ///      The callbacks are gated so legacy hooks are NOT broken: they run only when the key opts into
-    ///      the new hook interfaces (`checkHookFlag`) AND the hook advertises `IHookTransferAuthorization`
-    ///      via ERC-165 `supportsInterface`. A legacy-hook key (flag == 0) settles without invoking the
-    ///      TWA callbacks — it never configured a TWA policy, so nothing is bypassed. To gain TWA limits
-    ///      an owner re-installs a hook with the signature-hook flag set. This mirrors the compatibility
-    ///      rule used by the `isValidSignature` signature hook.
     function _settleWithHook(
         bytes32 keyHash,
         address token,
         address to,
         uint256 value
     ) private {
-        uint256 settings = _ownerSettings[keyHash];
-        address hookAddress = getHook(settings);
+        address hookAddress = getHook(_ownerSettings[keyHash]);
         bool isNative = token == NATIVE_ASSET;
 
         bool hookActive = hookAddress != address(0) &&
-            checkHookFlag(settings) &&
-            IERC165(hookAddress).supportsInterface(
+            ERC165Checker.supportsERC165InterfaceUnchecked(
+                hookAddress,
                 type(IHookTransferAuthorization).interfaceId
             );
 
@@ -297,8 +294,10 @@ abstract contract TransferWithAuthorization is
         }
 
         if (hookActive) {
-            IHookTransferAuthorization(hookAddress)
-                .postTransferWithAuthorization(ret, msg.sender);
+            IHookTransferAuthorization(hookAddress).postTransferWithAuthorization(
+                ret,
+                msg.sender
+            );
         }
     }
 
