@@ -101,17 +101,12 @@ interface IOwnerManager {
     /// @return True if signer has admin privileges
     function isAdmin(uint256 settings) external pure returns (bool);
 
-    /// @notice Whether the key's hook opts into the new signature/TWA hook interfaces (bits 208-215)
-    /// @param settings Packed settings value
-    /// @return True if the signature-hook flag is set (new hook); false for legacy hooks
-    function checkHookFlag(uint256 settings) external pure returns (bool);
-
     /// @notice Check if settings are expired based on block timestamp
     /// @param settings Packed settings value
     /// @return True if settings are expired (expiration != 0 and < block.timestamp)
     function isSettingsExpired(uint256 settings) external view returns (bool);
 
-    /// @notice Pack settings into uint256 (sigHookFlag defaults to 0 / legacy hook)
+    /// @notice Pack settings into uint256
     /// @param adminFlag Admin flag
     /// @param expiration Unix timestamp (0 = never expires)
     /// @param hook Hook address (address(0) = no hook)
@@ -120,18 +115,5 @@ interface IOwnerManager {
         bool adminFlag,
         uint40 expiration,
         address hook
-    ) external pure returns (uint256);
-
-    /// @notice Pack settings into uint256, explicitly setting the signature-hook flag
-    /// @param adminFlag Admin flag
-    /// @param expiration Unix timestamp (0 = never expires)
-    /// @param hook Hook address (address(0) = no hook)
-    /// @param sigHookFlag Whether the hook opts into the new signature/TWA hook interfaces
-    /// @return Packed settings value
-    function packSettings(
-        bool adminFlag,
-        uint40 expiration,
-        address hook,
-        bool sigHookFlag
     ) external pure returns (uint256);
 }

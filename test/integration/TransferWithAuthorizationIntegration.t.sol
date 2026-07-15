@@ -500,7 +500,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         // register bob as a non-admin key constrained by a recording hook
         IntegrationRecordingHook bobHook = new IntegrationRecordingHook();
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(bobHook), true);
+        uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(bobHook));
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), settings);
 
         // alice (admin, no hook) settles: bob's hook must not be touched
@@ -714,7 +714,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
 
         IntegrationBlockingHook blockingHook = new IntegrationBlockingHook();
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
-        uint256 blockedSettings = OwnerManager(_aliceWallet).packSettings(false, 0, address(blockingHook), true);
+        uint256 blockedSettings = OwnerManager(_aliceWallet).packSettings(false, 0, address(blockingHook));
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), blockedSettings);
 
         bytes32 nonce = keccak256("recover-hook");
