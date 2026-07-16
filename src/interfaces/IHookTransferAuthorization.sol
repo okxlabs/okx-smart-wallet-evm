@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import {IERC165} from "./IHook.sol";
+import {IHook} from "./IHook.sol";
 
 /// @title IHookTransferAuthorization
 /// @notice The spending-policy hook surface for TransferWithAuthorization (TWA) settlement. Distinct
@@ -17,7 +17,7 @@ import {IERC165} from "./IHook.sol";
 ///      fields (token / to / value) directly — the hook does not re-decode a synthesized `Call`, and
 ///      knows it is being invoked from the permissionless TWA path rather than a normal batch execute.
 ///      A hook shared with the execute path must implement BOTH `IHook` and this interface.
-interface IHookTransferAuthorization is IERC165 {
+interface IHookTransferAuthorization is IHook {
     /// @notice Pre-settlement check for a TWA transfer, mirroring `IHook.preCheck`'s pre/post pairing.
     /// @param keyHash  The signing key that authorized this transfer (routes both the validator and
     ///                 this hook). This is the true authorizer — NOT `caller`, which is an arbitrary

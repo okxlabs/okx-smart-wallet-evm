@@ -28,36 +28,25 @@ abstract contract TransferWithAuthorization is
 {
     using SafeERC20 for IERC20;
 
-    /// @notice EIP-712 typehash for an execute-style transfer authorization.
-    /// @dev Computed at compile time from the type string so the value can never drift from its preimage.
-    ///      `from` is bound to the account address (not a function arg) when the struct is hashed.
-    bytes32 public constant EXECUTE_TRANSFER_WITH_AUTHORIZATION_TYPEHASH =
-        keccak256(
-            "ExecuteTransferWithAuthorization(address token,address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 authorizationNonce)"
-        );
-    /// @notice EIP-712 typehash for a receive-style (payee-pulled) transfer authorization.
-    /// @dev Computed at compile time from the type string so the value can never drift from its preimage.
-    bytes32 public constant RECEIVE_WITH_AUTHORIZATION_TYPEHASH =
-        keccak256(
-            "ReceiveWithAuthorization(address token,address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 authorizationNonce)"
-        );
-    /// @notice EIP-712 typehash for a cancel authorization.
-    /// @dev Computed at compile time from the type string so the value can never drift from its preimage.
-    bytes32 public constant CANCEL_TRANSFER_AUTHORIZATION_TYPEHASH =
-        keccak256("CancelTransferAuthorization(bytes32 authorizationNonce)");
-    /// @notice ERC-165 interface id for this settlement surface
-    ///         (executeTransferWithAuthorization.selector ^ receiveWithAuthorization.selector).
-    bytes4 public constant INTERFACE_ID = 0x86c5a9e1;
-    /// @notice Sentinel `token` value selecting the native-asset (ETH) settlement path (ERC-7528).
-    address public constant NATIVE_ASSET = Static.NATIVE_ETH;
+    // keccak256("ExecuteTransferWithAuthorization(address token,address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 authorizationNonce)")
+    bytes32 constant EXECUTE_TRANSFER_WITH_AUTHORIZATION_TYPEHASH =
+        0xe751bf1b144414a77b82ede1d2a433edc347fef283ab5e53e96f438392517b3c;
+
+    // keccak256("ReceiveWithAuthorization(address token,address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 authorizationNonce)")
+    bytes32 constant RECEIVE_WITH_AUTHORIZATION_TYPEHASH =
+        0xd8a04c474fcb45b6fb4b17a80506c180af4818903f1ace6c1ff59053338529fd;
+
+    // keccak256("CancelTransferAuthorization(bytes32 authorizationNonce)")
+    bytes32 constant CANCEL_TRANSFER_AUTHORIZATION_TYPEHASH =
+        0xf30be15aedf9b01d0dac5525241af3753865a4968ffb9fb1a7ad6d2553d29f8e;
+
     /// @notice Minimum on-chain `signature` length: the 32-byte `keyHash` envelope prefix.
     uint256 public constant SIGNATURE_ENVELOPE_MIN_LENGTH = 32;
 
     /// @dev Dedicated ERC-7201 storage root for the TWA nonce namespace, independent of the account's
     ///      `CustomStorage` region. Verified non-colliding via `forge inspect storageLayout`.
     ///      keccak256(abi.encode(uint256(keccak256("SmartWallet.ERC7201.TransferAuthorization")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant _TWA_STORAGE_SLOT =
-        0xd0d1bd54e9d038badf8c6e8604633a46480fa6b609616e73025b209a31512900;
+    bytes32 private constant _TWA_STORAGE_SLOT = 0xd0d1bd54e9d038badf8c6e8604633a46480fa6b609616e73025b209a31512900;
 
     /// @custom:storage-location erc7201:SmartWallet.ERC7201.TransferAuthorization
     struct TransferAuthorizationStorage {
@@ -110,12 +99,8 @@ abstract contract TransferWithAuthorization is
     }
 
     /// @inheritdoc ITransferWithAuthorization
-    function cancelTransferAuthorization(
-        bytes32 authorizationNonce,
-        bytes calldata signature
-    ) external {
-        TransferAuthorizationStorage
-            storage $ = _getTransferAuthorizationStorage();
+    function cancelTransferAuthorization(bytes32 authorizationNonce, bytes calldata signature) external {
+        TransferAuthorizationStorage storage $ = _getTransferAuthorizationStorage();
         if ($.authorizationStates[authorizationNonce]) {
             revert AuthorizationAlreadyUsed(authorizationNonce);
         }
@@ -125,36 +110,17 @@ abstract contract TransferWithAuthorization is
             if (msg.sender != address(this)) revert NotFromSelf();
         } else {
             // Signed form: any registered account key may cancel; the nonce is account-scoped.
-            bytes32 structHash = keccak256(
-                abi.encode(
-                    CANCEL_TRANSFER_AUTHORIZATION_TYPEHASH,
-                    authorizationNonce
-                )
-            );
+            bytes32 structHash = keccak256(abi.encode(CANCEL_TRANSFER_AUTHORIZATION_TYPEHASH, authorizationNonce));
             _verifyTwaSignature(structHash, signature);
         }
 
         $.authorizationStates[authorizationNonce] = true;
-        emit TransferAuthorizationCanceled(address(this), authorizationNonce);
+        emit TransferAuthorizationCanceled(authorizationNonce);
     }
 
     /// @inheritdoc ITransferWithAuthorization
-    function transferAuthorizationState(
-        bytes32 authorizationNonce
-    ) external view returns (bool used) {
-        return
-            _getTransferAuthorizationStorage().authorizationStates[
-                authorizationNonce
-            ];
-    }
-
-    /// @inheritdoc ITransferWithAuthorization
-    function TRANSFER_AUTHORIZATION_DOMAIN_SEPARATOR()
-        external
-        view
-        returns (bytes32)
-    {
-        return _domainSeparator();
+    function transferAuthorizationState(bytes32 authorizationNonce) external view returns (bool used) {
+        return _getTransferAuthorizationStorage().authorizationStates[authorizationNonce];
     }
 
     /// @dev Verifies the `keyHash(32) || ownerSignature` envelope against the direct EIP-712 typed-data
@@ -164,26 +130,21 @@ abstract contract TransferWithAuthorization is
     /// @param structHash The EIP-712 struct hash being authorized.
     /// @param signature The `keyHash(32) || ownerSignature` envelope.
     /// @return keyHash The verified signing key hash, used downstream to select the spending-policy hook.
-    function _verifyTwaSignature(
-        bytes32 structHash,
-        bytes calldata signature
-    ) internal view returns (bytes32 keyHash) {
-        if (signature.length < SIGNATURE_ENVELOPE_MIN_LENGTH)
+    function _verifyTwaSignature(bytes32 structHash, bytes calldata signature)
+        internal
+        view
+        returns (bytes32 keyHash)
+    {
+        if (signature.length < SIGNATURE_ENVELOPE_MIN_LENGTH) {
             revert ISmartWallet.InvalidSignature();
+        }
 
         keyHash = bytes32(signature[:SIGNATURE_ENVELOPE_MIN_LENGTH]);
         address validator = getVerifiedValidator(keyHash);
         if (validator == address(0)) revert ISmartWallet.InvalidSignature();
 
         bytes32 digest = hashTypedData(structHash);
-        if (
-            !_validateSignature(
-                validator,
-                keyHash,
-                digest,
-                signature[SIGNATURE_ENVELOPE_MIN_LENGTH:]
-            )
-        ) {
+        if (!_validateSignature(validator, keyHash, digest, signature[SIGNATURE_ENVELOPE_MIN_LENGTH:])) {
             revert ISmartWallet.InvalidSignature();
         }
     }
@@ -202,27 +163,19 @@ abstract contract TransferWithAuthorization is
         bytes32 authorizationNonce,
         bytes calldata signature
     ) private {
-        TransferAuthorizationStorage
-            storage $ = _getTransferAuthorizationStorage();
+        TransferAuthorizationStorage storage $ = _getTransferAuthorizationStorage();
         if ($.authorizationStates[authorizationNonce]) {
             revert AuthorizationAlreadyUsed(authorizationNonce);
         }
-        if (block.timestamp <= validAfter)
+        if (block.timestamp <= validAfter) {
             revert AuthorizationNotYetValid(validAfter);
-        if (block.timestamp >= validBefore)
+        }
+        if (block.timestamp >= validBefore) {
             revert AuthorizationExpired(validBefore);
+        }
 
         bytes32 structHash = keccak256(
-            abi.encode(
-                typeHash,
-                token,
-                address(this),
-                to,
-                value,
-                validAfter,
-                validBefore,
-                authorizationNonce
-            )
+            abi.encode(typeHash, token, address(this), to, value, validAfter, validBefore, authorizationNonce)
         );
         bytes32 keyHash = _verifyTwaSignature(structHash, signature);
 
@@ -231,13 +184,7 @@ abstract contract TransferWithAuthorization is
 
         _settleWithHook(keyHash, token, to, value);
 
-        emit TransferAuthorizationUsed(
-            token,
-            address(this),
-            to,
-            value,
-            authorizationNonce
-        );
+        emit TransferAuthorizationUsed(token, address(this), to, value, authorizationNonce);
     }
 
     /// @dev Settles a single transfer through the spending-policy hook selected by the verified signing
@@ -248,38 +195,30 @@ abstract contract TransferWithAuthorization is
     ///
     ///      The hook is invoked through the dedicated `IHookTransferAuthorization` callbacks, which pass
     ///      the authorizing `keyHash` and the typed transfer fields (token / to / value) directly. The
-    ///      callbacks run only when the configured hook advertises `IHookTransferAuthorization` via
-    ///      ERC-165. The probe is `ERC165Checker.supportsERC165InterfaceUnchecked` — a gas-capped
-    ///      staticcall that returns false (rather than reverting) for a hook that is not a contract or does
-    ///      not implement `supportsInterface` — so a legacy hook that does not advertise this interface is
-    ///      skipped and settlement proceeds (nothing is bypassed: it never configured a TWA policy). This
-    ///      surface is intentionally distinct from the execute-path `IHook.preCheck`/`postCheck(Call[],
-    ///      executor)`.
-    function _settleWithHook(
-        bytes32 keyHash,
-        address token,
-        address to,
-        uint256 value
-    ) private {
+    ///      TWA path fails closed: if the key has a spending-policy hook configured, that hook MUST advertise
+    ///      `IHookTransferAuthorization` via ERC-165, otherwise settlement reverts with
+    ///      `HookNotTransferAuthorizationCompatible`. This keeps the TWA path symmetric with the execute
+    ///      path (which always runs a configured hook) — a key's spending policy can never be silently
+    ///      bypassed by routing through TWA. The probe is `ERC165Checker.supportsERC165InterfaceUnchecked`,
+    ///      a gas-capped staticcall that returns false (rather than reverting) for a hook that is not a
+    ///      contract or does not implement `supportsInterface`. This surface is intentionally distinct from
+    ///      the execute-path `IHook.preCheck`/`postCheck(Call[], executor)`.
+    function _settleWithHook(bytes32 keyHash, address token, address to, uint256 value) private {
         address hookAddress = getHook(_ownerSettings[keyHash]);
-        bool isNative = token == NATIVE_ASSET;
-
-        bool hookActive = hookAddress != address(0) &&
-            ERC165Checker.supportsERC165InterfaceUnchecked(
-                hookAddress,
-                type(IHookTransferAuthorization).interfaceId
-            );
+        bool isNative = token == Static.NATIVE_ETH;
 
         bytes memory ret;
-        if (hookActive) {
-            ret = IHookTransferAuthorization(hookAddress)
-                .preTransferWithAuthorization(
-                    keyHash,
-                    token,
-                    to,
-                    value,
-                    msg.sender
-                );
+        if (hookAddress != address(0)) {
+            if (
+                !ERC165Checker.supportsERC165InterfaceUnchecked(
+                    hookAddress, type(IHookTransferAuthorization).interfaceId
+                )
+            ) {
+                revert HookNotTransferAuthorizationCompatible(keyHash, hookAddress);
+            }
+            ret = IHookTransferAuthorization(hookAddress).preTransferWithAuthorization(
+                keyHash, token, to, value, msg.sender
+            );
         }
 
         if (isNative) {
@@ -293,20 +232,13 @@ abstract contract TransferWithAuthorization is
             IERC20(token).safeTransfer(to, value);
         }
 
-        if (hookActive) {
-            IHookTransferAuthorization(hookAddress).postTransferWithAuthorization(
-                ret,
-                msg.sender
-            );
+        if (hookAddress != address(0)) {
+            IHookTransferAuthorization(hookAddress).postTransferWithAuthorization(ret, msg.sender);
         }
     }
 
     /// @dev ERC-7201 storage accessor for the TWA authorization-nonce namespace.
-    function _getTransferAuthorizationStorage()
-        private
-        pure
-        returns (TransferAuthorizationStorage storage $)
-    {
+    function _getTransferAuthorizationStorage() private pure returns (TransferAuthorizationStorage storage $) {
         assembly ("memory-safe") {
             $.slot := _TWA_STORAGE_SLOT
         }

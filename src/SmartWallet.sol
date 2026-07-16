@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import {ERC712} from "./ERC712.sol";
 import {ERC7201} from "./ERC7201.sol";
 import {ISmartWallet} from "./interfaces/ISmartWallet.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
-import {OwnerManager} from "./OwnerManager.sol";
 import {NonceManager} from "./NonceManager.sol";
-import {ValidationManager} from "./ValidationManager.sol";
 import {ExecutionManager} from "./ExecutionManager.sol";
-import {TransferWithAuthorization} from "./TransferWithAuthorization.sol";
+import {
+    TransferWithAuthorization, 
+    ERC712, 
+    OwnerManager, 
+    ValidationManager
+} from "./TransferWithAuthorization.sol";
 import {FallbackHandler} from "./FallbackHandler.sol";
 import {Call, BatchedCall, InitialOwner} from "./Types.sol";
 import {Static} from "./libraries/Static.sol";
@@ -24,7 +26,6 @@ import {AllowanceManager} from "./AllowanceManager.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 import {DecodeLib} from "./libraries/DecodeLib.sol";
 import {ChainlessLib} from "./libraries/ChainlessLib.sol";
-import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {MessageSignLib} from "./libraries/MessageSignLib.sol";
 
 /// @dev This contract uses UUPS upgradeable pattern. All state is stored via inherited contracts.
@@ -361,16 +362,6 @@ abstract contract SmartWallet is
                     : Static.INVALID_VALUE;
         }
         return Static.INVALID_VALUE;
-    }
-
-    /// @notice Implementation of IERC165 interface detection
-    /// @dev Adds the transfer-with-authorization interface id on top of the inherited ERC-165 ids.
-    /// @param interfaceId The interface identifier to check
-    /// @return bool True if the contract supports the interface
-    function supportsInterface(
-        bytes4 interfaceId
-    ) public view override(IERC165, FallbackHandler) returns (bool) {
-        return interfaceId == INTERFACE_ID || super.supportsInterface(interfaceId);
     }
 
     /// @inheritdoc UUPSUpgradeable
