@@ -8,24 +8,23 @@ pragma solidity ^0.8.29;
 ///      exactly once. Native ETH is selected with the `NATIVE_ASSET` sentinel; any other `token` is an
 ///      ERC-20. Function/event/error signatures are stable backend ABI surface and must not change.
 interface ITransferWithAuthorization {
-    /// @notice Emitted once when an authorization settles (via execute or receive).
+    /// @notice Emitted exactly once when an authorization settles, via `executeTransferWithAuthorization`
+    ///         or `receiveWithAuthorization`, carrying the full transfer detail. `token`, `from`, and `to`
+    ///         are indexed so consumers can filter by asset or counterparty; `value` and
+    ///         `authorizationNonce` are in the data section (the nonce is a topic only on cancellation).
     /// @param token The asset transferred (`NATIVE_ASSET` for native ETH, else the ERC-20 address).
     /// @param from The paying account (always this account).
     /// @param to The recipient that received `value`.
     /// @param value The amount moved, in wei or token base units.
-    /// @param authorizationNonce The random authorization nonce that was consumed.
+    /// @param authorizationNonce The authorization nonce that was consumed (now terminal).
     event TransferAuthorizationUsed(
-        address indexed token,
-        address indexed from,
-        address indexed to,
-        uint256 value,
-        bytes32 authorizationNonce
+        address indexed token, address indexed from, address indexed to, uint256 value, bytes32 authorizationNonce
     );
 
-    /// @notice Emitted when an unused authorization is canceled (revoked); the nonce becomes terminal.
-    /// @param authorizer The account that owns the canceled authorization (always this account).
-    /// @param authorizationNonce The canceled authorization nonce.
-    event TransferAuthorizationCanceled(address indexed authorizer, bytes32 indexed authorizationNonce);
+    /// @notice Emitted when an unused authorization is revoked via `cancelTransferAuthorization`. The nonce
+    ///         is indexed and becomes terminal — it can no longer settle, exactly as if it had been used.
+    /// @param authorizationNonce The authorization nonce that was canceled (now terminal).
+    event TransferAuthorizationCanceled(bytes32 indexed authorizationNonce);
 
     /// @notice The authorization nonce is already in a terminal state (settled or canceled).
     error AuthorizationAlreadyUsed(bytes32 authorizationNonce);
@@ -35,6 +34,10 @@ interface ITransferWithAuthorization {
     error AuthorizationExpired(uint256 validBefore);
     /// @notice `receiveWithAuthorization` was not called by the authorized payee (`to`).
     error CallerNotPayee(address caller, address to);
+    /// @notice The signing key has a spending-policy hook configured, but that hook does not advertise
+    ///         `IHookTransferAuthorization` via ERC-165, so the TWA settlement path cannot enforce it.
+    ///         Settlement fails closed rather than silently bypassing the key's spending policy.
+    error HookNotTransferAuthorizationCompatible(bytes32 keyHash, address hook);
 
     /// @notice Settles an owner-signed transfer authorization. Permissionless: any relayer may submit.
     /// @param token The asset to transfer (`NATIVE_ASSET` for native ETH, else an ERC-20 address).
@@ -85,8 +88,4 @@ interface ITransferWithAuthorization {
     /// @param authorizationNonce The authorization nonce to query.
     /// @return used True if the nonce has been settled or canceled, false if still unused.
     function transferAuthorizationState(bytes32 authorizationNonce) external view returns (bool used);
-
-    /// @notice Returns the EIP-712 domain separator used to bind transfer authorizations to this account and chain.
-    /// @return The account's EIP-712 domain separator.
-    function TRANSFER_AUTHORIZATION_DOMAIN_SEPARATOR() external view returns (bytes32);
 }

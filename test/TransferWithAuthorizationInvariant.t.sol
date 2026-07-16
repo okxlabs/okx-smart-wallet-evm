@@ -170,7 +170,17 @@ contract TransferWithAuthorizationHandler is Base {
         view
         returns (bytes memory)
     {
-        return _envelope(_transferStructHash(twa.EXECUTE_TRANSFER_WITH_AUTHORIZATION_TYPEHASH(), tkn, to, value, nonce));
+        return _envelope(
+            _transferStructHash(
+                keccak256(
+                    "ExecuteTransferWithAuthorization(address token,address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 authorizationNonce)"
+                ),
+                tkn,
+                to,
+                value,
+                nonce
+            )
+        );
     }
 
     function _receiveSignature(address tkn, address to, uint256 value, bytes32 nonce)
@@ -178,11 +188,23 @@ contract TransferWithAuthorizationHandler is Base {
         view
         returns (bytes memory)
     {
-        return _envelope(_transferStructHash(twa.RECEIVE_WITH_AUTHORIZATION_TYPEHASH(), tkn, to, value, nonce));
+        return _envelope(
+            _transferStructHash(
+                keccak256(
+                    "ReceiveWithAuthorization(address token,address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 authorizationNonce)"
+                ),
+                tkn,
+                to,
+                value,
+                nonce
+            )
+        );
     }
 
     function _cancelSignature(bytes32 nonce) internal view returns (bytes memory) {
-        return _envelope(keccak256(abi.encode(twa.CANCEL_TRANSFER_AUTHORIZATION_TYPEHASH(), nonce)));
+        return _envelope(
+            keccak256(abi.encode(keccak256("CancelTransferAuthorization(bytes32 authorizationNonce)"), nonce))
+        );
     }
 
     function _envelope(bytes32 structHash) internal view returns (bytes memory) {

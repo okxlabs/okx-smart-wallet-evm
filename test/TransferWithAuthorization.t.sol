@@ -35,6 +35,12 @@ contract RevertingHook is IHookTransferAuthorization {
 
     function postTransferWithAuthorization(bytes calldata, address) external payable {}
 
+    function preCheck(Call[] calldata, address) external payable returns (bytes memory) {
+        return "";
+    }
+
+    function postCheck(bytes calldata, address) external payable {}
+
     function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
         return interfaceId == type(IHookTransferAuthorization).interfaceId;
     }
@@ -72,6 +78,12 @@ contract RecordingHook is IHookTransferAuthorization {
         lastPostRetHash = keccak256(preRet);
     }
 
+    function preCheck(Call[] calldata, address) external payable returns (bytes memory) {
+        return "";
+    }
+
+    function postCheck(bytes calldata, address) external payable {}
+
     function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
         return interfaceId == type(IHookTransferAuthorization).interfaceId;
     }
@@ -92,6 +104,12 @@ contract NonAdvertisingHook is IHookTransferAuthorization {
     }
 
     function postTransferWithAuthorization(bytes calldata, address) external payable {}
+
+    function preCheck(Call[] calldata, address) external payable returns (bytes memory) {
+        return "";
+    }
+
+    function postCheck(bytes calldata, address) external payable {}
 
     function supportsInterface(bytes4) external pure returns (bool) {
         return false;
@@ -205,10 +223,15 @@ contract TransferWithAuthorizationTest is Base {
         itwa = ITransferWithAuthorization(_aliceWallet);
         _relayer = makeAddr("relayer");
 
-        _execTypeHash = twa.EXECUTE_TRANSFER_WITH_AUTHORIZATION_TYPEHASH();
-        _receiveTypeHash = twa.RECEIVE_WITH_AUTHORIZATION_TYPEHASH();
-        _cancelTypeHash = twa.CANCEL_TRANSFER_AUTHORIZATION_TYPEHASH();
-        _nativeAsset = twa.NATIVE_ASSET();
+        // Typehashes are internal constants in the contract; recompute them from the type strings here.
+        _execTypeHash = keccak256(
+            "ExecuteTransferWithAuthorization(address token,address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 authorizationNonce)"
+        );
+        _receiveTypeHash = keccak256(
+            "ReceiveWithAuthorization(address token,address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 authorizationNonce)"
+        );
+        _cancelTypeHash = keccak256("CancelTransferAuthorization(bytes32 authorizationNonce)");
+        _nativeAsset = Static.NATIVE_ETH;
 
         token = new MockERC20();
         token.mint(_aliceWallet, 1_000 ether);
@@ -284,35 +307,50 @@ contract TransferWithAuthorizationTest is Base {
     // ---------------------------------------------------------------- discovery / getters
 
     function test_publicConstants_matchDesign() public view {
+        // The typehashes are internal constants in the contract; verify the type strings the tests use
+        // hash to the pinned design values (this is what the contract hardcodes).
         assertEq(
-            twa.EXECUTE_TRANSFER_WITH_AUTHORIZATION_TYPEHASH(),
+            _execTypeHash,
             0xe751bf1b144414a77b82ede1d2a433edc347fef283ab5e53e96f438392517b3c,
             "execute typehash"
         );
         assertEq(
-            twa.RECEIVE_WITH_AUTHORIZATION_TYPEHASH(),
+            _receiveTypeHash,
             0xd8a04c474fcb45b6fb4b17a80506c180af4818903f1ace6c1ff59053338529fd,
             "receive typehash"
         );
         assertEq(
-            twa.CANCEL_TRANSFER_AUTHORIZATION_TYPEHASH(),
+            _cancelTypeHash,
             0xf30be15aedf9b01d0dac5525241af3753865a4968ffb9fb1a7ad6d2553d29f8e,
             "cancel typehash"
         );
-        assertEq(twa.INTERFACE_ID(), bytes4(0x86c5a9e1), "interface id");
-        assertEq(twa.NATIVE_ASSET(), 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE, "native sentinel");
+        assertEq(Static.NATIVE_ETH, 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE, "native sentinel");
         assertEq(twa.SIGNATURE_ENVELOPE_MIN_LENGTH(), 32, "envelope prefix length");
     }
 
     function test_supportsInterface() public view {
-        assertTrue(IERC165(_aliceWallet).supportsInterface(twa.INTERFACE_ID()), "TWA id");
+        // The wallet no longer advertises the TWA interface id via supportsInterface;
+        // it only exposes the ERC-165 ids inherited from FallbackHandler.
+        assertFalse(IERC165(_aliceWallet).supportsInterface(bytes4(0x86c5a9e1)), "TWA id not advertised");
         assertTrue(IERC165(_aliceWallet).supportsInterface(0x01ffc9a7), "ERC165 id preserved");
         assertTrue(IERC165(_aliceWallet).supportsInterface(0x1626ba7e), "ERC1271 id preserved");
         assertFalse(IERC165(_aliceWallet).supportsInterface(0xffffffff), "unknown id");
     }
 
-    function test_domainSeparatorGetterMatchesDigest() public view {
-        bytes32 sep = itwa.TRANSFER_AUTHORIZATION_DOMAIN_SEPARATOR();
+    function test_domainSeparatorMatchesDigest() public view {
+        // The dedicated separator getter was removed; reconstruct it from the ERC-5267 eip712Domain()
+        // fields and confirm hashTypedData wires it correctly.
+        (, string memory name, string memory version, uint256 chainId, address verifyingContract, , ) =
+            twa.eip712Domain();
+        bytes32 sep = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes(name)),
+                keccak256(bytes(version)),
+                chainId,
+                verifyingContract
+            )
+        );
         assertTrue(sep != bytes32(0), "non-zero domain separator");
         bytes32 sh = _structHash(_execTypeHash, address(token), _bob, 1, 9_000, 11_000, keccak256("x"));
         // hashTypedData == keccak256(0x1901 || domainSeparator || structHash)
@@ -596,8 +634,8 @@ contract TransferWithAuthorizationTest is Base {
     function test_cancelFormB_selfThenSettleReverts() public {
         bytes32 nonce = keccak256("cancelB");
 
-        vm.expectEmit(true, true, false, false, _aliceWallet);
-        emit ITransferWithAuthorization.TransferAuthorizationCanceled(_aliceWallet, nonce);
+        vm.expectEmit(true, false, false, false, _aliceWallet);
+        emit ITransferWithAuthorization.TransferAuthorizationCanceled(nonce);
 
         vm.prank(_aliceWallet); // self-call form (empty signature)
         itwa.cancelTransferAuthorization(nonce, "");
@@ -622,8 +660,8 @@ contract TransferWithAuthorizationTest is Base {
         bytes32 sh = keccak256(abi.encode(_cancelTypeHash, nonce));
         bytes memory sig = _envelope(_alicePk, _aliceWalletKeyHash, sh);
 
-        vm.expectEmit(true, true, false, false, _aliceWallet);
-        emit ITransferWithAuthorization.TransferAuthorizationCanceled(_aliceWallet, nonce);
+        vm.expectEmit(true, false, false, false, _aliceWallet);
+        emit ITransferWithAuthorization.TransferAuthorizationCanceled(nonce);
 
         vm.prank(_relayer); // form A may be relayed by anyone
         itwa.cancelTransferAuthorization(nonce, sig);
@@ -730,48 +768,63 @@ contract TransferWithAuthorizationTest is Base {
         assertEq(hook.lastCaller(), _relayer, "caller is relayer");
     }
 
-    /// @dev Legacy compatibility: a hook that predates TWA and does NOT implement `supportsInterface`
-    ///      settles normally WITHOUT invoking (or reverting on) the TWA callbacks. This is the exact
-    ///      value of the gas-capped `supportsERC165InterfaceUnchecked` probe — a raw supportsInterface
-    ///      call would revert and brick settlement for existing owners.
-    function test_legacyHookWithoutErc165_skipsTwaCallbacks_andSettles() public {
+    /// @dev Fail-closed: a legacy hook that predates TWA and does NOT implement `supportsInterface`
+    ///      cannot enforce a spending policy on the TWA path, so settlement reverts with
+    ///      `HookNotTransferAuthorizationCompatible` rather than silently bypassing the key's hook.
+    ///      The transfer does not happen and the nonce is not consumed (effect rolled back).
+    function test_legacyHookWithoutErc165_reverts_failClosed() public {
         LegacyHookNoErc165 hook = new LegacyHookNoErc165();
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(hook));
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), settings);
 
-        bytes32 nonce = keccak256("hook-legacy-skip");
+        bytes32 nonce = keccak256("hook-legacy-fail-closed");
         uint256 value = 3 ether;
         bytes memory sig = _executeSignature(_bobPk, bobKeyHash, address(token), _charlie, value, 9_000, 11_000, nonce);
 
         uint256 charlieBefore = token.balanceOf(_charlie);
         vm.prank(_relayer);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ITransferWithAuthorization.HookNotTransferAuthorizationCompatible.selector,
+                bobKeyHash,
+                address(hook)
+            )
+        );
         itwa.executeTransferWithAuthorization(address(token), _charlie, value, 9_000, 11_000, nonce, sig);
 
-        assertEq(hook.preCount(), 0, "legacy hook must not be invoked on the TWA path");
-        assertEq(token.balanceOf(_charlie) - charlieBefore, value, "transfer still settles");
-        assertTrue(itwa.transferAuthorizationState(nonce), "nonce consumed");
+        assertEq(hook.preCount(), 0, "legacy hook is never invoked on the TWA path");
+        assertEq(token.balanceOf(_charlie), charlieBefore, "no transfer on fail-closed revert");
+        assertFalse(itwa.transferAuthorizationState(nonce), "nonce not consumed on revert");
     }
 
-    /// @dev A hook that implements the TWA callbacks but fails the ERC-165 probe is skipped and
-    ///      settlement proceeds — the supportsInterface gate governs invocation.
-    function test_interfaceNotAdvertised_skipsCallbacks_andSettles() public {
+    /// @dev Fail-closed: a hook that implements the TWA callbacks but does NOT advertise the interface via
+    ///      ERC-165 fails the probe, so settlement reverts with `HookNotTransferAuthorizationCompatible`
+    ///      instead of bypassing the hook.
+    function test_interfaceNotAdvertised_reverts_failClosed() public {
         NonAdvertisingHook hook = new NonAdvertisingHook();
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(hook));
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), settings);
 
-        bytes32 nonce = keccak256("hook-no-iface-skip");
+        bytes32 nonce = keccak256("hook-no-iface-fail-closed");
         uint256 value = 2 ether;
         bytes memory sig = _executeSignature(_bobPk, bobKeyHash, address(token), _charlie, value, 9_000, 11_000, nonce);
 
         uint256 charlieBefore = token.balanceOf(_charlie);
         vm.prank(_relayer);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ITransferWithAuthorization.HookNotTransferAuthorizationCompatible.selector,
+                bobKeyHash,
+                address(hook)
+            )
+        );
         itwa.executeTransferWithAuthorization(address(token), _charlie, value, 9_000, 11_000, nonce, sig);
 
-        assertEq(hook.preCount(), 0, "hook without advertised interface must not be invoked");
-        assertEq(token.balanceOf(_charlie) - charlieBefore, value, "transfer still settles");
-        assertTrue(itwa.transferAuthorizationState(nonce), "nonce consumed");
+        assertEq(hook.preCount(), 0, "non-advertising hook is never invoked");
+        assertEq(token.balanceOf(_charlie), charlieBefore, "no transfer on fail-closed revert");
+        assertFalse(itwa.transferAuthorizationState(nonce), "nonce not consumed on revert");
     }
 
     function test_nonAdminNativeSelfTarget_succeedsNetZero() public {

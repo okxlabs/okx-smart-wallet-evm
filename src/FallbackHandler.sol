@@ -31,7 +31,7 @@ abstract contract FallbackHandler is IERC165 {
     /// @return bool True if the contract supports the interface
     function supportsInterface(
         bytes4 interfaceId
-    ) public view virtual override returns (bool) {
+    ) external view virtual override returns (bool) {
         // 0x150b7a02: `type(IERC721Receiver).interfaceId`.
         // 0x4e2312e0: `type(IERC1155Receiver).interfaceId`.
         // 0x1626ba7e: `type(IERC1271).interfaceId`.

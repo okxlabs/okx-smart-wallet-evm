@@ -5,6 +5,7 @@ import {Base, MockERC20} from "../Base.t.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {ITransferWithAuthorization} from "src/interfaces/ITransferWithAuthorization.sol";
 import {TransferWithAuthorization} from "src/TransferWithAuthorization.sol";
+import {Static} from "src/libraries/Static.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
@@ -78,6 +79,12 @@ contract IntegrationRecordingHook is IHookTransferAuthorization {
         postCount++;
     }
 
+    function preCheck(Call[] calldata, address) external payable returns (bytes memory) {
+        return "";
+    }
+
+    function postCheck(bytes calldata, address) external payable {}
+
     function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
         return interfaceId == type(IHookTransferAuthorization).interfaceId;
     }
@@ -96,6 +103,12 @@ contract IntegrationBlockingHook is IHookTransferAuthorization {
     }
 
     function postTransferWithAuthorization(bytes calldata, address) external payable {}
+
+    function preCheck(Call[] calldata, address) external payable returns (bytes memory) {
+        return "";
+    }
+
+    function postCheck(bytes calldata, address) external payable {}
 
     function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
         return interfaceId == type(IHookTransferAuthorization).interfaceId;
@@ -158,10 +171,15 @@ abstract contract TwaIntegrationBase is Base {
         vm.warp(BASE_TS);
 
         TransferWithAuthorization aliceTwa = TransferWithAuthorization(payable(_aliceWallet));
-        EXEC_TYPEHASH = aliceTwa.EXECUTE_TRANSFER_WITH_AUTHORIZATION_TYPEHASH();
-        RECV_TYPEHASH = aliceTwa.RECEIVE_WITH_AUTHORIZATION_TYPEHASH();
-        CANCEL_TYPEHASH = aliceTwa.CANCEL_TRANSFER_AUTHORIZATION_TYPEHASH();
-        NATIVE = aliceTwa.NATIVE_ASSET();
+        // Typehashes are internal constants in the contract; recompute them from the type strings here.
+        EXEC_TYPEHASH = keccak256(
+            "ExecuteTransferWithAuthorization(address token,address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 authorizationNonce)"
+        );
+        RECV_TYPEHASH = keccak256(
+            "ReceiveWithAuthorization(address token,address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 authorizationNonce)"
+        );
+        CANCEL_TYPEHASH = keccak256("CancelTransferAuthorization(bytes32 authorizationNonce)");
+        NATIVE = Static.NATIVE_ETH;
 
         _relayerA = makeAddr("relayerA");
         _relayerB = makeAddr("relayerB");
@@ -175,6 +193,22 @@ abstract contract TwaIntegrationBase is Base {
 
     function _digest(address account, bytes32 structHash) internal view returns (bytes32) {
         return TransferWithAuthorization(payable(account)).hashTypedData(structHash);
+    }
+
+    /// @dev Reconstructs the account's EIP-712 domain separator from its ERC-5267 eip712Domain() fields
+    ///      (the dedicated separator getter was removed from the contract).
+    function _domainSeparatorOf(address account) internal view returns (bytes32) {
+        (, string memory name, string memory version, uint256 chainId, address verifyingContract, , ) =
+            TransferWithAuthorization(payable(account)).eip712Domain();
+        return keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes(name)),
+                keccak256(bytes(version)),
+                chainId,
+                verifyingContract
+            )
+        );
     }
 
     function _transferStructHash(
@@ -254,9 +288,11 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         assertTrue(_isSignerAdmin(account, aliceKeyHash), "alice admin");
         assertTrue(_isSignerAdmin(account, daveKeyHash), "dave admin");
 
-        // TWA surface live immediately on the fresh account
-        assertTrue(ISmartWallet(account).supportsInterface(0x86c5a9e1), "twa interface id");
-        bytes32 sep = ITransferWithAuthorization(account).TRANSFER_AUTHORIZATION_DOMAIN_SEPARATOR();
+        // TWA surface live immediately on the fresh account — the wallet no longer advertises the
+        // TWA interface id via supportsInterface, so liveness is proven by the wired domain separator below.
+        assertFalse(ISmartWallet(account).supportsInterface(0x86c5a9e1), "twa interface id not advertised");
+        // The dedicated separator getter was removed; reconstruct it from ERC-5267 eip712Domain() fields.
+        bytes32 sep = _domainSeparatorOf(account);
         bytes32 probe = _transferStructHash(EXEC_TYPEHASH, account, address(token), _bob, 1, keccak256("probe"));
         assertEq(_digest(account, probe), keccak256(abi.encodePacked(hex"1901", sep, probe)), "domain separator wired");
 
@@ -368,8 +404,8 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
             data: abi.encodeCall(ITransferWithAuthorization.cancelTransferAuthorization, (nonce, bytes("")))
         });
 
-        vm.expectEmit(true, true, false, false, _aliceWallet);
-        emit ITransferWithAuthorization.TransferAuthorizationCanceled(_aliceWallet, nonce);
+        vm.expectEmit(true, false, false, false, _aliceWallet);
+        emit ITransferWithAuthorization.TransferAuthorizationCanceled(nonce);
         vm.prank(_alice);
         ISmartWallet(_aliceWallet).execute(calls);
 
@@ -854,7 +890,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         assertTrue(itwa.transferAuthorizationState(canceledNonce), "canceled nonce terminal");
 
         bytes32 usedTopic = keccak256("TransferAuthorizationUsed(address,address,address,uint256,bytes32)");
-        bytes32 canceledTopic = keccak256("TransferAuthorizationCanceled(address,bytes32)");
+        bytes32 canceledTopic = keccak256("TransferAuthorizationCanceled(bytes32)");
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bool sawUsed;
@@ -862,7 +898,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         for (uint256 i; i < logs.length; i++) {
             if (logs[i].emitter != _aliceWallet) continue;
             if (logs[i].topics[0] == usedTopic) {
-                // Used: token/from/to indexed; value+nonce live in data (nonce is NOT a topic)
+                // Used: token/from/to indexed; value + nonce live in data (nonce is NOT a topic)
                 assertEq(logs[i].topics.length, 4, "used has 3 indexed fields");
                 assertEq(address(uint160(uint256(logs[i].topics[2]))), _aliceWallet, "used from == account");
                 (uint256 evValue, bytes32 evNonce) = abi.decode(logs[i].data, (uint256, bytes32));
@@ -870,10 +906,9 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
                 assertEq(evNonce, usedNonce, "used nonce in data");
                 sawUsed = true;
             } else if (logs[i].topics[0] == canceledTopic) {
-                // Canceled: authorizer + nonce indexed (nonce IS a topic, cheaply filterable)
-                assertEq(logs[i].topics.length, 3, "canceled has 2 indexed fields");
-                assertEq(address(uint160(uint256(logs[i].topics[1]))), _aliceWallet, "canceled authorizer == account");
-                assertEq(logs[i].topics[2], canceledNonce, "canceled nonce is a topic");
+                // Canceled: only authorizationNonce indexed (nonce IS a topic, cheaply filterable)
+                assertEq(logs[i].topics.length, 2, "canceled has 1 indexed field");
+                assertEq(logs[i].topics[1], canceledNonce, "canceled nonce is a topic");
                 sawCanceled = true;
             }
         }
