@@ -8,9 +8,12 @@ import {BaseAuthorization} from "src/BaseAuthorization.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
-import {IHookTransferAuthorization} from "src/interfaces/IHookTransferAuthorization.sol";
-import {IHook} from "src/interfaces/IHook.sol";
-import {Call} from "src/Types.sol";
+import {
+    RevertingHook,
+    RecordingHook,
+    NonAdvertisingHook,
+    LegacyHookNoErc165
+} from "./mocks/Hooks.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
 import {MessageSignLib} from "src/libraries/MessageSignLib.sol";
 import {PasskeyValidatorLib} from "src/libraries/PasskeyValidatorLib.sol";
@@ -19,117 +22,6 @@ import {HelperLib} from "./utils/Helper.s.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
-/// @dev Minimal hook that blocks any spend by reverting in the TWA pre-callback. Used to prove the TWA
-///      settle path invokes the key-selected hook and that a hook revert rolls back the consumed nonce.
-contract RevertingHook is IHookTransferAuthorization {
-    error HookBlocked();
-
-    function preTransferWithAuthorization(bytes32, address, address, uint256, address)
-        external
-        payable
-        returns (bytes memory)
-    {
-        revert HookBlocked();
-    }
-
-    function postTransferWithAuthorization(bytes calldata, address) external payable {}
-
-    function preCheck(Call[] calldata, address) external payable returns (bytes memory) {
-        return "";
-    }
-
-    function postCheck(bytes calldata, address) external payable {}
-
-    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
-        return interfaceId == type(IHookTransferAuthorization).interfaceId;
-    }
-}
-
-/// @dev TWA-aware recording hook: records the authorizing keyHash + typed transfer fields the account
-///      forwards through the dedicated IHookTransferAuthorization callbacks.
-contract RecordingHook is IHookTransferAuthorization {
-    uint256 public preCount;
-    uint256 public postCount;
-    bytes32 public lastKeyHash;
-    address public lastToken;
-    address public lastTo;
-    uint256 public lastValue;
-    address public lastCaller;
-    bytes32 public lastPostRetHash;
-
-    function preTransferWithAuthorization(bytes32 keyHash, address token, address to, uint256 value, address caller)
-        external
-        payable
-        returns (bytes memory)
-    {
-        preCount++;
-        lastKeyHash = keyHash;
-        lastToken = token;
-        lastTo = to;
-        lastValue = value;
-        lastCaller = caller;
-        return abi.encode(keyHash, token, to, value, caller);
-    }
-
-    function postTransferWithAuthorization(bytes calldata preRet, address caller) external payable {
-        postCount++;
-        lastCaller = caller;
-        lastPostRetHash = keccak256(preRet);
-    }
-
-    function preCheck(Call[] calldata, address) external payable returns (bytes memory) {
-        return "";
-    }
-
-    function postCheck(bytes calldata, address) external payable {}
-
-    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
-        return interfaceId == type(IHookTransferAuthorization).interfaceId;
-    }
-}
-
-/// @dev A hook that implements the TWA callbacks but does NOT advertise the interface via ERC-165.
-///      Used to prove that a hook which fails the supportsInterface probe is skipped rather than invoked.
-contract NonAdvertisingHook is IHookTransferAuthorization {
-    uint256 public preCount;
-
-    function preTransferWithAuthorization(bytes32, address, address, uint256, address)
-        external
-        payable
-        returns (bytes memory)
-    {
-        preCount++;
-        return "";
-    }
-
-    function postTransferWithAuthorization(bytes calldata, address) external payable {}
-
-    function preCheck(Call[] calldata, address) external payable returns (bytes memory) {
-        return "";
-    }
-
-    function postCheck(bytes calldata, address) external payable {}
-
-    function supportsInterface(bytes4) external pure returns (bool) {
-        return false;
-    }
-}
-
-/// @dev Models a truly legacy hook: an execute-path IHook that predates TWA and does NOT implement
-///      `supportsInterface` at all. A raw `IERC165(hook).supportsInterface(...)` call would revert; the
-///      gas-capped `supportsERC165InterfaceUnchecked` probe must instead return false so TWA settlement
-///      proceeds without invoking (and without reverting on) this hook.
-contract LegacyHookNoErc165 is IHook {
-    uint256 public preCount;
-
-    function preCheck(Call[] calldata, address) external payable returns (bytes memory) {
-        preCount++;
-        return "";
-    }
-
-    function postCheck(bytes calldata, address) external payable {}
-}
 
 contract FalseReturnERC20 {
     mapping(address => uint256) public balanceOf;

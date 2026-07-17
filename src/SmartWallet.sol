@@ -9,15 +9,15 @@ import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
 import {NonceManager} from "./NonceManager.sol";
 import {ExecutionManager} from "./ExecutionManager.sol";
 import {
-    TransferWithAuthorization, 
-    ERC712, 
-    OwnerManager, 
+    TransferWithAuthorization,
+    ERC712,
+    OwnerManager,
     ValidationManager
 } from "./TransferWithAuthorization.sol";
 import {FallbackHandler} from "./FallbackHandler.sol";
 import {Call, BatchedCall, InitialOwner} from "./Types.sol";
 import {Static} from "./libraries/Static.sol";
-import {IHook} from "./interfaces/IHook.sol";
+import {HookLib} from "./libraries/HookLib.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {ERC4337Account} from "./ERC4337Account.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
@@ -148,8 +148,7 @@ abstract contract SmartWallet is
     /// @dev Reverts if any of the calls fail
     /// @param calls Array of Call structs containing destination address, value, and calldata
     function _batchCall(Call[] calldata calls, bytes32 keyHash) internal {
-        uint256 settings = _ownerSettings[keyHash];
-        address hookAddress = getHook(settings);
+        address hookAddress = getHook(_ownerSettings[pubKeyHash]);
 
         // Allow self-calls for EIP-7702 EOAs or admins
         // Built-in address(this) owner is treated as admin by default
@@ -157,10 +156,7 @@ abstract contract SmartWallet is
             keccak256(abi.encodePacked(address(this))) ||
             isAdmin(settings);
 
-        bytes memory ret;
-        if (hookAddress != address(0)) {
-            ret = IHook(hookAddress).preCheck(calls, msg.sender);
-        }
+        bytes memory ret = HookLib.preCheck(hookAddress, calls, msg.sender);
 
         for (uint256 i; i < calls.length; i++) {
             if (calls[i].target == address(this) && !allowSelfCall) {
@@ -169,10 +165,7 @@ abstract contract SmartWallet is
             _call(calls[i]);
         }
 
-        // Only call postCheck if hook exists
-        if (hookAddress != address(0)) {
-            IHook(hookAddress).postCheck(ret, msg.sender);
-        }
+        HookLib.postCheck(hookAddress, ret, msg.sender);
     }
 
     /// @notice Validates and extracts data for relayer execution
@@ -350,17 +343,29 @@ abstract contract SmartWallet is
                 MessageSignLib.hash(_hash, validUntil, IMPLEMENTATION)
             );
 
-            // Step 5: Validate the signature and return result
-            return
-                _validateSignature(
+            // Step 5: Cryptographic validation first (cheap fail-fast, before any hook staticcall).
+            if (
+                !_validateSignature(
                     validator,
                     pubKeyHash,
                     typedDataHash,
                     signature[38:]
                 )
-                    ? Static.MAGIC_VALUE
-                    : Static.INVALID_VALUE;
+            ) {
+                return Static.INVALID_VALUE;
+            }
+
+            // Step 6: Fail closed — if the signing key has a spending-policy hook, that hook MUST
+            //         advertise `IHook` and approve this EIP-1271 signature, otherwise it is rejected.
+            //         This stops a restricted key from using EIP-1271 (e.g. a Permit) as an escape
+            //         hatch around the policy its hook enforces on the execute / TWA paths.
+            address hookAddress = getHook(_ownerSettings[pubKeyHash]);
+            if (!HookLib.approvesSignature(hookAddress, msg.sender, _hash, signature)) {
+                return Static.INVALID_VALUE;
+            }
+            return Static.MAGIC_VALUE;
         }
+
         return Static.INVALID_VALUE;
     }
 

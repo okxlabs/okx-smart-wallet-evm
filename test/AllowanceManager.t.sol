@@ -286,6 +286,83 @@ contract AllowanceManagerTest is Base {
         );
     }
 
+    function test_TransferFromNative_InfiniteAllowance_NotDecremented() public {
+        // An infinite (type(uint256).max) allowance is NOT decremented on spend.
+        _approveNative(spender, type(uint256).max);
+        uint256 transferAmount = 5 ether;
+        uint256 initialBalance = recipient.balance;
+
+        vm.prank(spender);
+        bool success = aliceSmartWallet.transferFromNative(recipient, transferAmount);
+
+        assertTrue(success);
+        assertEq(recipient.balance, initialBalance + transferAmount);
+        assertEq(
+            aliceSmartWallet.getTokenAllowance(Static.NATIVE_ETH, spender),
+            type(uint256).max,
+            "infinite native allowance stays max"
+        );
+    }
+
+    function test_TransferFromToken_InfiniteAllowance_NotDecremented() public {
+        // An infinite (type(uint256).max) allowance is NOT decremented on spend.
+        _approveToken(address(mockToken), spender, type(uint256).max);
+        uint256 transferAmount = 10 * 10 ** 18;
+        uint256 initialBalance = mockToken.balanceOf(recipient);
+
+        vm.prank(spender);
+        bool success = aliceSmartWallet.transferFromToken(address(mockToken), recipient, transferAmount);
+
+        assertTrue(success);
+        assertEq(mockToken.balanceOf(recipient), initialBalance + transferAmount);
+        assertEq(
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
+            type(uint256).max,
+            "infinite token allowance stays max"
+        );
+    }
+
+    /// @dev Fuzz: a finite allowance is decremented by exactly the spent amount, and the recipient
+    ///      receives exactly that amount, for any valid (allowance, spend<=allowance) pair.
+    function testFuzz_TransferFromToken_DecrementsExactly(uint256 allowance, uint256 spend) public {
+        allowance = bound(allowance, 1, INITIAL_TOKEN_BALANCE);
+        spend = bound(spend, 1, allowance);
+        _approveToken(address(mockToken), spender, allowance);
+
+        uint256 recvBefore = mockToken.balanceOf(recipient);
+        vm.prank(spender);
+        aliceSmartWallet.transferFromToken(address(mockToken), recipient, spend);
+
+        assertEq(mockToken.balanceOf(recipient), recvBefore + spend, "recipient credited exactly");
+        assertEq(
+            aliceSmartWallet.getTokenAllowance(address(mockToken), spender),
+            allowance - spend,
+            "allowance decremented exactly"
+        );
+    }
+
+    /// @dev Fuzz: spending more than the allowance always reverts and moves nothing.
+    function testFuzz_TransferFromToken_OverspendReverts(uint256 allowance, uint256 spend) public {
+        allowance = bound(allowance, 0, INITIAL_TOKEN_BALANCE - 1);
+        spend = bound(spend, allowance + 1, INITIAL_TOKEN_BALANCE);
+        _approveToken(address(mockToken), spender, allowance);
+
+        uint256 recvBefore = mockToken.balanceOf(recipient);
+        vm.prank(spender);
+        vm.expectRevert(IAllowanceManager.TokenAllowanceExceeded.selector);
+        aliceSmartWallet.transferFromToken(address(mockToken), recipient, spend);
+
+        assertEq(mockToken.balanceOf(recipient), recvBefore, "no transfer on overspend");
+    }
+
+    function test_RevertWhen_TransferFromToken_NativeSentinel() public {
+        // transferFromToken must reject the native-ETH sentinel (that path is native-only).
+        _approveToken(Static.NATIVE_ETH, spender, 100 ether);
+        vm.prank(spender);
+        vm.expectRevert(IAllowanceManager.InvalidTokenForTransfer.selector);
+        aliceSmartWallet.transferFromToken(Static.NATIVE_ETH, recipient, 1 ether);
+    }
+
     function test_RevertWhen_TransferFromNative_InsufficientAllowance() public {
         uint256 allowanceAmount = 1 ether;
         uint256 transferAmount = 2 ether;

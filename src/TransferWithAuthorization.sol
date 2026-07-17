@@ -3,13 +3,12 @@ pragma solidity ^0.8.29;
 
 import {ITransferWithAuthorization} from "./interfaces/ITransferWithAuthorization.sol";
 import {ISmartWallet} from "./interfaces/ISmartWallet.sol";
-import {IHookTransferAuthorization} from "./interfaces/IHookTransferAuthorization.sol";
 import {OwnerManager} from "./OwnerManager.sol";
 import {ValidationManager} from "./ValidationManager.sol";
 import {ERC712} from "./ERC712.sol";
 import {Static} from "./libraries/Static.sol";
+import {HookLib} from "./libraries/HookLib.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ERC165Checker} from "@openzeppelin/contracts/utils/introspection/ERC165Checker.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
@@ -193,33 +192,18 @@ abstract contract TransferWithAuthorization is
     ///      path always carries empty calldata (constructed here, not caller-supplied), so targeting
     ///      address(this) is a plain ETH deposit with no privileged dispatch surface.
     ///
-    ///      The hook is invoked through the dedicated `IHookTransferAuthorization` callbacks, which pass
-    ///      the authorizing `keyHash` and the typed transfer fields (token / to / value) directly. The
-    ///      TWA path fails closed: if the key has a spending-policy hook configured, that hook MUST advertise
-    ///      `IHookTransferAuthorization` via ERC-165, otherwise settlement reverts with
-    ///      `HookNotTransferAuthorizationCompatible`. This keeps the TWA path symmetric with the execute
-    ///      path (which always runs a configured hook) — a key's spending policy can never be silently
-    ///      bypassed by routing through TWA. The probe is `ERC165Checker.supportsERC165InterfaceUnchecked`,
-    ///      a gas-capped staticcall that returns false (rather than reverting) for a hook that is not a
-    ///      contract or does not implement `supportsInterface`. This surface is intentionally distinct from
-    ///      the execute-path `IHook.preCheck`/`postCheck(Call[], executor)`.
+    ///      The hook is invoked through {HookLib}, which forwards the authorizing `keyHash` and the typed
+    ///      transfer fields (token / to / value) to the dedicated `IHookTransferAuthorization` callbacks.
+    ///      The TWA path fails closed: if the key has a spending-policy hook configured, that hook MUST
+    ///      advertise `IHookTransferAuthorization` via ERC-165, otherwise {HookLib.preTransferWithAuthorization}
+    ///      reverts `HookNotTransferAuthorizationCompatible`. This keeps the TWA path symmetric with the
+    ///      execute path — a key's spending policy can never be silently bypassed by routing through TWA.
     function _settleWithHook(bytes32 keyHash, address token, address to, uint256 value) private {
         address hookAddress = getHook(_ownerSettings[keyHash]);
         bool isNative = token == Static.NATIVE_ETH;
 
-        bytes memory ret;
-        if (hookAddress != address(0)) {
-            if (
-                !ERC165Checker.supportsERC165InterfaceUnchecked(
-                    hookAddress, type(IHookTransferAuthorization).interfaceId
-                )
-            ) {
-                revert HookNotTransferAuthorizationCompatible(keyHash, hookAddress);
-            }
-            ret = IHookTransferAuthorization(hookAddress).preTransferWithAuthorization(
-                keyHash, token, to, value, msg.sender
-            );
-        }
+        bytes memory ret =
+            HookLib.preTransferWithAuthorization(hookAddress, keyHash, token, to, value, msg.sender);
 
         if (isNative) {
             (bool ok, bytes memory returndata) = to.call{value: value}("");
@@ -232,9 +216,7 @@ abstract contract TransferWithAuthorization is
             IERC20(token).safeTransfer(to, value);
         }
 
-        if (hookAddress != address(0)) {
-            IHookTransferAuthorization(hookAddress).postTransferWithAuthorization(ret, msg.sender);
-        }
+        HookLib.postTransferWithAuthorization(hookAddress, ret, msg.sender);
     }
 
     /// @dev ERC-7201 storage accessor for the TWA authorization-nonce namespace.
