@@ -148,7 +148,8 @@ abstract contract SmartWallet is
     /// @dev Reverts if any of the calls fail
     /// @param calls Array of Call structs containing destination address, value, and calldata
     function _batchCall(Call[] calldata calls, bytes32 keyHash) internal {
-        address hookAddress = getHook(_ownerSettings[pubKeyHash]);
+        uint256 settings = _ownerSettings[keyHash];
+        address hookAddress = getHook(settings);
 
         // Allow self-calls for EIP-7702 EOAs or admins
         // Built-in address(this) owner is treated as admin by default
