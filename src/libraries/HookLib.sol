@@ -71,21 +71,26 @@ library HookLib {
         IHookTransferAuthorization(hook).postTransferWithAuthorization(preRet, caller);
     }
 
-    /// @notice EIP-1271 gate. Returns true when there is no hook to enforce (`hook == address(0)`).
-    ///         Otherwise fails closed: returns false unless the hook advertises `IHook` and returns true.
-    ///         A failed staticcall or a malformed/empty return is treated as rejection and never reverts
-    ///         the caller's `isValidSignature`.
-    /// @param hook The signing key's configured hook (`address(0)` ⇒ no hook, approves).
+    /// @notice EIP-1271 approval gate for the signing key's spending-policy hook. It mirrors the hook
+    ///         callback name per this library's wrap-and-name-alike convention (`preCheck`, `postCheck`,
+    ///         …), but it is NOT a raw forwarder: it DECIDES whether the 1271 signature is approved, and
+    ///         fails closed —
+    ///         - `hook == address(0)` ⇒ approved (the key has no policy to enforce);
+    ///         - otherwise the hook MUST advertise `IHook` via ERC-165 AND return `true` from
+    ///           `IHook.isValidSignatureCheck`, else the signature is rejected.
+    ///         A non-advertising hook, a failed staticcall, or an empty / wrong-length return are treated
+    ///         as rejection.
+    /// @param hook The signing key's configured hook (`address(0)` ⇒ no hook, approved).
     /// @param caller `msg.sender` of the `isValidSignature` call, forwarded to the hook.
     /// @param hash The 1271 message hash.
     /// @param signature The full 1271 signature envelope.
-    /// @return True if there is no hook, or the hook advertises `IHook` and explicitly approves.
-    function approvesSignature(
+    /// @return approved True iff there is no hook, or the hook advertises `IHook` and explicitly approves.
+    function isValidSignatureCheck(
         address hook,
         address caller,
         bytes32 hash,
         bytes calldata signature
-    ) internal view returns (bool) {
+    ) internal view returns (bool approved) {
         if (hook == address(0)) return true;
         if (!ERC165Checker.supportsERC165InterfaceUnchecked(hook, type(IHook).interfaceId)) {
             return false;

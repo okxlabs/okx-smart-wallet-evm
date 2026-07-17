@@ -361,7 +361,7 @@ abstract contract SmartWallet is
             //         This stops a restricted key from using EIP-1271 (e.g. a Permit) as an escape
             //         hatch around the policy its hook enforces on the execute / TWA paths.
             address hookAddress = getHook(_ownerSettings[pubKeyHash]);
-            if (!HookLib.approvesSignature(hookAddress, msg.sender, _hash, signature)) {
+            if (!HookLib.isValidSignatureCheck(hookAddress, msg.sender, _hash, signature)) {
                 return Static.INVALID_VALUE;
             }
             return Static.MAGIC_VALUE;
