@@ -23,4 +23,11 @@ interface IHook {
         bytes calldata preCheckRet,
         address executor
     ) external payable;
+
+    /// 
+    function isValidSignatureCheck(
+        address caller,       
+        bytes32 hash,          
+        bytes calldata signature 
+    ) external view returns (bool);
 }

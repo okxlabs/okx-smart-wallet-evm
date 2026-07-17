@@ -55,6 +55,36 @@ contract AdminPermissionsTest is Base {
         );
     }
 
+    // ============ Packed-settings getter tests ============
+
+    /// @dev Round-trips packSettings through the individual extractors (getHook / getExpiration / isAdmin)
+    ///      to lock the bit layout: [207-200 isAdmin][199-160 expiration][159-0 hook].
+    function test_PackSettings_GettersRoundTrip() public view {
+        OwnerManager om = OwnerManager(_aliceWallet);
+        address hook = address(0xBEEF);
+        uint40 expiration = 1_777_000_000;
+
+        uint256 adminPacked = om.packSettings(true, expiration, hook);
+        assertEq(om.getHook(adminPacked), hook, "hook");
+        assertEq(om.getExpiration(adminPacked), expiration, "expiration");
+        assertTrue(om.isAdmin(adminPacked), "admin flag set");
+
+        uint256 nonAdminPacked = om.packSettings(false, 0, address(0));
+        assertEq(om.getHook(nonAdminPacked), address(0), "no hook");
+        assertEq(om.getExpiration(nonAdminPacked), 0, "never expires");
+        assertFalse(om.isAdmin(nonAdminPacked), "admin flag clear");
+    }
+
+    /// @dev Fuzz the full settings domain to prove the packed bit layout is loss-less and non-overlapping:
+    ///      no field bleeds into another for ANY (admin, expiration, hook) triple.
+    function testFuzz_PackSettings_RoundTrip(bool admin_, uint40 expiration, address hook) public view {
+        OwnerManager om = OwnerManager(_aliceWallet);
+        uint256 packed = om.packSettings(admin_, expiration, hook);
+        assertEq(om.getHook(packed), hook, "hook recovers");
+        assertEq(om.getExpiration(packed), expiration, "expiration recovers");
+        assertEq(om.isAdmin(packed), admin_, "admin recovers");
+    }
+
     // ============ Self-Call Restriction Tests ============
 
     function test_RevertWhen_AddOwner_ByNonAdmin_SelfCall() public {

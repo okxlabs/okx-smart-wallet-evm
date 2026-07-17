@@ -10,8 +10,8 @@ import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {IOwnerManager} from "src/interfaces/IOwnerManager.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
-import {IHookTransferAuthorization} from "src/interfaces/IHookTransferAuthorization.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
+import {RecordingHook, RevertingHook} from "../mocks/Hooks.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
@@ -48,70 +48,6 @@ contract IntegrationFeeOnTransferERC20 {
         balanceOf[to] += amount - fee;
         balanceOf[feeSink] += fee;
         return true;
-    }
-}
-
-/// @dev Records the authorizing keyHash + typed fields a settle forwards to a per-key hook.
-contract IntegrationRecordingHook is IHookTransferAuthorization {
-    uint256 public preCount;
-    uint256 public postCount;
-    bytes32 public lastKeyHash;
-    address public lastToken;
-    address public lastTo;
-    uint256 public lastValue;
-    address public lastCaller;
-
-    function preTransferWithAuthorization(bytes32 keyHash, address token, address to, uint256 value, address caller)
-        external
-        payable
-        returns (bytes memory)
-    {
-        preCount++;
-        lastKeyHash = keyHash;
-        lastToken = token;
-        lastTo = to;
-        lastValue = value;
-        lastCaller = caller;
-        return abi.encode(keyHash, token, to, value, caller);
-    }
-
-    function postTransferWithAuthorization(bytes calldata, address) external payable {
-        postCount++;
-    }
-
-    function preCheck(Call[] calldata, address) external payable returns (bytes memory) {
-        return "";
-    }
-
-    function postCheck(bytes calldata, address) external payable {}
-
-    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
-        return interfaceId == type(IHookTransferAuthorization).interfaceId;
-    }
-}
-
-/// @dev A per-key hook that blocks every spend by reverting in the TWA pre-callback.
-contract IntegrationBlockingHook is IHookTransferAuthorization {
-    error PolicyBlocked();
-
-    function preTransferWithAuthorization(bytes32, address, address, uint256, address)
-        external
-        payable
-        returns (bytes memory)
-    {
-        revert PolicyBlocked();
-    }
-
-    function postTransferWithAuthorization(bytes calldata, address) external payable {}
-
-    function preCheck(Call[] calldata, address) external payable returns (bytes memory) {
-        return "";
-    }
-
-    function postCheck(bytes calldata, address) external payable {}
-
-    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
-        return interfaceId == type(IHookTransferAuthorization).interfaceId;
     }
 }
 
@@ -534,7 +470,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
 
         // register bob as a non-admin key constrained by a recording hook
-        IntegrationRecordingHook bobHook = new IntegrationRecordingHook();
+        RecordingHook bobHook = new RecordingHook();
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(bobHook));
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), settings);
@@ -748,7 +684,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
     function test_recovery_hookBlockThenRemoveHookThenRetrySameSignature() public {
         ITransferWithAuthorization itwa = ITransferWithAuthorization(_aliceWallet);
 
-        IntegrationBlockingHook blockingHook = new IntegrationBlockingHook();
+        RevertingHook blockingHook = new RevertingHook();
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
         uint256 blockedSettings = OwnerManager(_aliceWallet).packSettings(false, 0, address(blockingHook));
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), blockedSettings);
@@ -762,7 +698,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
 
         // blocked: no partial effect
         vm.prank(_relayerA);
-        vm.expectRevert(IntegrationBlockingHook.PolicyBlocked.selector);
+        vm.expectRevert(RevertingHook.HookBlocked.selector);
         itwa.executeTransferWithAuthorization(address(token), _charlie, value, VALID_AFTER, VALID_BEFORE, nonce, sig);
         assertFalse(itwa.transferAuthorizationState(nonce), "nonce unused after block");
         assertEq(token.balanceOf(_aliceWallet), accountBefore, "account unchanged after block");

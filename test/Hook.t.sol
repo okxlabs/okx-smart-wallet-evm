@@ -69,6 +69,10 @@ contract MockHook is IHook {
             );
         }
     }
+
+    function isValidSignatureCheck(address, bytes32, bytes calldata) external pure returns (bool) {
+        return true;
+    }
 }
 
 // Test hooks for different scenarios
