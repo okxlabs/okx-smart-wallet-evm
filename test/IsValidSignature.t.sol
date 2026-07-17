@@ -120,9 +120,9 @@ contract IsValidSignatureTest is Base {
     function test_IsValidSignature_HookMalformedReturn_ReturnsInvalidValueWithoutRevert() public {
         bytes32 bobKeyHash = _addBobWithHook(address(new MalformedSigHook()));
         bytes32 hash = keccak256("hook-malformed");
-        // Must NOT revert (ret.length != 32 is treated as rejection); returns the invalid sentinel.
+        // ret.length != 32 is treated as rejection; returns the invalid sentinel.
         bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(hash, _bobSignature(hash, bobKeyHash));
-        assertEq(result, Static.INVALID_VALUE, "malformed hook return -> invalid, no revert");
+        assertEq(result, Static.INVALID_VALUE, "malformed hook return -> invalid");
     }
 
     function test_IsValidSignature_Exactly32Bytes_ReturnsInvalidValue()
