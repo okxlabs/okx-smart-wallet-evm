@@ -449,7 +449,7 @@ contract ChainlessExecutionTest is Base {
         view
         returns (PackedUserOperation memory)
     {
-        uint256 adminSettings = SmartWallet(payable(testAccount)).packSettings(
+        uint256 adminSettings = _packSettings(
             true,
             0,
             address(0)
@@ -589,7 +589,7 @@ contract ChainlessExecutionTest is Base {
 
     function _addOwnerAsAdmin(bytes32 keyHash, address validator) internal {
         vm.prank(_alice);
-        uint256 adminSettings = SmartWallet(payable(testAccount)).packSettings(
+        uint256 adminSettings = _packSettings(
             true,
             0,
             address(0)

@@ -224,7 +224,7 @@ contract ValidateUserOpTest is Base {
                 OwnerManager.addOwner.selector,
                 bobKeyHash,
                 address(1),
-                OwnerManager(account).packSettings(false, 0, address(0))
+                _packSettings(false, 0, address(0))
             )
         });
 
@@ -1075,7 +1075,7 @@ contract ValidateUserOpTest is Base {
         vm.deal(account, 2 ether);
 
         // Create updateOwner call (make alice admin)
-        uint256 adminSettings = IOwnerManager(account).packSettings(
+        uint256 adminSettings = _packSettings(
             true,
             0,
             address(0)

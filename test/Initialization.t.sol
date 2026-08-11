@@ -61,10 +61,11 @@ contract InitializationTest is Base {
         bytes32 aliceKeyHash = _makeKeyHash(_alice);
         bytes32 bobKeyHash = _makeKeyHash(_bob);
 
-        (address aliceValidator, , , , ) = IOwnerManager(wallet)
-            .getOwnerSettings(aliceKeyHash);
+        address aliceValidator = IOwnerManager(wallet).getVerifiedValidator(
+            aliceKeyHash
+        );
         assertEq(aliceValidator, address(_ecdsaValidator));
-        (address bobValidator, , , , ) = IOwnerManager(wallet).getOwnerSettings(
+        address bobValidator = IOwnerManager(wallet).getVerifiedValidator(
             bobKeyHash
         );
         assertEq(bobValidator, address(_ecdsaValidator));

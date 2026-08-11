@@ -26,7 +26,7 @@ contract AdminPermissionsTest is Base {
 
         // Add admin user with admin privileges
         bytes32 adminKeyHash = keccak256(abi.encodePacked(adminUser));
-        uint256 adminSettings = OwnerManager(_aliceWallet).packSettings(
+        uint256 adminSettings = _packSettings(
             true, // isAdmin = true
             0,
             address(0)
@@ -41,7 +41,7 @@ contract AdminPermissionsTest is Base {
 
         // Add non-admin user without admin privileges
         bytes32 nonAdminKeyHash = keccak256(abi.encodePacked(nonAdminUser));
-        uint256 nonAdminSettings = OwnerManager(_aliceWallet).packSettings(
+        uint256 nonAdminSettings = _packSettings(
             false, // isAdmin = false
             0,
             address(0)
@@ -57,19 +57,19 @@ contract AdminPermissionsTest is Base {
 
     // ============ Packed-settings getter tests ============
 
-    /// @dev Round-trips packSettings through the individual extractors (getHook / getExpiration / isAdmin)
+    /// @dev Round-trips test-only packed settings through the individual extractors (getHook / getExpiration / isAdmin)
     ///      to lock the bit layout: [207-200 isAdmin][199-160 expiration][159-0 hook].
-    function test_PackSettings_GettersRoundTrip() public view {
+    function test_PackedSettings_GettersRoundTrip() public view {
         OwnerManager om = OwnerManager(_aliceWallet);
         address hook = address(0xBEEF);
         uint40 expiration = 1_777_000_000;
 
-        uint256 adminPacked = om.packSettings(true, expiration, hook);
+        uint256 adminPacked = _packSettings(true, expiration, hook);
         assertEq(om.getHook(adminPacked), hook, "hook");
         assertEq(om.getExpiration(adminPacked), expiration, "expiration");
         assertTrue(om.isAdmin(adminPacked), "admin flag set");
 
-        uint256 nonAdminPacked = om.packSettings(false, 0, address(0));
+        uint256 nonAdminPacked = _packSettings(false, 0, address(0));
         assertEq(om.getHook(nonAdminPacked), address(0), "no hook");
         assertEq(om.getExpiration(nonAdminPacked), 0, "never expires");
         assertFalse(om.isAdmin(nonAdminPacked), "admin flag clear");
@@ -77,9 +77,9 @@ contract AdminPermissionsTest is Base {
 
     /// @dev Fuzz the full settings domain to prove the packed bit layout is loss-less and non-overlapping:
     ///      no field bleeds into another for ANY (admin, expiration, hook) triple.
-    function testFuzz_PackSettings_RoundTrip(bool admin_, uint40 expiration, address hook) public view {
+    function testFuzz_PackedSettings_RoundTrip(bool admin_, uint40 expiration, address hook) public view {
         OwnerManager om = OwnerManager(_aliceWallet);
-        uint256 packed = om.packSettings(admin_, expiration, hook);
+        uint256 packed = _packSettings(admin_, expiration, hook);
         assertEq(om.getHook(packed), hook, "hook recovers");
         assertEq(om.getExpiration(packed), expiration, "expiration recovers");
         assertEq(om.isAdmin(packed), admin_, "admin recovers");
@@ -97,7 +97,7 @@ contract AdminPermissionsTest is Base {
                 OwnerManager.addOwner.selector,
                 keccak256("malicious"),
                 address(_ecdsaValidator),
-                IOwnerManager(_aliceWallet).packSettings(false, 0, address(0))
+                _packSettings(false, 0, address(0))
             )
         });
 
@@ -133,7 +133,7 @@ contract AdminPermissionsTest is Base {
                 OwnerManager.addOwner.selector,
                 keccak256("newValidator"),
                 address(_ecdsaValidator),
-                IOwnerManager(_aliceWallet).packSettings(false, 0, address(0))
+                _packSettings(false, 0, address(0))
             )
         });
 
@@ -211,7 +211,7 @@ contract AdminPermissionsTest is Base {
                 OwnerManager.addOwner.selector,
                 newValidatorKeyHash,
                 address(_ecdsaValidator),
-                IOwnerManager(_aliceWallet).packSettings(false, 0, address(0))
+                _packSettings(false, 0, address(0))
             )
         });
 
@@ -277,7 +277,7 @@ contract AdminPermissionsTest is Base {
         bytes32 nonAdminKeyHash = keccak256(abi.encodePacked(nonAdminUser));
 
         // Admin updates non-admin validator to have expiry
-        uint256 newSettings = IOwnerManager(_aliceWallet).packSettings(
+        uint256 newSettings = _packSettings(
             false,
             uint40(block.timestamp + 1 days),
             address(0)
@@ -315,8 +315,9 @@ contract AdminPermissionsTest is Base {
         );
 
         // Verify settings were updated
-        (, , uint40 expiration, , ) = IOwnerManager(_aliceWallet)
-            .getOwnerSettings(nonAdminKeyHash);
+        uint40 expiration = IOwnerManager(_aliceWallet).getExpiration(
+            IOwnerManager(_aliceWallet).getOwnerSettings(nonAdminKeyHash)
+        );
         assertGt(expiration, block.timestamp);
     }
 
@@ -334,7 +335,7 @@ contract AdminPermissionsTest is Base {
                 OwnerManager.updateOwner.selector,
                 adminKeyHash,
                 address(_ecdsaValidator),
-                IOwnerManager(_aliceWallet).packSettings(false, 0, address(0)) // isAdmin = false
+                _packSettings(false, 0, address(0)) // isAdmin = false
             )
         });
 
@@ -366,7 +367,7 @@ contract AdminPermissionsTest is Base {
                 OwnerManager.addOwner.selector,
                 keccak256("shouldFail"),
                 address(_ecdsaValidator),
-                IOwnerManager(_aliceWallet).packSettings(false, 0, address(0))
+                _packSettings(false, 0, address(0))
             )
         });
 
@@ -403,7 +404,7 @@ contract AdminPermissionsTest is Base {
                 OwnerManager.updateOwner.selector,
                 nonAdminKeyHash,
                 address(_ecdsaValidator),
-                IOwnerManager(_aliceWallet).packSettings(true, 0, address(0)) // isAdmin = true
+                _packSettings(true, 0, address(0)) // isAdmin = true
             )
         });
 
@@ -435,7 +436,7 @@ contract AdminPermissionsTest is Base {
                 OwnerManager.addOwner.selector,
                 keccak256("newAdminValidator"),
                 address(_ecdsaValidator),
-                IOwnerManager(_aliceWallet).packSettings(false, 0, address(0))
+                _packSettings(false, 0, address(0))
             )
         });
 
@@ -477,7 +478,7 @@ contract AdminPermissionsTest is Base {
                 OwnerManager.addOwner.selector,
                 keccak256("mixedValidator"),
                 address(_ecdsaValidator),
-                IOwnerManager(_aliceWallet).packSettings(false, 0, address(0))
+                _packSettings(false, 0, address(0))
             )
         });
 
@@ -519,7 +520,7 @@ contract AdminPermissionsTest is Base {
                 OwnerManager.addOwner.selector,
                 keccak256("shouldFailValidator"),
                 address(_ecdsaValidator),
-                IOwnerManager(_aliceWallet).packSettings(false, 0, address(0))
+                _packSettings(false, 0, address(0))
             )
         });
 
@@ -602,7 +603,7 @@ contract AdminPermissionsTest is Base {
         uint256 baseTime = block.timestamp;
 
         // Case 1: Never expires (expiration = 0)
-        uint256 neverExpiresSettings = OwnerManager(_aliceWallet).packSettings(
+        uint256 neverExpiresSettings = _packSettings(
             true,
             0,
             address(0)
@@ -614,7 +615,7 @@ contract AdminPermissionsTest is Base {
 
         // Case 2: Future expiration (not expired)
         uint40 futureTime = uint40(baseTime + 500);
-        uint256 futureSettings = OwnerManager(_aliceWallet).packSettings(
+        uint256 futureSettings = _packSettings(
             false,
             futureTime,
             address(0)
@@ -626,7 +627,7 @@ contract AdminPermissionsTest is Base {
 
         // Case 3: Current timestamp (not expired - boundary case)
         uint40 currentTime = uint40(baseTime);
-        uint256 currentSettings = OwnerManager(_aliceWallet).packSettings(
+        uint256 currentSettings = _packSettings(
             true,
             currentTime,
             address(0)
@@ -638,7 +639,7 @@ contract AdminPermissionsTest is Base {
 
         // Case 4: Past expiration (expired)
         uint40 pastTime = uint40(baseTime - 1);
-        uint256 pastSettings = OwnerManager(_aliceWallet).packSettings(
+        uint256 pastSettings = _packSettings(
             false,
             pastTime,
             address(0)
@@ -650,7 +651,7 @@ contract AdminPermissionsTest is Base {
 
         // Case 5: Time warp test - transition from not expired to expired
         uint40 targetTime = uint40(baseTime + 100);
-        uint256 warpSettings = OwnerManager(_aliceWallet).packSettings(
+        uint256 warpSettings = _packSettings(
             true,
             targetTime,
             address(0)

@@ -98,7 +98,7 @@ contract ERC7702Test is Base {
         emit ExecuteSuccessEvent(CallLib.hash(calls), eoaWallet);
         ISmartWallet(eoaWallet).execute(calls);
 
-        (address validator, , , , ) = IOwnerManager(eoaWallet).getOwnerSettings(
+        address validator = IOwnerManager(eoaWallet).getVerifiedValidator(
             newOwnerKeyHash
         );
         assertEq(
