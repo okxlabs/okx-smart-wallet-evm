@@ -77,8 +77,7 @@ abstract contract SmartWallet is
         InitialOwner[] calldata initialOwners
     ) external initializer onlyFactory {
         // Set up initial owners
-        // isAdmin = true, expiration = 0 (never expires), hook = address(0)
-        uint256 settings = packSettings(true, 0, address(0));
+        uint256 settings = Static.ROOT_KEY_SETTINGS;
         uint256 len = initialOwners.length;
         if (len == 0) {
             revert InitialOwnersLengthIsZero();
@@ -148,19 +147,20 @@ abstract contract SmartWallet is
     /// @dev Reverts if any of the calls fail
     /// @param calls Array of Call structs containing destination address, value, and calldata
     function _batchCall(Call[] calldata calls, bytes32 keyHash) internal {
-        uint256 settings = _ownerSettings[keyHash];
-        address hookAddress = getHook(settings);
+        uint256 settings = getOwnerSettings(keyHash);
+        if (isSettingsExpired(settings)) {
+            revert ISmartWallet.InvalidKeyHash(keyHash);
+        }
 
-        // Allow self-calls for EIP-7702 EOAs or admins
-        // Built-in address(this) owner is treated as admin by default
-        bool allowSelfCall = keyHash ==
-            keccak256(abi.encodePacked(address(this))) ||
-            isAdmin(settings);
+        address hookAddress = getHook(settings);
+        bool canSelfCall = isAdmin(settings);
 
         bytes memory ret = HookLib.preCheck(hookAddress, calls, msg.sender);
 
+        // Allow self-calls for EIP-7702 EOAs or admins
+        // Built-in address(this) owner is treated as admin by default
         for (uint256 i; i < calls.length; i++) {
-            if (calls[i].target == address(this) && !allowSelfCall) {
+            if (calls[i].target == address(this) && !canSelfCall) {
                 revert ISmartWallet.NonAdminSelfCall();
             }
             _call(calls[i]);
@@ -360,7 +360,7 @@ abstract contract SmartWallet is
             //         advertise `IHook` and approve this EIP-1271 signature, otherwise it is rejected.
             //         This stops a restricted key from using EIP-1271 (e.g. a Permit) as an escape
             //         hatch around the policy its hook enforces on the execute / TWA paths.
-            address hookAddress = getHook(_ownerSettings[pubKeyHash]);
+            address hookAddress = getHook(getOwnerSettings(pubKeyHash));
             if (!HookLib.isValidSignatureCheck(hookAddress, msg.sender, _hash, signature)) {
                 return Static.INVALID_VALUE;
             }

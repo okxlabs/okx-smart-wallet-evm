@@ -426,10 +426,16 @@ contract Base is Test {
         return _constructUserOpSignature(userOp, signer, privateKey, userOpHash, uint48(0), wallet);
     }
 
+    /// @dev Test-only encoder for OwnerManager's packed settings layout.
+    ///      Production callers should construct the packed value off-chain.
+    function _packSettings(bool adminFlag, uint40 expiration, address hook) internal pure returns (uint256) {
+        return (adminFlag ? Static.ROOT_KEY_SETTINGS : 0) | (uint256(expiration) << 160) | uint256(uint160(hook));
+    }
+
     // Helper function for tests to check if a signer is admin
     function _isSignerAdmin(address wallet, bytes32 keyHash) internal view returns (bool) {
-        (,,, bool adminStatus,) = IOwnerManager(wallet).getOwnerSettings(keyHash);
-        return adminStatus;
+        IOwnerManager manager = IOwnerManager(wallet);
+        return manager.isAdmin(manager.getOwnerSettings(keyHash));
     }
 
     // Helper function to test validateUserOp from EntryPoint's perspective
@@ -458,14 +464,14 @@ contract Base is Test {
 
     // Helper function for tests to check if a signer is expired
     function _isSignerExpired(address wallet, bytes32 keyHash) internal view returns (bool) {
-        (,,,, bool expired) = IOwnerManager(wallet).getOwnerSettings(keyHash);
-        return expired;
+        IOwnerManager manager = IOwnerManager(wallet);
+        return manager.hasOwner(keyHash) && manager.getVerifiedValidator(keyHash) == address(0);
     }
 
     // Helper function for tests to get signer expiration
     function _getSignerExpiration(address wallet, bytes32 keyHash) internal view returns (uint40) {
-        (,, uint40 expiration,,) = IOwnerManager(wallet).getOwnerSettings(keyHash);
-        return expiration;
+        IOwnerManager manager = IOwnerManager(wallet);
+        return manager.getExpiration(manager.getOwnerSettings(keyHash));
     }
 
     // Helper function to call removeValidator through executeWithRelayer

@@ -592,7 +592,7 @@ contract TransferWithAuthorizationTest is Base {
     function test_hookInvoked_blocksSettle_and_nonceUnconsumed() public {
         RevertingHook hook = new RevertingHook();
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(hook)); // non-admin, TWA hook advertised via ERC-165
+        uint256 settings = _packSettings(false, 0, address(hook)); // non-admin, TWA hook advertised via ERC-165
 
         // Register bob as a hook-constrained, externally-validated key (admin alice authorizes via execute).
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), settings);
@@ -614,7 +614,7 @@ contract TransferWithAuthorizationTest is Base {
     function test_recordingHookReceivesErc20FieldsAndKeyHash() public {
         RecordingHook hook = new RecordingHook();
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(hook));
+        uint256 settings = _packSettings(false, 0, address(hook));
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), settings);
 
         bytes32 nonce = keccak256("hook-record-erc20");
@@ -641,7 +641,7 @@ contract TransferWithAuthorizationTest is Base {
     function test_recordingHookReceivesNativeFieldsAndKeyHash() public {
         RecordingHook hook = new RecordingHook();
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(hook));
+        uint256 settings = _packSettings(false, 0, address(hook));
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), settings);
 
         bytes32 nonce = keccak256("hook-record-native");
@@ -667,7 +667,7 @@ contract TransferWithAuthorizationTest is Base {
     function test_legacyHookWithoutErc165_reverts_failClosed() public {
         LegacyHookNoErc165 hook = new LegacyHookNoErc165();
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(hook));
+        uint256 settings = _packSettings(false, 0, address(hook));
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), settings);
 
         bytes32 nonce = keccak256("hook-legacy-fail-closed");
@@ -696,7 +696,7 @@ contract TransferWithAuthorizationTest is Base {
     function test_interfaceNotAdvertised_reverts_failClosed() public {
         NonAdvertisingHook hook = new NonAdvertisingHook();
         bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(hook));
+        uint256 settings = _packSettings(false, 0, address(hook));
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), settings);
 
         bytes32 nonce = keccak256("hook-no-iface-fail-closed");
@@ -726,7 +726,7 @@ contract TransferWithAuthorizationTest is Base {
             _aliceWallet,
             bobKeyHash,
             address(_ecdsaValidator),
-            OwnerManager(_aliceWallet).packSettings(false, 0, address(0))
+            _packSettings(false, 0, address(0))
         );
 
         bytes32 nonce = keccak256("non-admin-native-self");
@@ -761,7 +761,7 @@ contract TransferWithAuthorizationTest is Base {
             _aliceWallet,
             bobKeyHash,
             address(_ecdsaValidator),
-            OwnerManager(_aliceWallet).packSettings(false, 0, address(0))
+            _packSettings(false, 0, address(0))
         );
 
         bytes32 nonce = keccak256("external-token-self-recipient");

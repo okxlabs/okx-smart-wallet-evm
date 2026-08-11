@@ -78,7 +78,7 @@ contract SmartWalletUpgradeTest is Base {
     function test_UpgradeToAndCall_PreservesOwnersThroughRelayer_Success() public {
         // Add an additional owner before upgrade
         bytes32 bobKeyHash = _makeKeyHash(_bob);
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(true, 0, address(0));
+        uint256 settings = _packSettings(true, 0, address(0));
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), settings);
         
         // Create upgrade call
@@ -197,7 +197,7 @@ contract SmartWalletUpgradeTest is Base {
     function test_RevertWhen_NonAdminOwner_UpgradeThroughRelayer() public {
         // Add bob as a non-admin owner
         bytes32 bobKeyHash = _makeKeyHash(_bob);
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(false, 0, address(0));
+        uint256 settings = _packSettings(false, 0, address(0));
         _addOwnerToAccount(_alice, _aliceWallet, bobKeyHash, address(_ecdsaValidator), settings);
         
         // Bob (non-admin) tries to upgrade through executeWithRelayer

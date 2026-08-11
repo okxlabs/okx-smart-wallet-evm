@@ -34,7 +34,7 @@ contract IsValidSignatureTest is Base {
         );
 
         // Add PasskeyValidator for Alice's wallet
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings = _packSettings(
             true,
             0,
             address(0)
@@ -85,7 +85,7 @@ contract IsValidSignatureTest is Base {
             _aliceWallet,
             bobKeyHash,
             Static.ECDSA_VALIDATOR_ADDRESS,
-            OwnerManager(_aliceWallet).packSettings(false, 0, hook)
+            _packSettings(false, 0, hook)
         );
     }
 
@@ -573,7 +573,7 @@ contract IsValidSignatureTest is Base {
         // Add validator using _bob to avoid EIP-7702 fallback collision
         bytes32 bobKeyHash = _makeKeyHash(_bob);
 
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings = _packSettings(
             false,
             0, // No expiry in storage
             address(0)
@@ -682,7 +682,7 @@ contract IsValidSignatureTest is Base {
         uint256 testPubY = 987654321;
         bytes32 passkeyKeyHash = keccak256(abi.encode([testPubX, testPubY]));
 
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings = _packSettings(
             true,
             0,
             address(0)
@@ -785,7 +785,7 @@ contract IsValidSignatureTest is Base {
         bytes32 passkeyKeyHash = keccak256(abi.encode([testPubX, testPubY]));
         uint40 expiry = uint40(block.timestamp + 1 days);
 
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings = _packSettings(
             false,
             expiry,
             address(0)

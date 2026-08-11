@@ -55,7 +55,7 @@ contract ExecutionTest is Base {
 
         // Add user as validator for complex tests
         bytes32 userKeyHash = keccak256(abi.encodePacked(user));
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings = _packSettings(
             false, // adminFlag
             0, // expiration
             address(0) // hook
@@ -911,8 +911,9 @@ contract ExecutionTest is Base {
         );
 
         // Verify the new owner was added
-        (address validator, , , , ) = IOwnerManager(_aliceWallet)
-            .getOwnerSettings(newOwnerKeyHash);
+        address validator = IOwnerManager(_aliceWallet).getVerifiedValidator(
+            newOwnerKeyHash
+        );
         assertEq(
             validator,
             address(_ecdsaValidator),

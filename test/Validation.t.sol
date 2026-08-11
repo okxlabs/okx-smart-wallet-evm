@@ -238,7 +238,7 @@ contract ValidationTest is Base {
         bytes32 bobKeyHash = _makeKeyHash(_bob);
         uint40 expiry = uint40(block.timestamp + 1 days);
 
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings = _packSettings(
             false,
             expiry,
             address(0)
@@ -275,7 +275,7 @@ contract ValidationTest is Base {
         bytes32 bobKeyHash = _makeKeyHash(_bob);
         uint40 expiry = uint40(block.timestamp + 7 days);
 
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings = _packSettings(
             false,
             expiry,
             address(0)
@@ -773,7 +773,7 @@ contract ValidationTest is Base {
     {
         // Create addOwner call
         bytes32 newOwnerKeyHash = _makeKeyHash(_bob);
-        uint256 newOwnerSettings = OwnerManager(_aliceWallet).packSettings(
+        uint256 newOwnerSettings = _packSettings(
             false,
             0,
             address(0)
@@ -824,7 +824,7 @@ contract ValidationTest is Base {
     {
         // First add an owner to update
         bytes32 ownerKeyHash = _makeKeyHash(_bob);
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings = _packSettings(
             false,
             0,
             address(0)
@@ -838,7 +838,7 @@ contract ValidationTest is Base {
         );
 
         // Create updateOwner call
-        uint256 newSettings = IOwnerManager(_aliceWallet).packSettings(
+        uint256 newSettings = _packSettings(
             true, // Make admin
             uint40(block.timestamp + 1 days), // Set expiry
             address(0) // No hook
@@ -888,7 +888,7 @@ contract ValidationTest is Base {
     {
         // First add an owner to remove
         bytes32 ownerKeyHash = _makeKeyHash(_bob);
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings = _packSettings(
             false,
             0,
             address(0)
@@ -996,7 +996,7 @@ contract ValidationTest is Base {
 
         // updateOwner call (NOT supported for chainless)
         bytes32 aliceKeyHash = _makeKeyHash(_alice);
-        uint256 adminSettings = IOwnerManager(_aliceWallet).packSettings(
+        uint256 adminSettings = _packSettings(
             true, // Make admin
             0, // No expiry
             address(0) // No hook
@@ -1101,7 +1101,7 @@ contract ValidationTest is Base {
         bytes32 aliceKeyHash = _makeKeyHash(_alice);
 
         // First add an owner that we can later remove
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings = _packSettings(
             false,
             0,
             address(0)
@@ -1130,7 +1130,7 @@ contract ValidationTest is Base {
         });
 
         // 2. updateOwner call (NOT supported for chainless)
-        uint256 adminSettings = IOwnerManager(_aliceWallet).packSettings(
+        uint256 adminSettings = _packSettings(
             true,
             0,
             address(0)

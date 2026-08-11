@@ -15,7 +15,7 @@ interface IOwnerManager {
     /// @notice Add an owner to the wallet
     /// @param keyHash The public key hash to associate with this validator
     /// @param validator The address of the validator contract to be registered
-    /// @param settings Packed settings value (use packSettings to create)
+    /// @param settings Packed settings value
     function addOwner(
         bytes32 keyHash,
         address validator,
@@ -25,7 +25,7 @@ interface IOwnerManager {
     /// @notice Update an owner to the wallet
     /// @param keyHash The public key hash to associate with this validator
     /// @param newValidator The address of the validator contract to be registered
-    /// @param newSettings Packed settings value (use packSettings to create)
+    /// @param newSettings Packed settings value
     function updateOwner(
         bytes32 keyHash,
         address newValidator,
@@ -64,26 +64,13 @@ interface IOwnerManager {
     /// @return True if the keyHash is a registered owner, false otherwise
     function hasOwner(bytes32 keyHash) external view returns (bool);
 
-    // Validator settings query functions
-    /// @notice Get comprehensive validator settings including hook, expiration, and admin status
-    /// @param keyHash The public key hash to query
-    /// @return validator The validator address
-    /// @return hook The hook address (address(0) if no hook)
-    /// @return expiration Unix timestamp when validator expires (0 = never expires)
-    /// @return adminStatus Whether this validator has admin privileges
-    /// @return expired Whether the validator is currently expired
+    /// @notice Get packed settings for a registered owner
+    /// @dev Returns root-key settings for the built-in EIP-7702 owner and reverts for missing owners. Expired owners remain readable.
+    /// @param keyHash The owner key hash to query
+    /// @return settings The owner's packed settings
     function getOwnerSettings(
         bytes32 keyHash
-    )
-        external
-        view
-        returns (
-            address validator,
-            address hook,
-            uint40 expiration,
-            bool adminStatus,
-            bool expired
-        );
+    ) external view returns (uint256 settings);
 
     // Settings utility functions
     /// @notice Extract hook address from packed settings (bits 0-159)
@@ -105,15 +92,4 @@ interface IOwnerManager {
     /// @param settings Packed settings value
     /// @return True if settings are expired (expiration != 0 and < block.timestamp)
     function isSettingsExpired(uint256 settings) external view returns (bool);
-
-    /// @notice Pack settings into uint256
-    /// @param adminFlag Admin flag
-    /// @param expiration Unix timestamp (0 = never expires)
-    /// @param hook Hook address (address(0) = no hook)
-    /// @return Packed settings value
-    function packSettings(
-        bool adminFlag,
-        uint40 expiration,
-        address hook
-    ) external pure returns (uint256);
 }
