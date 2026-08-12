@@ -29,7 +29,7 @@ contract InitializationAuthTest is Base {
         address wallet = factory.createAccount(initialOwners, 123);
 
         // Verify owner was set correctly
-        address validator = IOwnerManager(wallet).getVerifiedValidator(
+        (address validator, ) = IOwnerManager(wallet).getOwnerConfig(
             _makeKeyHash(_alice)
         );
         assertEq(validator, address(_ecdsaValidator));
@@ -113,7 +113,7 @@ contract InitializationAuthTest is Base {
         ISmartWallet(wallet).initialize(initialOwners);
 
         // Verify initialization succeeded
-        address validator4 = IOwnerManager(wallet).getVerifiedValidator(
+        (address validator4, ) = IOwnerManager(wallet).getOwnerConfig(
             _makeKeyHash(_alice)
         );
         assertEq(validator4, address(_ecdsaValidator));
@@ -178,7 +178,7 @@ contract InitializationAuthTest is Base {
         ISmartWallet(wallet).initialize(legitOwners);
 
         // Verify legitimate owner was set
-        address validator5 = IOwnerManager(wallet).getVerifiedValidator(
+        (address validator5, ) = IOwnerManager(wallet).getOwnerConfig(
             _makeKeyHash(_alice)
         );
         assertEq(validator5, address(_ecdsaValidator));

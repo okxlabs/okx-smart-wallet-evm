@@ -36,14 +36,16 @@ interface IOwnerManager {
     /// @param keyHash The public key hash to associate with this validator
     function removeOwner(bytes32 keyHash) external;
 
-    /// @notice Get the verified validator for a given keyHash
-    /// @dev For EIP-7702 compatibility, address(this) ALWAYS returns ECDSA validator and cannot be overridden.
-    ///      The built-in address(this) owner is immutable and ignores any settings in ownerValidators or ownerSettings.
-    /// @param keyHash The public key hash to associate with this validator
-    /// @return Address of the verified validator
-    function getVerifiedValidator(
+    /// @notice Returns the active validator and packed settings for a keyHash
+    /// @dev For EIP-7702 compatibility, the root key always returns the built-in
+    ///      ECDSA validator and root-key settings. Missing or expired owners return
+    ///      address(0) as validator.
+    /// @param keyHash The owner key hash to query
+    /// @return validator The active validator, or address(0) if missing or expired
+    /// @return settings The owner's packed settings
+    function getOwnerConfig(
         bytes32 keyHash
-    ) external view returns (address);
+    ) external view returns (address validator, uint256 settings);
 
     // Validator enumeration functions
     /// @notice Returns the total number of owners registered in the wallet
@@ -63,14 +65,6 @@ interface IOwnerManager {
     /// @param keyHash The keyHash to check
     /// @return True if the keyHash is a registered owner, false otherwise
     function hasOwner(bytes32 keyHash) external view returns (bool);
-
-    /// @notice Get packed settings for a registered owner
-    /// @dev Returns root-key settings for the built-in EIP-7702 owner and reverts for missing owners. Expired owners remain readable.
-    /// @param keyHash The owner key hash to query
-    /// @return settings The owner's packed settings
-    function getOwnerSettings(
-        bytes32 keyHash
-    ) external view returns (uint256 settings);
 
     // Settings utility functions
     /// @notice Extract hook address from packed settings (bits 0-159)

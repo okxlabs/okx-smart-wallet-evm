@@ -129,17 +129,19 @@ abstract contract TransferWithAuthorization is
     /// @param structHash The EIP-712 struct hash being authorized.
     /// @param signature The `keyHash(32) || ownerSignature` envelope.
     /// @return keyHash The verified signing key hash, used downstream to select the spending-policy hook.
+    /// @return settings The verified signing key's packed settings.
     function _verifyTwaSignature(bytes32 structHash, bytes calldata signature)
         internal
         view
-        returns (bytes32 keyHash)
+        returns (bytes32 keyHash, uint256 settings)
     {
         if (signature.length < SIGNATURE_ENVELOPE_MIN_LENGTH) {
             revert ISmartWallet.InvalidSignature();
         }
 
         keyHash = bytes32(signature[:SIGNATURE_ENVELOPE_MIN_LENGTH]);
-        address validator = getVerifiedValidator(keyHash);
+        address validator;
+        (validator, settings) = getOwnerConfig(keyHash);
         if (validator == address(0)) revert ISmartWallet.InvalidSignature();
 
         bytes32 digest = hashTypedData(structHash);
@@ -176,12 +178,15 @@ abstract contract TransferWithAuthorization is
         bytes32 structHash = keccak256(
             abi.encode(typeHash, token, address(this), to, value, validAfter, validBefore, authorizationNonce)
         );
-        bytes32 keyHash = _verifyTwaSignature(structHash, signature);
+        (bytes32 keyHash, uint256 settings) = _verifyTwaSignature(
+            structHash,
+            signature
+        );
 
         // Effect before interaction: a later revert rolls this write back, leaving the nonce unused.
         $.authorizationStates[authorizationNonce] = true;
 
-        _settleWithHook(keyHash, token, to, value);
+        _settleWithHook(keyHash, settings, token, to, value);
 
         emit TransferAuthorizationUsed(token, address(this), to, value, authorizationNonce);
     }
@@ -198,8 +203,14 @@ abstract contract TransferWithAuthorization is
     ///      advertise `IHookTransferAuthorization` via ERC-165, otherwise {HookLib.preTransferWithAuthorization}
     ///      reverts `HookNotTransferAuthorizationCompatible`. This keeps the TWA path symmetric with the
     ///      execute path — a key's spending policy can never be silently bypassed by routing through TWA.
-    function _settleWithHook(bytes32 keyHash, address token, address to, uint256 value) private {
-        address hookAddress = getHook(_ownerSettings[keyHash]);
+    function _settleWithHook(
+        bytes32 keyHash,
+        uint256 settings,
+        address token,
+        address to,
+        uint256 value
+    ) private {
+        address hookAddress = getHook(settings);
         bool isNative = token == Static.NATIVE_ETH;
 
         bytes memory ret =

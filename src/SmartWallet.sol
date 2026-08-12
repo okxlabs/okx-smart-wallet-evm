@@ -57,17 +57,6 @@ abstract contract SmartWallet is
         _disableInitializers();
     }
 
-    modifier onlyOwner() {
-        bytes32 keyHash = keccak256(abi.encodePacked(msg.sender));
-        address validator = getVerifiedValidator(keyHash);
-
-        if (validator == address(0)) {
-            revert ISmartWallet.InvalidCaller(msg.sender);
-        }
-
-        _;
-    }
-
     /// @notice Initializes the smart wallet with initial owners
     /// @dev Can only be called by factory during deployment. For EIP-7702 scenarios,
     ///      use execute/executeWithRelayer to add owners after delegation
@@ -94,8 +83,13 @@ abstract contract SmartWallet is
     /// @notice Executes multiple contract calls in a single transaction
     /// @dev Only callable by the account owner
     /// @param calls Array of Call structs containing destination address, value, and calldata
-    function execute(Call[] calldata calls) external onlyOwner {
-        _batchCall(calls, keccak256(abi.encodePacked(msg.sender)));
+    function execute(Call[] calldata calls) external {
+        bytes32 keyHash = keccak256(abi.encodePacked(msg.sender));
+        (address validator, uint256 settings) = getOwnerConfig(keyHash);
+        if (validator == address(0)) {
+            revert ISmartWallet.InvalidCaller(msg.sender);
+        }
+        _batchCall(calls, settings);
         emit ExecuteSuccessEvent(CallLib.hash(calls), msg.sender);
     }
 
@@ -114,9 +108,14 @@ abstract contract SmartWallet is
             userOp.signature
         );
 
+        (address validator, uint256 settings) = getOwnerConfig(keyHash);
+        if (validator == address(0)) {
+            revert ISmartWallet.InvalidKeyHash(keyHash);
+        }
+
         Call[] calldata calls = DecodeLib.decodeCalls(userOp.callData[4:]);
 
-        _batchCall(calls, keyHash);
+        _batchCall(calls, settings);
     }
 
     /// @notice Executes a validated call and subsequent batch of user's calls sent by a relayer
@@ -128,12 +127,12 @@ abstract contract SmartWallet is
         BatchedCall calldata batchedCall,
         bytes calldata validatorData
     ) external {
-        (bytes32 pubKeyHash, bytes32 dataHash) = _validateAndExtractRelayerData(
+        (uint256 settings, bytes32 dataHash) = _validateAndExtractRelayerData(
             batchedCall,
             validatorData
         );
 
-        _batchCall(batchedCall.calls, pubKeyHash);
+        _batchCall(batchedCall.calls, settings);
 
         emit RelayerExecuteSuccessEvent(
             dataHash,
@@ -145,12 +144,7 @@ abstract contract SmartWallet is
     /// @notice Executes multiple contract calls in a single transaction
     /// @dev Reverts if any of the calls fail
     /// @param calls Array of Call structs containing destination address, value, and calldata
-    function _batchCall(Call[] calldata calls, bytes32 keyHash) internal {
-        uint256 settings = getOwnerSettings(keyHash);
-        if (isSettingsExpired(settings)) {
-            revert ISmartWallet.InvalidKeyHash(keyHash);
-        }
-
+    function _batchCall(Call[] calldata calls, uint256 settings) internal {
         address hookAddress = getHook(settings);
         bool canSelfCall = isAdmin(settings);
 
@@ -172,12 +166,12 @@ abstract contract SmartWallet is
     /// @dev Comprehensive validation function for executeWithRelayer
     /// @param batchedCall The batched call data
     /// @param validatorData The validator data containing pubKeyHash, validUntil, and signature
-    /// @return pubKeyHash The extracted public key hash
+    /// @return settings The verified owner's packed settings
     /// @return dataHash The computed data hash for event emission
     function _validateAndExtractRelayerData(
         BatchedCall calldata batchedCall,
         bytes calldata validatorData
-    ) internal returns (bytes32 pubKeyHash, bytes32 dataHash) {
+    ) internal returns (uint256 settings, bytes32 dataHash) {
         // Step 1: Validate and consume nonce
         if (!validateAndUpdateNonce(batchedCall.nonce))
             revert ISmartWallet.InvalidNonce(batchedCall.nonce);
@@ -190,8 +184,7 @@ abstract contract SmartWallet is
             );
         }
         // Step 2: Extract validation components from validatorData
-        uint48 validUntil;
-        (pubKeyHash, validUntil) = DecodeLib.decodeSignatureComponents(
+        (bytes32 pubKeyHash, uint48 validUntil) = DecodeLib.decodeSignatureComponents(
             validatorData
         );
 
@@ -200,9 +193,11 @@ abstract contract SmartWallet is
             revert ISmartWallet.ExpiryPassed(validUntil);
 
         // Step 4: Verify validator exists and is not expired
-        address validator = getVerifiedValidator(pubKeyHash);
-        if (validator == address(0))
+        address validator;
+        (validator, settings) = getOwnerConfig(pubKeyHash);
+        if (validator == address(0)) {
             revert ISmartWallet.InvalidKeyHash(pubKeyHash);
+        }
 
         // Step 5: Compute the data hash based on nonce type
         bytes32 intentHash = batchedCall.hash(validUntil, IMPLEMENTATION);
@@ -267,7 +262,7 @@ abstract contract SmartWallet is
             .decodeSignatureComponents(userOp.signature);
 
         // Step 4: Verify validator exists and is not expired
-        address validator = getVerifiedValidator(pubKeyHash);
+        (address validator, ) = getOwnerConfig(pubKeyHash);
         if (validator == address(0)) return Static.SIG_VALIDATION_FAILED;
 
         // Step 5: Handle chainless execution if applicable
@@ -347,7 +342,7 @@ abstract contract SmartWallet is
             if (_isExpired(validUntil)) return Static.INVALID_VALUE;
 
             // Step 3: Get and verify validator exists
-            address validator = getVerifiedValidator(pubKeyHash);
+            (address validator, uint256 settings) = getOwnerConfig(pubKeyHash);
             if (validator == address(0)) return Static.INVALID_VALUE;
 
             // Step 4: Hash the message with EIP-712 standard
@@ -371,7 +366,7 @@ abstract contract SmartWallet is
             //         advertise `IHook` and approve this EIP-1271 signature, otherwise it is rejected.
             //         This stops a restricted key from using EIP-1271 (e.g. a Permit) as an escape
             //         hatch around the policy its hook enforces on the execute / TWA paths.
-            address hookAddress = getHook(getOwnerSettings(pubKeyHash));
+            address hookAddress = getHook(settings);
             if (!HookLib.isValidSignatureCheck(hookAddress, msg.sender, _hash, signature)) {
                 return Static.INVALID_VALUE;
             }

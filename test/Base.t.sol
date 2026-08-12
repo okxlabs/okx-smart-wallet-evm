@@ -461,7 +461,8 @@ contract Base is Test {
     // Helper function for tests to check if a signer is admin
     function _isSignerAdmin(address wallet, bytes32 keyHash) internal view returns (bool) {
         IOwnerManager manager = IOwnerManager(wallet);
-        return manager.isAdmin(manager.getOwnerSettings(keyHash));
+        (, uint256 settings) = manager.getOwnerConfig(keyHash);
+        return manager.isAdmin(settings);
     }
 
     // Helper function to test validateUserOp from EntryPoint's perspective
@@ -491,13 +492,19 @@ contract Base is Test {
     // Helper function for tests to check if a signer is expired
     function _isSignerExpired(address wallet, bytes32 keyHash) internal view returns (bool) {
         IOwnerManager manager = IOwnerManager(wallet);
-        return manager.hasOwner(keyHash) && manager.getVerifiedValidator(keyHash) == address(0);
+        (address validator, ) = manager.getOwnerConfig(keyHash);
+        return manager.hasOwner(keyHash) && validator == address(0);
     }
 
     // Helper function for tests to get signer expiration
     function _getSignerExpiration(address wallet, bytes32 keyHash) internal view returns (uint40) {
         IOwnerManager manager = IOwnerManager(wallet);
-        return manager.getExpiration(manager.getOwnerSettings(keyHash));
+        (, uint256 settings) = manager.getOwnerConfig(keyHash);
+        return manager.getExpiration(settings);
+    }
+
+    function _getOwnerSettings(address wallet, bytes32 keyHash) internal view returns (uint256 settings) {
+        (, settings) = IOwnerManager(wallet).getOwnerConfig(keyHash);
     }
 
     // Helper function to call removeValidator through executeWithRelayer
