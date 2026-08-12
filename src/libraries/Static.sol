@@ -11,6 +11,8 @@ library Static {
     bytes4 public constant MAGIC_VALUE = 0x1626ba7e;
     bytes4 public constant INVALID_VALUE = 0xffffffff;
 
+    // ERC-4337 nonce layout:
+    // [chainless prefix: 160 bits][operation type: 16 bits][queue id: 16 bits][sequence: 64 bits]
     uint256 public constant CHAINLESS_NONCE_KEY = 196;
 
     // EIP-1271 signature validation return values
@@ -22,7 +24,7 @@ library Static {
     uint256 public constant ROOT_KEY_SETTINGS = 1 << 200;
 
     string public constant ERC712_NAMESPACE = "SmartWallet";
-    string public constant ERC712_VERSION = "1.1.0";
+    string public constant ERC712_VERSION = "2.0.0";
     string public constant ERC7201_NAMESPACE =
         "SmartWallet.ERC7201.CustomStorage";
     bytes32 public constant ERC7201_CUSTOM_STORAGE_ROOT =

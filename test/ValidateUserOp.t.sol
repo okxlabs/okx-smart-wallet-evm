@@ -237,7 +237,7 @@ contract ValidateUserOpTest is Base {
         // Build UserOperation with chainless nonce
         PackedUserOperation memory userOp = PackedUserOperation({
             sender: account,
-            nonce: uint256(Static.CHAINLESS_NONCE_KEY) << 64, // Chainless nonce key
+            nonce: _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0), // Chainless nonce key
             initCode: bytes(""),
             callData: callData,
             accountGasLimits: bytes32((uint256(3000000) << 128) | 100000),
@@ -292,7 +292,7 @@ contract ValidateUserOpTest is Base {
         PackedUserOperation memory userOp;
         userOp.sender = account;
         userOp.nonce = 0;
-        userOp.callData = abi.encodeCall(ISmartWallet.execute, (calls));
+        userOp.callData = _encodeExecuteUserOpCalls(calls);
         userOp.accountGasLimits = bytes32(
             abi.encodePacked(uint128(100000), uint128(100000))
         );
@@ -499,7 +499,7 @@ contract ValidateUserOpTest is Base {
 
         TestTemps memory t;
         PackedUserOperation memory userOp;
-        userOp.nonce = Static.CHAINLESS_NONCE_KEY << 64;
+        userOp.nonce = _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0);
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -513,10 +513,7 @@ contract ValidateUserOpTest is Base {
             )
         });
 
-        userOp.callData = abi.encodeWithSelector(
-            ISmartWallet.execute.selector,
-            calls
-        );
+        userOp.callData = _encodeExecuteUserOpCalls(calls);
 
         t.signer = _alice; // signer is EOA
         t.privateKey = _alicePk;
@@ -556,7 +553,7 @@ contract ValidateUserOpTest is Base {
 
         TestTemps memory t;
         PackedUserOperation memory userOp;
-        userOp.nonce = Static.CHAINLESS_NONCE_KEY << 64;
+        userOp.nonce = _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0);
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -570,10 +567,7 @@ contract ValidateUserOpTest is Base {
             )
         });
 
-        userOp.callData = abi.encodeWithSelector(
-            ISmartWallet.execute.selector,
-            calls
-        );
+        userOp.callData = _encodeExecuteUserOpCalls(calls);
 
         t.userOpHash = keccak256("123");
         t.signer = _alice; // fixed: signer is EOA, not account
@@ -607,7 +601,7 @@ contract ValidateUserOpTest is Base {
     {
         TestTemps memory t;
         PackedUserOperation memory userOp;
-        userOp.nonce = Static.CHAINLESS_NONCE_KEY << 64;
+        userOp.nonce = _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0);
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -616,10 +610,7 @@ contract ValidateUserOpTest is Base {
             data: abi.encodeWithSelector(OwnerManager.ownerCount.selector)
         });
 
-        userOp.callData = abi.encodeWithSelector(
-            ISmartWallet.execute.selector,
-            calls
-        );
+        userOp.callData = _encodeExecuteUserOpCalls(calls);
 
         t.userOpHash = keccak256("123");
         t.signer = _alice; // signer is EOA
@@ -1038,11 +1029,8 @@ contract ValidateUserOpTest is Base {
         });
 
         PackedUserOperation memory userOp;
-        userOp.nonce = Static.CHAINLESS_NONCE_KEY << 64; // Use chainless nonce
-        userOp.callData = abi.encodeWithSelector(
-            ISmartWallet.execute.selector,
-            calls
-        );
+        userOp.nonce = _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0); // Use chainless nonce
+        userOp.callData = _encodeExecuteUserOpCalls(calls);
 
         // Use new unified helper to prepare and sign
         (userOp.signature, ) = _prepareAndSignUserOp(
@@ -1093,11 +1081,8 @@ contract ValidateUserOpTest is Base {
         });
 
         PackedUserOperation memory userOp;
-        userOp.nonce = Static.CHAINLESS_NONCE_KEY << 64;
-        userOp.callData = abi.encodeWithSelector(
-            ISmartWallet.execute.selector,
-            calls
-        );
+        userOp.nonce = _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0);
+        userOp.callData = _encodeExecuteUserOpCalls(calls);
 
         // Use new unified helper to prepare and sign
         (userOp.signature, ) = _prepareAndSignUserOp(
@@ -1144,11 +1129,8 @@ contract ValidateUserOpTest is Base {
         });
 
         PackedUserOperation memory userOp;
-        userOp.nonce = Static.CHAINLESS_NONCE_KEY << 64;
-        userOp.callData = abi.encodeWithSelector(
-            ISmartWallet.execute.selector,
-            calls
-        );
+        userOp.nonce = _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0);
+        userOp.callData = _encodeExecuteUserOpCalls(calls);
 
         // Use new unified helper to prepare and sign
         (userOp.signature, ) = _prepareAndSignUserOp(
@@ -1185,11 +1167,8 @@ contract ValidateUserOpTest is Base {
         calls[0] = Call({target: _bob, value: 1 ether, data: ""});
 
         PackedUserOperation memory userOp;
-        userOp.nonce = Static.CHAINLESS_NONCE_KEY << 64;
-        userOp.callData = abi.encodeWithSelector(
-            ISmartWallet.execute.selector,
-            calls
-        );
+        userOp.nonce = _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0);
+        userOp.callData = _encodeExecuteUserOpCalls(calls);
 
         // Use new unified helper to prepare and sign
         (userOp.signature, ) = _prepareAndSignUserOp(
@@ -1237,11 +1216,8 @@ contract ValidateUserOpTest is Base {
             )
         });
         PackedUserOperation memory userOp;
-        userOp.nonce = Static.CHAINLESS_NONCE_KEY << 64;
-        userOp.callData = abi.encodeWithSelector(
-            ISmartWallet.execute.selector,
-            calls
-        );
+        userOp.nonce = _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0);
+        userOp.callData = _encodeExecuteUserOpCalls(calls);
 
         // Use new unified helper to prepare and sign
         (userOp.signature, ) = _prepareAndSignUserOp(
@@ -1277,7 +1253,7 @@ contract ValidateUserOpTest is Base {
         PackedUserOperation memory userOp;
         userOp.sender = account;
         userOp.nonce = 0; // Normal nonce (not chainless)
-        userOp.callData = abi.encodeCall(ISmartWallet.execute, (calls));
+        userOp.callData = _encodeExecuteUserOpCalls(calls);
 
         // Get hash on chain 1
         vm.chainId(1);
@@ -1354,8 +1330,8 @@ contract ValidateUserOpTest is Base {
 
         PackedUserOperation memory userOp;
         userOp.sender = account;
-        userOp.nonce = Static.CHAINLESS_NONCE_KEY << 64; // Chainless nonce
-        userOp.callData = abi.encodeCall(ISmartWallet.execute, (calls));
+        userOp.nonce = _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0); // Chainless nonce
+        userOp.callData = _encodeExecuteUserOpCalls(calls);
 
         // Get hash on chain 1
         vm.chainId(1);
@@ -1372,6 +1348,7 @@ contract ValidateUserOpTest is Base {
         );
 
         vm.deal(account, 1 ether);
+        uint256 chain1State = vm.snapshotState();
 
         // Validate on chain 1 - should succeed
         uint256 result1 = _testValidateUserOp(
@@ -1381,6 +1358,11 @@ contract ValidateUserOpTest is Base {
             missingAccountFunds
         );
         assertEq(result1, 0, "Should succeed on chain 1");
+
+        // A replay happens on a different chain with independent wallet state.
+        // Restore the pre-validation state so this test does not incorrectly
+        // model both chains as sharing the same queue watermark.
+        assertTrue(vm.revertToState(chain1State));
 
         // Switch to chain 2
         vm.chainId(2);

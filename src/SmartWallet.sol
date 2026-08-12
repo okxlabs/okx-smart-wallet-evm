@@ -6,7 +6,7 @@ import {ISmartWallet} from "./interfaces/ISmartWallet.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
-import {NonceManager} from "./NonceManager.sol";
+import {NonceManager, ChainlessLib} from "./NonceManager.sol";
 import {ExecutionManager} from "./ExecutionManager.sol";
 import {
     TransferWithAuthorization,
@@ -25,7 +25,6 @@ import {CallLib, BatchedCallLib} from "./libraries/BatchedCallLib.sol";
 import {AllowanceManager} from "./AllowanceManager.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 import {DecodeLib} from "./libraries/DecodeLib.sol";
-import {ChainlessLib} from "./libraries/ChainlessLib.sol";
 import {MessageSignLib} from "./libraries/MessageSignLib.sol";
 
 /// @dev This contract uses UUPS upgradeable pattern. All state is stored via inherited contracts.
@@ -206,11 +205,10 @@ abstract contract SmartWallet is
             revert ISmartWallet.InvalidKeyHash(pubKeyHash);
 
         // Step 5: Compute the data hash based on nonce type
-        uint256 nonceKey = batchedCall.nonce >> 64;
         bytes32 intentHash = batchedCall.hash(validUntil, IMPLEMENTATION);
 
         // Step 6: Handle chainless execution if applicable
-        if (nonceKey == Static.CHAINLESS_NONCE_KEY) {
+        if (ChainlessLib.isChainlessNonce(batchedCall.nonce)) {
             // Validate all calls are allowed for chainless execution
             if (
                 !ChainlessLib.validateChainlessNonceCallData(
@@ -218,7 +216,15 @@ abstract contract SmartWallet is
                     address(this)
                 )
             ) {
-                revert ISmartWallet.InvalidNonceKey(nonceKey);
+                revert ISmartWallet.InvalidNonceKey(
+                    batchedCall.nonce >> 96
+                );
+            }
+            
+            if (!_validateAndUpdateChainlessQueue(batchedCall.nonce)) {
+                revert ISmartWallet.InvalidNonceKey(
+                    batchedCall.nonce >> 96
+                );
             }
             // Hash without chain ID for cross-chain compatibility
             dataHash = hashTypedDataSansChainId(intentHash);
@@ -265,8 +271,7 @@ abstract contract SmartWallet is
         if (validator == address(0)) return Static.SIG_VALIDATION_FAILED;
 
         // Step 5: Handle chainless execution if applicable
-        uint256 nonceKey = userOp.nonce >> 64;
-        if (nonceKey == Static.CHAINLESS_NONCE_KEY) {
+        if (ChainlessLib.isChainlessNonce(userOp.nonce)) {
             // Decode calls from userOp.callData
             Call[] calldata calls = DecodeLib.decodeCalls(userOp.callData[4:]);
 
@@ -277,6 +282,12 @@ abstract contract SmartWallet is
                     address(this)
                 )
             ) {
+                return Static.SIG_VALIDATION_FAILED;
+            }
+
+            // EntryPoint owns the 64-bit sequence, while the wallet owns the
+            // per-operation-type chainless queue watermark.
+            if (!_validateAndUpdateChainlessQueue(userOp.nonce)) {
                 return Static.SIG_VALIDATION_FAILED;
             }
 

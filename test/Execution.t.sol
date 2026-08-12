@@ -1087,8 +1087,7 @@ contract ExecutionTest is Base {
         });
 
         // Use chainless nonce - starting from 0 for uninitialized wallet
-        uint256 chainlessNonce = (uint256(Static.CHAINLESS_NONCE_KEY) << 64) |
-            uint256(0);
+        uint256 chainlessNonce = _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0);
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: chainlessNonce
