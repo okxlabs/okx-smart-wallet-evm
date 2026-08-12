@@ -5,6 +5,7 @@ import {Base} from "./Base.t.sol";
 import {Static} from "src/libraries/Static.sol";
 import {Call, BatchedCall} from "src/Types.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
+import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
 import {IERC4337Account} from "src/interfaces/IERC4337Account.sol";
 import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
@@ -44,6 +45,180 @@ contract ChainlessExecutionTest is Base {
     // ===================
     // Hash Function Tests
     // ===================
+
+    function test_ChainlessNonceLayoutAndEntryPointQueues_Success()
+        external
+        view
+    {
+        uint16 queueId = 0xbeef;
+        uint64 sequence = 7;
+        uint256 nonce = _chainlessNonce(
+            CHAINLESS_OPERATION_TYPE_1,
+            queueId,
+            sequence
+        );
+
+        assertEq(nonce >> 96, Static.CHAINLESS_NONCE_KEY);
+        assertEq(uint16(nonce >> 80), CHAINLESS_OPERATION_TYPE_1);
+        assertEq(uint16(nonce >> 64), queueId);
+        assertEq(uint64(nonce), sequence);
+
+        uint256 queueZeroNonce = _chainlessNonce(
+            CHAINLESS_OPERATION_TYPE_1,
+            0,
+            0
+        );
+        uint256 queueOneNonce = _chainlessNonce(
+            CHAINLESS_OPERATION_TYPE_1,
+            1,
+            0
+        );
+        assertEq(
+            IEntryPoint(ENTRYPOINT_ADDRESS).getNonce(
+                testAccount,
+                uint192(queueZeroNonce >> 64)
+            ),
+            queueZeroNonce
+        );
+        assertEq(
+            IEntryPoint(ENTRYPOINT_ADDRESS).getNonce(
+                testAccount,
+                uint192(queueOneNonce >> 64)
+            ),
+            queueOneNonce
+        );
+        assertNotEq(queueZeroNonce >> 64, queueOneNonce >> 64);
+    }
+
+    function test_ChainlessOperationTypeIsOnlyAQueueNamespace() external {
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: testAccount,
+            value: 0,
+            data: abi.encodeCall(
+                OwnerManager.addOwner,
+                (bobKeyHash, address(_ecdsaValidator), 0)
+            )
+        });
+
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: _chainlessNonce(CHAINLESS_OPERATION_TYPE_2, 1, 0)
+        });
+        bytes memory validatorData = _constructRelayerSignature(
+            testAccount,
+            _alice,
+            _alicePk,
+            batchedCall,
+            0
+        );
+
+        ISmartWallet(testAccount).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
+        assertTrue(SmartWallet(payable(testAccount)).hasOwner(bobKeyHash));
+        assertEq(
+            INonceManager(testAccount).getChainlessQueueState(
+                CHAINLESS_OPERATION_TYPE_1
+            ),
+            0
+        );
+        assertEq(
+            INonceManager(testAccount).getChainlessQueueState(
+                CHAINLESS_OPERATION_TYPE_2
+            ),
+            2
+        );
+    }
+
+    function test_ArbitraryChainlessOperationTypeCanBeAQueueNamespace()
+        external
+    {
+        BatchedCall memory batchedCall = _createChainlessAddOwnerBatchedCall();
+        batchedCall.nonce = _chainlessNonce(type(uint16).max, 0, 0);
+        bytes memory validatorData = _constructRelayerSignature(
+            testAccount,
+            _alice,
+            _alicePk,
+            batchedCall,
+            0
+        );
+
+        ISmartWallet(testAccount).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
+        assertTrue(SmartWallet(payable(testAccount)).hasOwner(bobKeyHash));
+        assertEq(
+            INonceManager(testAccount).getChainlessQueueState(
+                type(uint16).max
+            ),
+            1
+        );
+    }
+
+    function test_ChainlessUserOp_InvalidatesLowerQueueForSameType()
+        external
+    {
+        PackedUserOperation memory higherQueueUserOp =
+            _createChainlessAddOwnerUserOp();
+        higherQueueUserOp.nonce = _chainlessNonce(
+            CHAINLESS_OPERATION_TYPE_1,
+            5,
+            0
+        );
+        bytes32 higherQueueHash = IEntryPoint(ENTRYPOINT_ADDRESS).getUserOpHash(
+            higherQueueUserOp
+        );
+        higherQueueUserOp.signature = _constructUserOpSignature(
+            higherQueueUserOp,
+            _alice,
+            _alicePk,
+            higherQueueHash,
+            testAccount
+        );
+
+        assertEq(
+            _executeUserOpThroughEntryPoint(
+                higherQueueUserOp,
+                higherQueueHash
+            ),
+            0
+        );
+        uint16 addOwnerNextQueueId = INonceManager(testAccount)
+            .getChainlessQueueState(CHAINLESS_OPERATION_TYPE_1);
+        uint16 upgradeNextQueueId = INonceManager(testAccount)
+            .getChainlessQueueState(CHAINLESS_OPERATION_TYPE_2);
+        assertEq(addOwnerNextQueueId, 6);
+        assertEq(upgradeNextQueueId, 0);
+
+        PackedUserOperation memory lowerQueueUserOp =
+            _createChainlessAddOwnerUserOp();
+        lowerQueueUserOp.nonce = _chainlessNonce(
+            CHAINLESS_OPERATION_TYPE_1,
+            4,
+            0
+        );
+        bytes32 lowerQueueHash = IEntryPoint(ENTRYPOINT_ADDRESS).getUserOpHash(
+            lowerQueueUserOp
+        );
+        lowerQueueUserOp.signature = _constructUserOpSignature(
+            lowerQueueUserOp,
+            _alice,
+            _alicePk,
+            lowerQueueHash,
+            testAccount
+        );
+
+        assertEq(
+            _executeUserOpThroughEntryPoint(
+                lowerQueueUserOp,
+                lowerQueueHash
+            ),
+            Static.SIG_VALIDATION_FAILED
+        );
+    }
 
     /**
      * @notice Test hashTypedData and hashTypedDataSansChainId produce different results
@@ -143,12 +318,9 @@ contract ChainlessExecutionTest is Base {
 
         PackedUserOperation memory userOp = PackedUserOperation({
             sender: testAccount,
-            nonce: Static.CHAINLESS_NONCE_KEY << 64,
+            nonce: _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0),
             initCode: "",
-            callData: abi.encodeWithSelector(
-                ISmartWallet.execute.selector,
-                calls
-            ),
+            callData: _encodeExecuteUserOpCalls(calls),
             accountGasLimits: bytes32((uint256(2000000) << 128) | 100000),
             preVerificationGas: 21000,
             gasFees: bytes32((uint256(1000000000) << 128) | 1000000000),
@@ -237,7 +409,7 @@ contract ChainlessExecutionTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: Static.CHAINLESS_NONCE_KEY << 64
+            nonce: _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0)
         });
 
         bytes memory validatorData = _constructRelayerSignature(
@@ -309,7 +481,7 @@ contract ChainlessExecutionTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: Static.CHAINLESS_NONCE_KEY << 64
+            nonce: _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0)
         });
 
         bytes memory validatorData = _constructRelayerSignature(
@@ -346,7 +518,7 @@ contract ChainlessExecutionTest is Base {
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
-            nonce: Static.CHAINLESS_NONCE_KEY << 64
+            nonce: _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0)
         });
 
         bytes memory validatorData = _constructRelayerSignature(
@@ -430,12 +602,9 @@ contract ChainlessExecutionTest is Base {
         return
             PackedUserOperation({
                 sender: testAccount,
-                nonce: Static.CHAINLESS_NONCE_KEY << 64,
+                nonce: _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0),
                 initCode: "",
-                callData: abi.encodeWithSelector(
-                    ISmartWallet.execute.selector,
-                    calls
-                ),
+                callData: _encodeExecuteUserOpCalls(calls),
                 accountGasLimits: bytes32((uint256(2000000) << 128) | 100000),
                 preVerificationGas: 21000,
                 gasFees: bytes32((uint256(1000000000) << 128) | 1000000000),
@@ -470,12 +639,9 @@ contract ChainlessExecutionTest is Base {
         return
             PackedUserOperation({
                 sender: testAccount,
-                nonce: Static.CHAINLESS_NONCE_KEY << 64,
+                nonce: _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0),
                 initCode: "",
-                callData: abi.encodeWithSelector(
-                    ISmartWallet.execute.selector,
-                    calls
-                ),
+                callData: _encodeExecuteUserOpCalls(calls),
                 accountGasLimits: bytes32((uint256(2000000) << 128) | 100000),
                 preVerificationGas: 21000,
                 gasFees: bytes32((uint256(1000000000) << 128) | 1000000000),
@@ -500,12 +666,9 @@ contract ChainlessExecutionTest is Base {
         return
             PackedUserOperation({
                 sender: testAccount,
-                nonce: Static.CHAINLESS_NONCE_KEY << 64,
+                nonce: _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0),
                 initCode: "",
-                callData: abi.encodeWithSelector(
-                    ISmartWallet.execute.selector,
-                    calls
-                ),
+                callData: _encodeExecuteUserOpCalls(calls),
                 accountGasLimits: bytes32((uint256(2000000) << 128) | 100000),
                 preVerificationGas: 21000,
                 gasFees: bytes32((uint256(1000000000) << 128) | 1000000000),
@@ -525,12 +688,9 @@ contract ChainlessExecutionTest is Base {
         return
             PackedUserOperation({
                 sender: testAccount,
-                nonce: Static.CHAINLESS_NONCE_KEY << 64,
+                nonce: _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0),
                 initCode: "",
-                callData: abi.encodeWithSelector(
-                    ISmartWallet.execute.selector,
-                    calls
-                ),
+                callData: _encodeExecuteUserOpCalls(calls),
                 accountGasLimits: bytes32((uint256(2000000) << 128) | 100000),
                 preVerificationGas: 21000,
                 gasFees: bytes32((uint256(1000000000) << 128) | 1000000000),
@@ -559,7 +719,7 @@ contract ChainlessExecutionTest is Base {
         return
             BatchedCall({
                 calls: calls,
-                nonce: Static.CHAINLESS_NONCE_KEY << 64
+                nonce: _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0)
             });
     }
 
@@ -574,7 +734,7 @@ contract ChainlessExecutionTest is Base {
         return
             BatchedCall({
                 calls: calls,
-                nonce: Static.CHAINLESS_NONCE_KEY << 64
+                nonce: _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0)
             });
     }
 
@@ -613,8 +773,11 @@ contract ChainlessExecutionTest is Base {
             data: "" // Empty data - length 0, which is < 4
         });
 
-        // Create chainless nonce: CHAINLESS_NONCE_KEY (196) in upper 192 bits, nonce 0 in lower 64 bits
-        uint256 chainlessNonce = (Static.CHAINLESS_NONCE_KEY << 64) | 0;
+        uint256 chainlessNonce = _chainlessNonce(
+            CHAINLESS_OPERATION_TYPE_1,
+            1,
+            0
+        );
 
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,

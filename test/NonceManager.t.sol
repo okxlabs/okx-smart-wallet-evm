@@ -4,6 +4,7 @@ pragma solidity ^0.8.29;
 import {Test} from "forge-std/Test.sol";
 import {NonceManager} from "src/NonceManager.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
+import {Static} from "src/libraries/Static.sol";
 
 /**
  * @title TestableNonceManager
@@ -16,13 +17,26 @@ contract TestableNonceManager is NonceManager {
     ) external returns (bool) {
         return validateAndUpdateNonce(packedNonce);
     }
+
+    function exposedValidateAndUpdateChainlessQueue(
+        uint256 packedNonce
+    ) external returns (bool) {
+        return _validateAndUpdateChainlessQueue(packedNonce);
+    }
 }
 
 contract NonceManagerTest is Test {
+    uint16 private constant CHAINLESS_OPERATION_TYPE_1 = 1;
+    uint16 private constant CHAINLESS_OPERATION_TYPE_2 = 2;
+
     TestableNonceManager public nonceManager;
 
     // Test events
     event NonceConsumed(uint192 key, uint64 nonce);
+    event ChainlessQueueInvalidated(
+        uint16 indexed operationType,
+        uint16 indexed queueId
+    );
 
     function setUp() public {
         nonceManager = new TestableNonceManager();
@@ -45,6 +59,135 @@ contract NonceManagerTest is Test {
 
         // Check it returns 1
         assertEq(nonceManager.getNonce(key), 1);
+    }
+
+    // ============ Chainless Queue Invalidation Tests ============
+
+    function test_ChainlessQueue_QueueZeroCanBeUsedOnce() public {
+        uint16 nextQueueId = nonceManager.getChainlessQueueState(
+            CHAINLESS_OPERATION_TYPE_1
+        );
+        assertEq(nextQueueId, 0);
+
+        uint256 packedNonce = _chainlessNonce(
+            CHAINLESS_OPERATION_TYPE_1,
+            0,
+            0
+        );
+
+        vm.expectEmit(true, true, true, true);
+        emit ChainlessQueueInvalidated(
+            CHAINLESS_OPERATION_TYPE_1,
+            0
+        );
+        assertTrue(
+            nonceManager.exposedValidateAndUpdateChainlessQueue(packedNonce)
+        );
+
+        nextQueueId = nonceManager.getChainlessQueueState(
+            CHAINLESS_OPERATION_TYPE_1
+        );
+        assertEq(nextQueueId, 1);
+        assertFalse(
+            nonceManager.exposedValidateAndUpdateChainlessQueue(packedNonce)
+        );
+    }
+
+    function test_ChainlessQueue_InvalidatesSameAndLowerQueueIds() public {
+        assertTrue(
+            nonceManager.exposedValidateAndUpdateChainlessQueue(
+                _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 10, 0)
+            )
+        );
+
+        assertFalse(
+            nonceManager.exposedValidateAndUpdateChainlessQueue(
+                _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 9, 0)
+            )
+        );
+        assertFalse(
+            nonceManager.exposedValidateAndUpdateChainlessQueue(
+                _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 10, 1)
+            )
+        );
+        uint16 nextQueueId = nonceManager.getChainlessQueueState(
+            CHAINLESS_OPERATION_TYPE_1
+        );
+        assertEq(nextQueueId, 11);
+
+        assertTrue(
+            nonceManager.exposedValidateAndUpdateChainlessQueue(
+                _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 11, 0)
+            )
+        );
+    }
+
+    function test_ChainlessQueue_OperationTypesAreIndependent() public {
+        assertTrue(
+            nonceManager.exposedValidateAndUpdateChainlessQueue(
+                _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 20, 0)
+            )
+        );
+
+        assertTrue(
+            nonceManager.exposedValidateAndUpdateChainlessQueue(
+                _chainlessNonce(CHAINLESS_OPERATION_TYPE_2, 1, 0)
+            )
+        );
+        uint16 addOwnerNextQueueId = nonceManager.getChainlessQueueState(
+            CHAINLESS_OPERATION_TYPE_1
+        );
+        uint16 upgradeNextQueueId = nonceManager.getChainlessQueueState(
+            CHAINLESS_OPERATION_TYPE_2
+        );
+        assertEq(addOwnerNextQueueId, 21);
+        assertEq(upgradeNextQueueId, 2);
+    }
+
+    function test_ChainlessQueue_MaxUsableQueueThenMaxIsRejected() public {
+        uint16 maxUsableQueueId = type(uint16).max - 1;
+        assertTrue(
+            nonceManager.exposedValidateAndUpdateChainlessQueue(
+                _chainlessNonce(
+                    CHAINLESS_OPERATION_TYPE_1,
+                    maxUsableQueueId,
+                    0
+                )
+            )
+        );
+        assertEq(
+            nonceManager.getChainlessQueueState(
+                CHAINLESS_OPERATION_TYPE_1
+            ),
+            type(uint16).max
+        );
+
+        assertFalse(
+            nonceManager.exposedValidateAndUpdateChainlessQueue(
+                _chainlessNonce(
+                    CHAINLESS_OPERATION_TYPE_1,
+                    type(uint16).max,
+                    0
+                )
+            )
+        );
+        assertEq(
+            nonceManager.getChainlessQueueState(
+                CHAINLESS_OPERATION_TYPE_1
+            ),
+            type(uint16).max
+        );
+    }
+
+    function test_ChainlessQueue_DoesNotAffectRegularNonceKeys() public {
+        assertTrue(
+            nonceManager.exposedValidateAndUpdateChainlessQueue(
+                _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 5, 0)
+            )
+        );
+
+        assertTrue(nonceManager.testValidateAndUpdateNonce(0));
+        assertEq(nonceManager.getNonce(0), 1);
     }
 
     function test_ValidateAndUpdateNonce_ValidNonceReturnsTrue() public {
@@ -370,5 +513,17 @@ contract NonceManagerTest is Test {
         assertTrue(gasUsed2 > 20000); // Should use at least 20k gas for SSTORE
         assertTrue(gasUsed1 < 50000); // Should not exceed 50k gas
         assertTrue(gasUsed2 < 50000); // Should not exceed 50k gas
+    }
+
+    function _chainlessNonce(
+        uint16 operationType,
+        uint16 queueId,
+        uint64 sequence
+    ) private pure returns (uint256) {
+        return
+            (Static.CHAINLESS_NONCE_KEY << 96) |
+            (uint256(operationType) << 80) |
+            (uint256(queueId) << 64) |
+            uint256(sequence);
     }
 }

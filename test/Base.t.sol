@@ -22,6 +22,7 @@ import {EntryPoint} from "account-abstraction/core/EntryPoint.sol";
 import {IEntryPoint} from "account-abstraction/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
 import {IAccount} from "account-abstraction/interfaces/IAccount.sol";
+import {IERC4337Account} from "src/interfaces/IERC4337Account.sol";
 import {Static} from "src/libraries/Static.sol";
 import {ERC4337Account} from "src/ERC4337Account.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
@@ -80,6 +81,11 @@ contract Base is Test {
 
     string public constant NAME = "SmartWallet";
     string public constant VERSION = "1.0.0";
+
+    // Test-only queue namespaces. Production code intentionally does not bind
+    // an operation type to a specific chainless selector.
+    uint16 internal constant CHAINLESS_OPERATION_TYPE_1 = 1;
+    uint16 internal constant CHAINLESS_OPERATION_TYPE_2 = 2;
 
     // Standard EntryPoint address used in ERC-4337
     address constant ENTRYPOINT_ADDRESS = 0x0000000071727De22E5E9d8BAf0edAc6f37da032;
@@ -261,6 +267,28 @@ contract Base is Test {
         return uint256(INonceManager(account).getNonce(uint192(0)));
     }
 
+    function _chainlessNonce(
+        uint16 operationType,
+        uint16 queueId,
+        uint64 sequence
+    ) internal pure returns (uint256) {
+        return
+            (Static.CHAINLESS_NONCE_KEY << 96) |
+            (uint256(operationType) << 80) |
+            (uint256(queueId) << 64) |
+            uint256(sequence);
+    }
+
+    function _encodeExecuteUserOpCalls(
+        Call[] memory calls
+    ) internal pure returns (bytes memory) {
+        return
+            abi.encodePacked(
+                IERC4337Account.executeUserOp.selector,
+                abi.encode(calls)
+            );
+    }
+
     // Mimics the exact hash calculation in SmartWallet.executeWithRelayer
     function _getExecuteWithRelayerHash(BatchedCall memory batchedCall, uint48 validUntil, address wallet)
         internal
@@ -269,8 +297,7 @@ contract Base is Test {
     {
         bytes32 dataHash = BatchedCallLib.hash(batchedCall, validUntil, SmartWallet(payable(wallet)).IMPLEMENTATION());
 
-        uint256 nonceKey = batchedCall.nonce >> 64;
-        if (nonceKey == Static.CHAINLESS_NONCE_KEY) {
+        if (batchedCall.nonce >> 96 == Static.CHAINLESS_NONCE_KEY) {
             // For chainless nonce, use hashTypedDataSansChainId
             return ERC712(wallet).hashTypedDataSansChainId(dataHash);
         } else {
@@ -393,8 +420,7 @@ contract Base is Test {
         uint48 validUntil,
         address wallet
     ) internal view returns (bytes32) {
-        uint256 nonceKey = userOp.nonce >> 64;
-        if (nonceKey == Static.CHAINLESS_NONCE_KEY) {
+        if (userOp.nonce >> 96 == Static.CHAINLESS_NONCE_KEY) {
             userOpHash = ERC4337Account(wallet).getUserOpHashWithoutChainId(userOp);
         }
         return
