@@ -911,7 +911,7 @@ contract ExecutionTest is Base {
         );
 
         // Verify the new owner was added
-        address validator = IOwnerManager(_aliceWallet).getVerifiedValidator(
+        (address validator, ) = IOwnerManager(_aliceWallet).getOwnerConfig(
             newOwnerKeyHash
         );
         assertEq(
@@ -1042,7 +1042,7 @@ contract ExecutionTest is Base {
 
         // Step 2: Check validator for a different keyHash (not address(this))
         bytes32 bobKeyHash = _makeKeyHash(_bob);
-        address validator = IOwnerManager(eoaWallet).getVerifiedValidator(
+        (address validator, ) = IOwnerManager(eoaWallet).getOwnerConfig(
             bobKeyHash
         );
 
@@ -1054,7 +1054,7 @@ contract ExecutionTest is Base {
 
         // Step 3: Verify address(this) returns ECDSA validator
         bytes32 eoaKeyHash = keccak256(abi.encodePacked(eoaWallet));
-        validator = IOwnerManager(eoaWallet).getVerifiedValidator(eoaKeyHash);
+        (validator, ) = IOwnerManager(eoaWallet).getOwnerConfig(eoaKeyHash);
         assertEq(
             validator,
             Static.ECDSA_VALIDATOR_ADDRESS,

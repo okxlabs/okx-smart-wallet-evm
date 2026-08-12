@@ -316,7 +316,7 @@ contract AdminPermissionsTest is Base {
 
         // Verify settings were updated
         uint40 expiration = IOwnerManager(_aliceWallet).getExpiration(
-            IOwnerManager(_aliceWallet).getOwnerSettings(nonAdminKeyHash)
+            _getOwnerSettings(_aliceWallet, nonAdminKeyHash)
         );
         assertGt(expiration, block.timestamp);
     }

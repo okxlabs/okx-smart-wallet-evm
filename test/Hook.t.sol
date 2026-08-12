@@ -247,7 +247,7 @@ contract HookTest is Base {
 
         // Verify hook is properly set
         address hookAddress = IOwnerManager(_aliceWallet).getHook(
-            IOwnerManager(_aliceWallet).getOwnerSettings(aliceKeyHash)
+            _getOwnerSettings(_aliceWallet, aliceKeyHash)
         );
         assertEq(hookAddress, address(mockHook));
 
@@ -1263,7 +1263,7 @@ contract HookTest is Base {
 
         // Now verify the hook is set
         address hook = IOwnerManager(_aliceWallet).getHook(
-            IOwnerManager(_aliceWallet).getOwnerSettings(aliceKeyHash)
+            _getOwnerSettings(_aliceWallet, aliceKeyHash)
         );
         assertEq(hook, address(mockHook));
         // Now try to execute a call that should trigger the hook
@@ -1307,8 +1307,10 @@ contract HookTest is Base {
         _setHookForOwnerWithRelayer(aliceKeyHash, address(mockHook), 0);
 
         // Check what the contract actually reads for ownerSettings
-        uint256 contractSettings = IOwnerManager(_aliceWallet)
-            .getOwnerSettings(aliceKeyHash);
+        uint256 contractSettings = _getOwnerSettings(
+            _aliceWallet,
+            aliceKeyHash
+        );
         assertEq(
             IOwnerManager(_aliceWallet).getHook(contractSettings),
             address(mockHook)
@@ -1356,8 +1358,8 @@ contract HookTest is Base {
         // Get the keyHash for address(this)
         bytes32 selfKeyHash = keccak256(abi.encodePacked(_aliceWallet));
 
-        // Verify that getVerifiedValidator returns ECDSA validator for address(this)
-        address validator = IOwnerManager(_aliceWallet).getVerifiedValidator(
+        // Verify that getOwnerConfig returns ECDSA validator for address(this)
+        (address validator, ) = IOwnerManager(_aliceWallet).getOwnerConfig(
             selfKeyHash
         );
         assertEq(
@@ -1373,8 +1375,8 @@ contract HookTest is Base {
         );
         address freshWallet = _factory.createAccount(singleOwner, 1);
         bytes32 freshSelfKeyHash = keccak256(abi.encodePacked(freshWallet));
-        address freshValidator = IOwnerManager(freshWallet)
-            .getVerifiedValidator(freshSelfKeyHash);
+        (address freshValidator, ) = IOwnerManager(freshWallet)
+            .getOwnerConfig(freshSelfKeyHash);
         assertEq(
             freshValidator,
             Static.ECDSA_VALIDATOR_ADDRESS,
@@ -1425,7 +1427,7 @@ contract HookTest is Base {
         );
 
         // Verify it still returns ECDSA validator
-        address validator = IOwnerManager(_aliceWallet).getVerifiedValidator(
+        (address validator, ) = IOwnerManager(_aliceWallet).getOwnerConfig(
             selfKeyHash
         );
         assertEq(
@@ -1473,7 +1475,7 @@ contract HookTest is Base {
         );
 
         // Verify it still returns ECDSA validator
-        address validator = IOwnerManager(_aliceWallet).getVerifiedValidator(
+        (address validator, ) = IOwnerManager(_aliceWallet).getOwnerConfig(
             selfKeyHash
         );
         assertEq(
@@ -1535,7 +1537,8 @@ contract HookTest is Base {
         );
 
         // Verify the built-in owner has immutable root-key settings.
-        uint256 rootSettings = IOwnerManager(_aliceWallet).getOwnerSettings(
+        uint256 rootSettings = _getOwnerSettings(
+            _aliceWallet,
             selfKeyHash
         );
         address retrievedHook = IOwnerManager(_aliceWallet).getHook(
@@ -1561,9 +1564,9 @@ contract HookTest is Base {
             "address(this) should not be expired"
         );
 
-        // But getVerifiedValidator still returns ECDSA
-        address verifiedValidator = IOwnerManager(_aliceWallet)
-            .getVerifiedValidator(selfKeyHash);
+        // But getOwnerConfig still returns ECDSA
+        (address verifiedValidator, ) = IOwnerManager(_aliceWallet)
+            .getOwnerConfig(selfKeyHash);
         assertEq(
             verifiedValidator,
             Static.ECDSA_VALIDATOR_ADDRESS,
@@ -1614,15 +1617,15 @@ contract HookTest is Base {
         vm.warp(block.timestamp + 2);
 
         // Bob's validator should be expired
-        address bobValidator = IOwnerManager(_aliceWallet).getVerifiedValidator(
+        (address bobValidator, ) = IOwnerManager(_aliceWallet).getOwnerConfig(
             bobKeyHash
         );
         assertEq(bobValidator, address(0), "Bob's validator should be expired");
 
         // But address(this) should still work
         bytes32 selfKeyHash = keccak256(abi.encodePacked(_aliceWallet));
-        address selfValidator = IOwnerManager(_aliceWallet)
-            .getVerifiedValidator(selfKeyHash);
+        (address selfValidator, ) = IOwnerManager(_aliceWallet)
+            .getOwnerConfig(selfKeyHash);
         assertEq(
             selfValidator,
             Static.ECDSA_VALIDATOR_ADDRESS,

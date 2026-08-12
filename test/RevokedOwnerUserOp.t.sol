@@ -81,12 +81,15 @@ contract RevokedOwnerUserOpTest is Base {
             "expired owner must remain registered"
         );
         assertEq(
-            IOwnerManager(_aliceWallet).getOwnerSettings(bobKeyHash),
+            _getOwnerSettings(_aliceWallet, bobKeyHash),
             expiredSettings,
             "expired owner settings must remain readable"
         );
+        (address validator, ) = IOwnerManager(_aliceWallet).getOwnerConfig(
+            bobKeyHash
+        );
         assertEq(
-            IOwnerManager(_aliceWallet).getVerifiedValidator(bobKeyHash),
+            validator,
             address(0),
             "expired owner must not have an active validator"
         );
@@ -116,7 +119,7 @@ contract RevokedOwnerUserOpTest is Base {
             bobSettings
         );
         assertEq(
-            IOwnerManager(_aliceWallet).getOwnerSettings(bobKeyHash),
+            _getOwnerSettings(_aliceWallet, bobKeyHash),
             bobSettings
         );
 
@@ -151,8 +154,10 @@ contract RevokedOwnerUserOpTest is Base {
         IEntryPoint(ENTRYPOINT_ADDRESS).handleOps(ops, payable(_dave));
 
         assertFalse(IOwnerManager(_aliceWallet).hasOwner(bobKeyHash));
-        vm.expectRevert(IOwnerManager.ValidatorNotFound.selector);
-        IOwnerManager(_aliceWallet).getOwnerSettings(bobKeyHash);
+        (address validator, uint256 settings) = IOwnerManager(_aliceWallet)
+            .getOwnerConfig(bobKeyHash);
+        assertEq(validator, address(0));
+        assertEq(settings, 0);
         assertEq(
             _bob.balance,
             bobBalanceBefore,

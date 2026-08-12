@@ -128,52 +128,6 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
         return _ownerKeys.contains(keyHash);
     }
 
-    // Public View Functions
-
-    /// @notice Get the active validator address for a given `keyHash`
-    /// @dev Returns the configured validator address if present and not expired; otherwise returns address(0).
-    ///      For EIP-7702 compatibility, address(this) ALWAYS returns ECDSA validator and cannot be overridden.
-    /// @param keyHash The public key hash to look up
-    /// @return The validator address to use for validation (address(0) if none or expired)
-    function getVerifiedValidator(
-        bytes32 keyHash
-    ) public view returns (address) {
-        // EIP-7702 compatible: Built-in owner for address(this)
-        if (keyHash == _getRootKey()) {
-            return Static.ECDSA_VALIDATOR_ADDRESS;
-        }
-
-        address validator = _ownerValidators[keyHash];
-
-        // Check if validator exists and is not expired
-        if (validator != address(0)) {
-            uint256 settings = _ownerSettings[keyHash];
-            if (isSettingsExpired(settings)) {
-                validator = address(0); // Expired validator
-            }
-        }
-
-        return validator;
-    }
-
-    /// @notice Returns packed settings for a registered owner
-    /// @dev The built-in EIP-7702 owner always uses root-key settings. Missing owners revert; expired owners remain readable.
-    /// @param keyHash The owner key hash to query
-    /// @return settings The owner's packed settings
-    function getOwnerSettings(
-        bytes32 keyHash
-    ) public view returns (uint256 settings) {
-        if (keyHash == _getRootKey()) {
-            return Static.ROOT_KEY_SETTINGS;
-        }
-
-        if (hasOwner(keyHash)) {
-            return _ownerSettings[keyHash];
-        }
-
-        revert IOwnerManager.ValidatorNotFound();
-    }
-
     /// @notice Check if settings are expired based on block timestamp
     /// @param settings Packed settings value
     /// @return expired True if settings are expired (expiration != 0 and < block.timestamp)
@@ -218,6 +172,28 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
         _ownerValidators[keyHash] = validator;
         _ownerSettings[keyHash] = settings;
         _ownerKeys.add(keyHash); // Add to the set
+    }
+
+    /// @inheritdoc IOwnerManager
+    function getOwnerConfig(
+        bytes32 keyHash
+    ) public view override returns (address validator, uint256 settings) {
+        if (keyHash == _getRootKey()) {
+            return (
+                Static.ECDSA_VALIDATOR_ADDRESS,
+                Static.ROOT_KEY_SETTINGS
+            );
+        }
+
+        validator = _ownerValidators[keyHash];
+        if (validator == address(0)) {
+            return (address(0), 0);
+        }
+
+        settings = _ownerSettings[keyHash];
+        if (isSettingsExpired(settings)) {
+            validator = address(0);
+        }
     }
 
     /// @notice Internal function to remove an owner's validator mapping
