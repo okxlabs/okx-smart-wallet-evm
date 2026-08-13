@@ -113,7 +113,7 @@ abstract contract SmartWallet is
             revert ISmartWallet.InvalidKeyHash(keyHash);
         }
 
-        Call[] calldata calls = DecodeLib.decodeCalls(userOp.callData[4:]);
+        Call[] memory calls = abi.decode(userOp.callData[4:], (Call[]));
 
         _batchCall(calls, settings);
     }
@@ -144,7 +144,7 @@ abstract contract SmartWallet is
     /// @notice Executes multiple contract calls in a single transaction
     /// @dev Reverts if any of the calls fail
     /// @param calls Array of Call structs containing destination address, value, and calldata
-    function _batchCall(Call[] calldata calls, uint256 settings) internal {
+    function _batchCall(Call[] memory calls, uint256 settings) internal {
         address hookAddress = getHook(settings);
         bool canSelfCall = isAdmin(settings);
 
@@ -169,7 +169,7 @@ abstract contract SmartWallet is
     /// @return settings The verified owner's packed settings
     /// @return dataHash The computed data hash for event emission
     function _validateAndExtractRelayerData(
-        BatchedCall calldata batchedCall,
+        BatchedCall memory batchedCall,
         bytes calldata validatorData
     ) internal returns (uint256 settings, bytes32 dataHash) {
         // Step 1: Validate and consume nonce
@@ -268,7 +268,7 @@ abstract contract SmartWallet is
         // Step 5: Handle chainless execution if applicable
         if (ChainlessLib.isChainlessNonce(userOp.nonce)) {
             // Decode calls from userOp.callData
-            Call[] calldata calls = DecodeLib.decodeCalls(userOp.callData[4:]);
+            Call[] memory calls = abi.decode(userOp.callData[4:], (Call[]));
 
             // Validate all calls are allowed to skip chain ID validation
             if (

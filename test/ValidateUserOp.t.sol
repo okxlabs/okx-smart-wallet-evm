@@ -477,7 +477,7 @@ contract ValidateUserOpTest is Base {
                 t.userOpHash,
                 t.missingAccountFunds
             ),
-            1 << 96
+            Static.SIG_VALIDATION_FAILED
         );
         assertEq(
             address(ENTRYPOINT_ADDRESS).balance,
@@ -695,7 +695,7 @@ contract ValidateUserOpTest is Base {
                 t.userOpHash,
                 t.missingAccountFunds
             ),
-            1 << 96,
+            Static.SIG_VALIDATION_FAILED,
             "Invalid ECDSA signature should fail"
         );
     }
@@ -790,7 +790,7 @@ contract ValidateUserOpTest is Base {
                 t.userOpHash,
                 t.missingAccountFunds
             ),
-            1 << 96,
+            Static.SIG_VALIDATION_FAILED,
             "Invalid Passkey should fail"
         );
     }
@@ -880,7 +880,7 @@ contract ValidateUserOpTest is Base {
                 userOpHash,
                 missingAccountFunds
             ),
-            1 << 96,
+            Static.SIG_VALIDATION_FAILED,
             "Empty signature should fail"
         );
 
@@ -894,7 +894,7 @@ contract ValidateUserOpTest is Base {
                 userOpHash,
                 missingAccountFunds
             ),
-            1 << 96,
+            Static.SIG_VALIDATION_FAILED,
             "Missing signature data should fail"
         );
 
@@ -921,7 +921,7 @@ contract ValidateUserOpTest is Base {
                 userOpHash,
                 missingAccountFunds
             ),
-            1 << 96,
+            Static.SIG_VALIDATION_FAILED,
             "Wrong keyHash should fail"
         );
 
@@ -939,7 +939,7 @@ contract ValidateUserOpTest is Base {
                 userOpHash,
                 missingAccountFunds
             ),
-            1 << 96,
+            Static.SIG_VALIDATION_FAILED,
             "Malformed signature should fail"
         );
     }

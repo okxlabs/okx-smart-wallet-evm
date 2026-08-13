@@ -1499,14 +1499,14 @@ contract ValidatorTest is Base {
 
         uint256 missingAccountFunds = 100;
 
-        // Should return SIG_VALIDATION_FAILED (1 << 96)
+        // Should return the ERC-4337 SIG_VALIDATION_FAILED sentinel (1)
         uint256 result = _testValidateUserOp(
             address(account),
             userOp,
             userOpHash,
             missingAccountFunds
         );
-        assertEq(result, 1 << 96);
+        assertEq(result, Static.SIG_VALIDATION_FAILED);
     }
 
     function test_RevertWhen_ExternalValidator_Reverts() public {

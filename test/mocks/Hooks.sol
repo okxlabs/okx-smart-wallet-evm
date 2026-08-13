@@ -4,6 +4,7 @@ pragma solidity ^0.8.29;
 import {IHook} from "src/interfaces/IHook.sol";
 import {IHookTransferAuthorization} from "src/interfaces/IHookTransferAuthorization.sol";
 import {Call} from "src/Types.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
 /// @title Shared hook mocks
 /// @notice Reusable spending-policy hook fixtures for the TWA and EIP-1271 test suites, so each hook is
@@ -34,7 +35,10 @@ contract RevertingHook is IHookTransferAuthorization {
     }
 
     function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
-        return interfaceId == type(IHookTransferAuthorization).interfaceId;
+        return
+            interfaceId == type(IHookTransferAuthorization).interfaceId ||
+            interfaceId == type(IHook).interfaceId ||
+            interfaceId == type(IERC165).interfaceId;
     }
 }
 
@@ -81,7 +85,10 @@ contract RecordingHook is IHookTransferAuthorization {
     }
 
     function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
-        return interfaceId == type(IHookTransferAuthorization).interfaceId;
+        return
+            interfaceId == type(IHookTransferAuthorization).interfaceId ||
+            interfaceId == type(IHook).interfaceId ||
+            interfaceId == type(IERC165).interfaceId;
     }
 }
 
@@ -111,14 +118,17 @@ contract NonAdvertisingHook is IHookTransferAuthorization {
         return true;
     }
 
-    function supportsInterface(bytes4) external pure returns (bool) {
-        return false;
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return
+            interfaceId == type(IHook).interfaceId ||
+            interfaceId == type(IERC165).interfaceId;
     }
 }
 
-/// @dev A truly legacy execute-path `IHook` that does NOT implement `supportsInterface` at all — a raw
+/// @dev A truly legacy execute-path hook that does NOT implement `supportsInterface` at all — a raw
 ///      `IERC165(hook).supportsInterface(...)` would revert; the gas-capped probe must return false.
-contract LegacyHookNoErc165 is IHook {
+///      It intentionally does not inherit `IHook`, because `IHook` now extends `IERC165`.
+contract LegacyHookNoErc165 {
     uint256 public preCount;
 
     function preCheck(Call[] calldata, address) external payable returns (bytes memory) {
@@ -130,6 +140,24 @@ contract LegacyHookNoErc165 is IHook {
 
     function isValidSignatureCheck(address, bytes32, bytes calldata) external pure returns (bool) {
         return true;
+    }
+}
+
+/// @dev Legacy fallback that returns ABI-encoded dynamic bytes for every selector. An unchecked
+///      ERC-165 probe reads its non-zero offset word as `true`, and its fallback can also swallow
+///      both TWA callbacks. The checked ERC-165 probe must reject it.
+contract LegacyTruthyFallbackHook {
+    fallback(bytes calldata) external returns (bytes memory) {
+        return abi.encode(bytes(""));
+    }
+}
+
+contract LegacyBoolFallbackHook {
+    fallback() external {
+        assembly ("memory-safe") {
+            mstore(0, 1)
+            return(0, 0x20)
+        }
     }
 }
 
@@ -152,7 +180,9 @@ contract SigCheckHook is IHook {
     }
 
     function supportsInterface(bytes4 id) external pure returns (bool) {
-        return id == type(IHook).interfaceId;
+        return
+            id == type(IHook).interfaceId ||
+            id == type(IERC165).interfaceId;
     }
 }
 
@@ -180,7 +210,9 @@ contract TwaOnlySigHook is IHookTransferAuthorization {
     }
 
     function supportsInterface(bytes4 id) external pure returns (bool) {
-        return id == type(IHookTransferAuthorization).interfaceId;
+        return
+            id == type(IHookTransferAuthorization).interfaceId ||
+            id == type(IERC165).interfaceId;
     }
 }
 
@@ -200,6 +232,8 @@ contract MalformedSigHook is IHook {
     }
 
     function supportsInterface(bytes4 id) external pure returns (bool) {
-        return id == type(IHook).interfaceId;
+        return
+            id == type(IHook).interfaceId ||
+            id == type(IERC165).interfaceId;
     }
 }

@@ -26,6 +26,12 @@ contract RejectAllUserOpHook is IHook {
     ) external pure returns (bool) {
         return true;
     }
+
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return
+            interfaceId == type(IHook).interfaceId ||
+            interfaceId == 0x01ffc9a7;
+    }
 }
 
 contract RevokedOwnerUserOpTest is Base {

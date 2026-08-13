@@ -15,8 +15,8 @@ library Static {
     // [chainless prefix: 160 bits][operation type: 16 bits][queue id: 16 bits][sequence: 64 bits]
     uint256 public constant CHAINLESS_NONCE_KEY = 196;
 
-    // EIP-1271 signature validation return values
-    uint256 public constant SIG_VALIDATION_FAILED = 1 << 96;
+    // ERC-4337 signature validation failure sentinel (address(1))
+    uint256 public constant SIG_VALIDATION_FAILED = 1;
 
     address public constant NATIVE_ETH =
         0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;

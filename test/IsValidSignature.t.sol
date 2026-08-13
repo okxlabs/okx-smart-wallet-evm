@@ -10,7 +10,12 @@ import {HelperLib} from "./utils/Helper.s.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
-import {SigCheckHook, TwaOnlySigHook, MalformedSigHook} from "./mocks/Hooks.sol";
+import {
+    SigCheckHook,
+    TwaOnlySigHook,
+    MalformedSigHook,
+    LegacyBoolFallbackHook
+} from "./mocks/Hooks.sol";
 
 contract IsValidSignatureTest is Base {
     // Passkey-related constants and variables
@@ -123,6 +128,18 @@ contract IsValidSignatureTest is Base {
         // ret.length != 32 is treated as rejection; returns the invalid sentinel.
         bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(hash, _bobSignature(hash, bobKeyHash));
         assertEq(result, Static.INVALID_VALUE, "malformed hook return -> invalid");
+    }
+
+    function test_IsValidSignature_TruthyFallback_ReturnsInvalidValue() public {
+        bytes32 bobKeyHash = _addBobWithHook(
+            address(new LegacyBoolFallbackHook())
+        );
+        bytes32 hash = keccak256("truthy-fallback");
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            _bobSignature(hash, bobKeyHash)
+        );
+        assertEq(result, Static.INVALID_VALUE, "generic fallback must fail closed");
     }
 
     function test_IsValidSignature_Exactly32Bytes_ReturnsInvalidValue()

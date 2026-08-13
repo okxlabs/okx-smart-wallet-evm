@@ -26,7 +26,7 @@ library HookLib {
     /// @return preRet Opaque data to forward to {postCheck}.
     function preCheck(
         address hook,
-        Call[] calldata calls,
+        Call[] memory calls,
         address executor
     ) internal returns (bytes memory preRet) {
         if (hook == address(0)) return "";
@@ -53,7 +53,7 @@ library HookLib {
     ) internal returns (bytes memory preRet) {
         if (hook == address(0)) return "";
         if (
-            !ERC165Checker.supportsERC165InterfaceUnchecked(
+            !ERC165Checker.supportsInterface(
                 hook,
                 type(IHookTransferAuthorization).interfaceId
             )
@@ -92,7 +92,7 @@ library HookLib {
         bytes calldata signature
     ) internal view returns (bool approved) {
         if (hook == address(0)) return true;
-        if (!ERC165Checker.supportsERC165InterfaceUnchecked(hook, type(IHook).interfaceId)) {
+        if (!ERC165Checker.supportsInterface(hook, type(IHook).interfaceId)) {
             return false;
         }
         (bool ok, bytes memory ret) = hook.staticcall(

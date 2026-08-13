@@ -10,9 +10,9 @@ import {IHook} from "./IHook.sol";
 ///      via ERC-165 `supportsInterface(type(IHookTransferAuthorization).interfaceId)`. A hook that wants
 ///      to enforce a TWA policy MUST therefore both implement these callbacks and return true from
 ///      `supportsInterface` for this interface id. Legacy hooks — which do not advertise this interface —
-///      are left untouched: the probe is a gas-capped, non-reverting `supportsERC165InterfaceUnchecked`,
-///      so the callbacks are skipped rather than reverting, and existing owners are not broken. A key
-///      opts into TWA limits simply by (re)installing a hook that advertises this interface.
+///      fail the checked ERC-165 compatibility probe, causing TWA settlement to revert rather than bypass
+///      the configured spending policy. A key opts into TWA limits by installing a standards-compliant
+///      hook that advertises this interface.
 ///      Compared to `preCheck`, this surface passes the *authorizing* `keyHash` and the typed transfer
 ///      fields (token / to / value) directly — the hook does not re-decode a synthesized `Call`, and
 ///      knows it is being invoked from the permissionless TWA path rather than a normal batch execute.
