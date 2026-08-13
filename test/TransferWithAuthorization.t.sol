@@ -12,7 +12,8 @@ import {
     RevertingHook,
     RecordingHook,
     NonAdvertisingHook,
-    LegacyHookNoErc165
+    LegacyHookNoErc165,
+    LegacyTruthyFallbackHook
 } from "./mocks/Hooks.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
 import {MessageSignLib} from "src/libraries/MessageSignLib.sol";
@@ -688,6 +689,54 @@ contract TransferWithAuthorizationTest is Base {
         assertEq(hook.preCount(), 0, "legacy hook is never invoked on the TWA path");
         assertEq(token.balanceOf(_charlie), charlieBefore, "no transfer on fail-closed revert");
         assertFalse(itwa.transferAuthorizationState(nonce), "nonce not consumed on revert");
+    }
+
+    function test_truthyFallbackHook_reverts_failClosed() public {
+        LegacyTruthyFallbackHook hook = new LegacyTruthyFallbackHook();
+        bytes32 bobKeyHash = keccak256(abi.encodePacked(_bob));
+        uint256 settings = _packSettings(false, 0, address(hook));
+        _addOwnerToAccount(
+            _alice,
+            _aliceWallet,
+            bobKeyHash,
+            address(_ecdsaValidator),
+            settings
+        );
+
+        bytes32 nonce = keccak256("truthy-fallback-fail-closed");
+        uint256 value = 1 ether;
+        bytes memory sig = _executeSignature(
+            _bobPk,
+            bobKeyHash,
+            address(token),
+            _charlie,
+            value,
+            9_000,
+            11_000,
+            nonce
+        );
+
+        vm.prank(_relayer);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ITransferWithAuthorization
+                    .HookNotTransferAuthorizationCompatible
+                    .selector,
+                bobKeyHash,
+                address(hook)
+            )
+        );
+        itwa.executeTransferWithAuthorization(
+            address(token),
+            _charlie,
+            value,
+            9_000,
+            11_000,
+            nonce,
+            sig
+        );
+
+        assertFalse(itwa.transferAuthorizationState(nonce));
     }
 
     /// @dev Fail-closed: a hook that implements the TWA callbacks but does NOT advertise the interface via

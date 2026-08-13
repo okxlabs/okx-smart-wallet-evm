@@ -73,6 +73,12 @@ contract MockHook is IHook {
     function isValidSignatureCheck(address, bytes32, bytes calldata) external pure returns (bool) {
         return true;
     }
+
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return
+            interfaceId == type(IHook).interfaceId ||
+            interfaceId == 0x01ffc9a7;
+    }
 }
 
 // Test hooks for different scenarios
