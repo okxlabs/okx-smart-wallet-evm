@@ -55,7 +55,7 @@ contract ExecutionTest is Base {
 
         // Add user as validator for complex tests
         bytes32 userKeyHash = keccak256(abi.encodePacked(user));
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings = _packSettings(
             false, // adminFlag
             0, // expiration
             address(0) // hook
@@ -911,8 +911,9 @@ contract ExecutionTest is Base {
         );
 
         // Verify the new owner was added
-        (address validator, , , , ) = IOwnerManager(_aliceWallet)
-            .getOwnerSettings(newOwnerKeyHash);
+        (address validator, ) = IOwnerManager(_aliceWallet).getOwnerConfig(
+            newOwnerKeyHash
+        );
         assertEq(
             validator,
             address(_ecdsaValidator),
@@ -1041,7 +1042,7 @@ contract ExecutionTest is Base {
 
         // Step 2: Check validator for a different keyHash (not address(this))
         bytes32 bobKeyHash = _makeKeyHash(_bob);
-        address validator = IOwnerManager(eoaWallet).getVerifiedValidator(
+        (address validator, ) = IOwnerManager(eoaWallet).getOwnerConfig(
             bobKeyHash
         );
 
@@ -1053,7 +1054,7 @@ contract ExecutionTest is Base {
 
         // Step 3: Verify address(this) returns ECDSA validator
         bytes32 eoaKeyHash = keccak256(abi.encodePacked(eoaWallet));
-        validator = IOwnerManager(eoaWallet).getVerifiedValidator(eoaKeyHash);
+        (validator, ) = IOwnerManager(eoaWallet).getOwnerConfig(eoaKeyHash);
         assertEq(
             validator,
             Static.ECDSA_VALIDATOR_ADDRESS,
@@ -1086,8 +1087,7 @@ contract ExecutionTest is Base {
         });
 
         // Use chainless nonce - starting from 0 for uninitialized wallet
-        uint256 chainlessNonce = (uint256(Static.CHAINLESS_NONCE_KEY) << 64) |
-            uint256(0);
+        uint256 chainlessNonce = _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0);
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: chainlessNonce

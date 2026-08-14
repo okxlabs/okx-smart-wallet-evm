@@ -10,6 +10,12 @@ import {HelperLib} from "./utils/Helper.s.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
 import {SmartWallet} from "src/SmartWallet.sol";
+import {
+    SigCheckHook,
+    TwaOnlySigHook,
+    MalformedSigHook,
+    LegacyBoolFallbackHook
+} from "./mocks/Hooks.sol";
 
 contract IsValidSignatureTest is Base {
     // Passkey-related constants and variables
@@ -33,7 +39,7 @@ contract IsValidSignatureTest is Base {
         );
 
         // Add PasskeyValidator for Alice's wallet
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings = _packSettings(
             true,
             0,
             address(0)
@@ -45,6 +51,95 @@ contract IsValidSignatureTest is Base {
             address(passkeyValidator),
             settings
         );
+    }
+
+    /// @dev Fuzz: a correct owner signature over ANY hash returns the 1271 magic value (owner has no hook).
+    function testFuzz_IsValidSignature_ValidOwnerSig_ReturnsMagic(bytes32 hash) public view {
+        bytes32 aliceKeyHash = _makeKeyHash(_alice);
+        uint48 validUntil = 0;
+        bytes memory sig = _signDigestWithValidation(hash, _alicePk, validUntil);
+        bytes memory signature = abi.encodePacked(aliceKeyHash, validUntil, sig);
+        assertEq(
+            ISmartWallet(_aliceWallet).isValidSignature(hash, signature),
+            Static.MAGIC_VALUE,
+            "valid owner signature over any hash is accepted"
+        );
+    }
+
+    /// @dev Fuzz: a signature from a non-owner key is always rejected.
+    function testFuzz_IsValidSignature_WrongSigner_ReturnsInvalid(bytes32 hash, uint256 wrongPk) public view {
+        wrongPk = bound(wrongPk, 1, type(uint128).max);
+        vm.assume(vm.addr(wrongPk) != _alice);
+        bytes32 aliceKeyHash = _makeKeyHash(_alice);
+        uint48 validUntil = 0;
+        bytes memory sig = _signDigestWithValidation(hash, wrongPk, validUntil);
+        bytes memory signature = abi.encodePacked(aliceKeyHash, validUntil, sig);
+        assertEq(
+            ISmartWallet(_aliceWallet).isValidSignature(hash, signature),
+            Static.INVALID_VALUE,
+            "wrong signer is rejected"
+        );
+    }
+
+    // ===== Hook-gated EIP-1271 (fail-closed) tests =====
+
+    function _addBobWithHook(address hook) internal returns (bytes32 bobKeyHash) {
+        bobKeyHash = _makeKeyHash(_bob);
+        _addOwnerToAccount(
+            _alice,
+            _aliceWallet,
+            bobKeyHash,
+            Static.ECDSA_VALIDATOR_ADDRESS,
+            _packSettings(false, 0, hook)
+        );
+    }
+
+    function _bobSignature(bytes32 hash, bytes32 bobKeyHash) internal view returns (bytes memory) {
+        uint48 validUntil = 0;
+        bytes memory sig = _signDigestWithValidation(hash, _bobPk, validUntil);
+        return abi.encodePacked(bobKeyHash, validUntil, sig);
+    }
+
+    function test_IsValidSignature_HookApproves_ReturnsMagicValue() public {
+        bytes32 bobKeyHash = _addBobWithHook(address(new SigCheckHook(true)));
+        bytes32 hash = keccak256("hook-approves");
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(hash, _bobSignature(hash, bobKeyHash));
+        assertEq(result, Static.MAGIC_VALUE, "hook approves -> magic");
+    }
+
+    function test_IsValidSignature_HookRejects_ReturnsInvalidValue() public {
+        bytes32 bobKeyHash = _addBobWithHook(address(new SigCheckHook(false)));
+        bytes32 hash = keccak256("hook-rejects");
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(hash, _bobSignature(hash, bobKeyHash));
+        assertEq(result, Static.INVALID_VALUE, "valid sig but hook rejects -> invalid");
+    }
+
+    function test_IsValidSignature_HookNotAdvertisingIHook_ReturnsInvalidValue() public {
+        // Hook implements isValidSignatureCheck but advertises only IHookTransferAuthorization.
+        bytes32 bobKeyHash = _addBobWithHook(address(new TwaOnlySigHook()));
+        bytes32 hash = keccak256("hook-not-advertised");
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(hash, _bobSignature(hash, bobKeyHash));
+        assertEq(result, Static.INVALID_VALUE, "hook not advertising IHook -> invalid (fail-closed)");
+    }
+
+    function test_IsValidSignature_HookMalformedReturn_ReturnsInvalidValueWithoutRevert() public {
+        bytes32 bobKeyHash = _addBobWithHook(address(new MalformedSigHook()));
+        bytes32 hash = keccak256("hook-malformed");
+        // ret.length != 32 is treated as rejection; returns the invalid sentinel.
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(hash, _bobSignature(hash, bobKeyHash));
+        assertEq(result, Static.INVALID_VALUE, "malformed hook return -> invalid");
+    }
+
+    function test_IsValidSignature_TruthyFallback_ReturnsInvalidValue() public {
+        bytes32 bobKeyHash = _addBobWithHook(
+            address(new LegacyBoolFallbackHook())
+        );
+        bytes32 hash = keccak256("truthy-fallback");
+        bytes4 result = ISmartWallet(_aliceWallet).isValidSignature(
+            hash,
+            _bobSignature(hash, bobKeyHash)
+        );
+        assertEq(result, Static.INVALID_VALUE, "generic fallback must fail closed");
     }
 
     function test_IsValidSignature_Exactly32Bytes_ReturnsInvalidValue()
@@ -495,7 +590,7 @@ contract IsValidSignatureTest is Base {
         // Add validator using _bob to avoid EIP-7702 fallback collision
         bytes32 bobKeyHash = _makeKeyHash(_bob);
 
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings = _packSettings(
             false,
             0, // No expiry in storage
             address(0)
@@ -604,7 +699,7 @@ contract IsValidSignatureTest is Base {
         uint256 testPubY = 987654321;
         bytes32 passkeyKeyHash = keccak256(abi.encode([testPubX, testPubY]));
 
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings = _packSettings(
             true,
             0,
             address(0)
@@ -707,7 +802,7 @@ contract IsValidSignatureTest is Base {
         bytes32 passkeyKeyHash = keccak256(abi.encode([testPubX, testPubY]));
         uint40 expiry = uint40(block.timestamp + 1 days);
 
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings = _packSettings(
             false,
             expiry,
             address(0)

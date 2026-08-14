@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import {MerkleProofProcessor} from "./MerkleProofProcessor.sol";
+import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 
 /// @title PasskeyValidatorLib
@@ -51,10 +51,7 @@ library PasskeyValidatorLib {
             );
 
         // Process Merkle proofs if present (using fixed signature length approach)
-        bytes32 rootHash = MerkleProofProcessor.processWithMerkleProof(
-            proofs,
-            messageHash
-        );
+        bytes32 rootHash = MerkleProof.processProof(proofs, messageHash);
 
         // Verify that the provided public key matches the registered keyHash
         if (keccak256(abi.encodePacked(sig.pubKeyX, sig.pubKeyY)) != keyHash) {

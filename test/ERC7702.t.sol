@@ -56,12 +56,12 @@ contract ERC7702Test is Base {
         usdcPermit = new USDCTest();
     }
 
-    /// @notice getVerifiedValidator(keccak256(abi.encodePacked(eoa))) returns ECDSA for 7702 EOA (built-in owner).
+    /// @notice getOwnerConfig(keccak256(abi.encodePacked(eoa))) returns ECDSA for 7702 EOA (built-in owner).
     function test_ERC7702_BuiltInOwner_GetVerifiedValidator_ReturnsEcdsa()
         public
     {
         bytes32 eoaKeyHash = keccak256(abi.encodePacked(eoaWallet));
-        address validator = IOwnerManager(eoaWallet).getVerifiedValidator(
+        (address validator, ) = IOwnerManager(eoaWallet).getOwnerConfig(
             eoaKeyHash
         );
         assertEq(validator, Static.ECDSA_VALIDATOR_ADDRESS);
@@ -70,7 +70,7 @@ contract ERC7702Test is Base {
     /// @notice Non-address(this) keyHash has no validator on uninitialized 7702 EOA.
     function test_ERC7702_NonAddressThisKeyHash_ReturnsZeroValidator() public {
         bytes32 bobKeyHash = _makeKeyHash(_bob);
-        address validator = IOwnerManager(eoaWallet).getVerifiedValidator(
+        (address validator, ) = IOwnerManager(eoaWallet).getOwnerConfig(
             bobKeyHash
         );
         assertEq(validator, address(0));
@@ -98,7 +98,7 @@ contract ERC7702Test is Base {
         emit ExecuteSuccessEvent(CallLib.hash(calls), eoaWallet);
         ISmartWallet(eoaWallet).execute(calls);
 
-        (address validator, , , , ) = IOwnerManager(eoaWallet).getOwnerSettings(
+        (address validator, ) = IOwnerManager(eoaWallet).getOwnerConfig(
             newOwnerKeyHash
         );
         assertEq(

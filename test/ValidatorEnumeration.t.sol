@@ -88,7 +88,7 @@ contract ValidatorEnumerationTest is Base {
         bytes32 keyHash2 = _makeKeyHash(_dave);
 
         // Add first validator with settings
-        uint256 settings1 = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings1 = _packSettings(
             true,
             0,
             address(0)
@@ -102,7 +102,7 @@ contract ValidatorEnumerationTest is Base {
         );
 
         // Add second validator with settings
-        uint256 settings2 = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings2 = _packSettings(
             false,
             uint40(block.timestamp + 3600),
             address(0)

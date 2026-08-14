@@ -8,21 +8,18 @@ abstract contract ExecutionManager {
 
     /// @notice Executes a low-level call to a target contract
     /// @param call Call data containing target, value, and calldata
-    function _call(Call calldata call) internal {
+    function _call(Call memory call) internal {
         address target = call.target;
         uint256 value = call.value;
-        bytes calldata data = call.data;
+        bytes memory data = call.data;
 
         assembly {
-            let ptr := mload(0x40)
-            calldatacopy(ptr, data.offset, data.length)
-
             let success := call(
                 gas(),
                 target,
                 value,
-                ptr,
-                data.length,
+                add(data, 0x20),
+                mload(data),
                 0, // no output ptr
                 0 // no output len
             )
@@ -33,8 +30,8 @@ abstract contract ExecutionManager {
                 if gt(len, MAX_RETURNDATA_SIZE) {
                     len := MAX_RETURNDATA_SIZE
                 }
-                returndatacopy(ptr, 0x00, len)
-                revert(ptr, len)
+                returndatacopy(0x00, 0x00, len)
+                revert(0x00, len)
             }
         }
     }

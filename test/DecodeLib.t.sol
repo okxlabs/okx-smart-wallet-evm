@@ -13,11 +13,14 @@ contract DecodeLibHarness {
     function decodeCalls(
         bytes calldata callData
     ) external pure returns (Call[] memory result) {
-        Call[] calldata calls = DecodeLib.decodeCalls(callData);
-        result = new Call[](calls.length);
-        for (uint256 i = 0; i < calls.length; i++) {
-            result[i] = calls[i];
-        }
+        return DecodeLib.decodeCalls(callData);
+    }
+
+    function decodeCallsWithTail(
+        bytes calldata callData,
+        bytes calldata
+    ) external pure returns (Call[] memory result) {
+        return DecodeLib.decodeCalls(callData);
     }
 
     /// @notice Decode signature components (pubKeyHash and validUntil) from signature bytes
@@ -126,74 +129,93 @@ contract DecodeLibTest is Test {
         assertEq(result.length, 0);
     }
 
+    function test_RevertWhen_DecodeCalls_NestedOffsetEscapesParentSlice() public {
+        bytes memory payload = new bytes(548);
+        bytes4 selector = harness.decodeCallsWithTail.selector;
+
+        assembly ("memory-safe") {
+            let p := add(payload, 0x20)
+            mstore(p, selector)
+            // Two dynamic argument offsets, relative to byte 4.
+            mstore(add(p, 0x04), 0x40)
+            mstore(add(p, 0x24), 0x200)
+            // callData.length = 64, callData = [array offset=32, length=1].
+            mstore(add(p, 0x44), 0x40)
+            mstore(add(p, 0x64), 0x20)
+            mstore(add(p, 0x84), 0x01)
+            // Forged Call encoding after the end of callData.
+            mstore(add(p, 0xa4), 0x40)
+            mstore(add(p, 0xe4), 0x000000000000000000000000000000000000bEEF)
+            mstore(add(p, 0x104), 7)
+            mstore(add(p, 0x124), 0x60)
+            mstore(add(p, 0x144), 4)
+            mstore(add(p, 0x164), shl(224, 0xdeadbeef))
+            // Empty second bytes argument keeps the outer calldata valid.
+            mstore(add(p, 0x204), 0)
+        }
+
+        (bool ok, ) = address(harness).call(payload);
+        assertFalse(ok);
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // decodeCalls — Length Validation: callData.length < 32
     // ═══════════════════════════════════════════════════════════════
 
     function test_RevertWhen_DecodeCalls_Empty() public {
-        vm.expectRevert(DecodeLib.InvalidCallData.selector);
+        vm.expectRevert();
         harness.decodeCalls("");
     }
 
     function test_RevertWhen_DecodeCalls_16Bytes() public {
-        vm.expectRevert(DecodeLib.InvalidCallData.selector);
+        vm.expectRevert();
         harness.decodeCalls(new bytes(16));
     }
 
     function test_RevertWhen_DecodeCalls_Exactly31Bytes() public {
-        vm.expectRevert(DecodeLib.InvalidCallData.selector);
+        vm.expectRevert();
         harness.decodeCalls(new bytes(31));
     }
 
-    /// @dev 32 bytes through first check (length >= 32), but relOffset=32 > length-32=0 → revert
-    ///      Valid encoding requires at least 64 bytes
+    /// @dev The ABI decoder rejects an offset whose array length word is missing.
     function test_RevertWhen_DecodeCalls_Exactly32Bytes_OffsetTooLarge()
         public
     {
         bytes memory callData = abi.encodePacked(bytes32(uint256(32)));
         assertEq(callData.length, 32);
-        vm.expectRevert(DecodeLib.InvalidCallData.selector);
+        vm.expectRevert();
         harness.decodeCalls(callData);
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // decodeCalls — Offset Out of Bounds: relOffset > callData.length - 32
+    // decodeCalls — Offset Out of Bounds
     // ═══════════════════════════════════════════════════════════════
 
     function test_RevertWhen_DecodeCalls_OffsetOutOfBounds() public {
-        // callData = 64 bytes, relOffset = 1000 (far beyond callData.length - 32 = 32)
+        // callData = 64 bytes, relOffset = 1000 (outside callData)
         bytes memory callData = abi.encodePacked(
             bytes32(uint256(1000)),
             bytes32(uint256(0))
         );
         assertEq(callData.length, 64);
-        vm.expectRevert(DecodeLib.InvalidCallData.selector);
+        vm.expectRevert();
         harness.decodeCalls(callData);
     }
 
     function test_RevertWhen_DecodeCalls_OffsetExactlyOneBeyondBound() public {
-        // relOffset = 33, callData.length - 32 = 32, 33 > 32 → revert
+        // relOffset = 33 cannot address a complete array length word.
         bytes memory callData = abi.encodePacked(
             bytes32(uint256(33)),
             bytes32(uint256(0))
         );
         assertEq(callData.length, 64);
-        vm.expectRevert(DecodeLib.InvalidCallData.selector);
+        vm.expectRevert();
         harness.decodeCalls(callData);
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // decodeCalls — Overflow Attack Defense Validation
-    //
-    // Old Code Vulnerability (Fixed):
-    //   if gt(add(relOffset, 32), callData.length) { revert }
-    //
-    // When relOffset = type(uint256).max - 31:
-    //   add(type(uint256).max - 31, 32) = 0 (integer overflow wraparound)
-    //   gt(0, callData.length) = false → check bypassed, dataPointer points to arbitrary position
-    //
-    // New Code Fix:
-    //   if (relOffset > callData.length - 32) revert InvalidCallData();
+    // decodeCalls — ABI Decoder Overflow Validation
+    // The standard ABI decoder rejects oversized offsets without manual arithmetic.
     // ═══════════════════════════════════════════════════════════════
 
     function test_RevertWhen_DecodeCalls_OverflowAttack_MaxOffset() public {
@@ -202,7 +224,7 @@ contract DecodeLibTest is Test {
             bytes32(type(uint256).max),
             bytes32(uint256(0))
         );
-        vm.expectRevert(DecodeLib.InvalidCallData.selector);
+        vm.expectRevert();
         harness.decodeCalls(callData);
     }
 
@@ -211,13 +233,12 @@ contract DecodeLibTest is Test {
         public
     {
         uint256 R = type(uint256).max - 31;
-        // Old Code: add(R, 32) = 0, gt(0, 64) = false → old check fails, should revert
-        // New Code: R > 64-32 → R > 32 → true → revert ✓
+        // Manual add(R, 32) would wrap to zero; the ABI decoder must still reject it.
         bytes memory callData = abi.encodePacked(
             bytes32(R),
             bytes32(uint256(0))
         );
-        vm.expectRevert(DecodeLib.InvalidCallData.selector);
+        vm.expectRevert();
         harness.decodeCalls(callData);
     }
 
@@ -226,13 +247,12 @@ contract DecodeLibTest is Test {
     {
         // relOffset = type(uint256).max - 15
         // add(type(uint256).max - 15, 32) = 16 (overflows, wraps to positive)
-        // Old: gt(16, 64) = false → bypass
-        // New: (type(uint256).max - 15) > (64 - 32) → correct revert
+        // Manual add(offset, 32) would wrap to 16; the ABI decoder must reject it.
         bytes memory callData = abi.encodePacked(
             bytes32(type(uint256).max - 15),
             bytes32(uint256(0))
         );
-        vm.expectRevert(DecodeLib.InvalidCallData.selector);
+        vm.expectRevert();
         harness.decodeCalls(callData);
     }
 
@@ -340,14 +360,14 @@ contract DecodeLibTest is Test {
     // Fuzz Tests
     // ═══════════════════════════════════════════════════════════════
 
-    /// @dev Any input shorter than 32 bytes should trigger InvalidCallData
+    /// @dev Any input shorter than 32 bytes should be rejected by the ABI decoder
     function testFuzz_DecodeCalls_ShortInputReverts(bytes memory input) public {
         vm.assume(input.length < 32);
-        vm.expectRevert(DecodeLib.InvalidCallData.selector);
+        vm.expectRevert();
         harness.decodeCalls(input);
     }
 
-    /// @dev For 64 bytes of callData, relOffset > 32 should revert
+    /// @dev For 64 bytes of callData, an offset beyond the encoded array must revert
     function testFuzz_DecodeCalls_OverflowProtection(
         uint256 maliciousOffset
     ) public {
@@ -359,7 +379,7 @@ contract DecodeLibTest is Test {
         );
         assertEq(callData.length, 64);
 
-        vm.expectRevert(DecodeLib.InvalidCallData.selector);
+        vm.expectRevert();
         harness.decodeCalls(callData);
     }
 
