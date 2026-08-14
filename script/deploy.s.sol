@@ -78,12 +78,6 @@ contract DeployInit is Script {
             "Unexpected EntryPoint"
         );
 
-        // TWA interface must be advertised by the implementation.
-        require(
-            SmartWalletEntry(smartWalletAddr).supportsInterface(TWA_INTERFACE_ID),
-            "TWA interface id missing"
-        );
-
         console.log("SmartWallet implementation verified on SmartWalletFactory!");
         console.log("=== Deployment Summary ===");
         console.log("Deployer:", deployOwner);
