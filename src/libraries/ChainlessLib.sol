@@ -3,12 +3,28 @@ pragma solidity ^0.8.29;
 
 import {Call} from "../Types.sol";
 import {OwnerManager} from "../OwnerManager.sol";
+import {Static} from "./Static.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 
 /// @title ChainlessLib
 /// @notice Library for chainless operation validation
 /// @dev Provides validation functions for operations that can be performed without chain ID
 library ChainlessLib {
+    /// @notice Returns whether the nonce belongs to the chainless namespace.
+    function isChainlessNonce(uint256 nonce) internal pure returns (bool) {
+        return nonce >> 96 == Static.CHAINLESS_NONCE_KEY;
+    }
+
+    /// @notice Extracts the 16-bit operation type from a chainless nonce.
+    function operationType(uint256 nonce) internal pure returns (uint16) {
+        return uint16(nonce >> 80);
+    }
+
+    /// @notice Extracts the 16-bit independent queue id from a chainless nonce.
+    function queueId(uint256 nonce) internal pure returns (uint16) {
+        return uint16(nonce >> 64);
+    }
+
     /// @notice Checks if a function selector is allowed to skip chain ID validation
     /// @param functionSelector The 4-byte function selector to check
     /// @return true if the selector is allowed to skip chain ID validation, false otherwise
@@ -34,7 +50,7 @@ library ChainlessLib {
     /// @dev This is used when CHAINLESS_NONCE_KEY is used to ensure only allowed operations are performed
     ///      All chainless calls must be self-calls (target == address(this))
     function validateChainlessNonceCallData(
-        Call[] calldata calls,
+        Call[] memory calls,
         address selfAddress
     ) internal pure returns (bool) {
         for (uint256 i; i < calls.length; i++) {
@@ -43,12 +59,12 @@ library ChainlessLib {
                 return false;
             }
 
-            bytes calldata callData = calls[i].data;
+            bytes memory callData = calls[i].data;
             if (callData.length < 4) {
                 return false;
             }
 
-            bytes4 selector = bytes4(callData[0:4]);
+            bytes4 selector = bytes4(callData);
 
             if (!canSkipChainIdValidation(selector)) {
                 return false;

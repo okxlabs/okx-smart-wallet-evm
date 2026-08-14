@@ -2,8 +2,9 @@
 pragma solidity ^0.8.29;
 
 import {Call} from "../Types.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
-interface IHook {
+interface IHook is IERC165 {
     /// @notice Called before execution of calls to perform pre-execution checks
     /// @dev Can be used for validation, access control, or state preparation
     /// @param calls Array of calls that will be executed
@@ -22,4 +23,11 @@ interface IHook {
         bytes calldata preCheckRet,
         address executor
     ) external payable;
+
+    /// 
+    function isValidSignatureCheck(
+        address caller,       
+        bytes32 hash,          
+        bytes calldata signature 
+    ) external view returns (bool);
 }

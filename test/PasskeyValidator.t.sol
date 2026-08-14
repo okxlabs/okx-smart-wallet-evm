@@ -84,8 +84,9 @@ contract PasskeyValidatorTest is Base {
     }
 
     function test_PasskeyValidator_AddedToWallet() public view {
-        (address validator, , , , ) = IOwnerManager(_aliceWallet)
-            .getOwnerSettings(testKeyHash);
+        (address validator, ) = IOwnerManager(_aliceWallet).getOwnerConfig(
+            testKeyHash
+        );
         assertEq(validator, address(passkeyValidator));
     }
 
@@ -488,15 +489,15 @@ contract PasskeyValidatorTest is Base {
      * @dev Verify built-in validator setup is correct
      */
     function test_BuiltinValidator_Setup() public view {
-        (address validator, , , , ) = IOwnerManager(builtinWallet)
-            .getOwnerSettings(builtinKeyHash);
+        (address validator, ) = IOwnerManager(builtinWallet)
+            .getOwnerConfig(builtinKeyHash);
         assertEq(
             validator,
             Static.PASSKEY_VALIDATOR_ADDRESS,
             "Built-in validator should be registered"
         );
 
-        address verified = IOwnerManager(builtinWallet).getVerifiedValidator(
+        (address verified, ) = IOwnerManager(builtinWallet).getOwnerConfig(
             builtinKeyHash
         );
         assertEq(

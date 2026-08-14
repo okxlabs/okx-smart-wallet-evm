@@ -1,20 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import {ERC712} from "./ERC712.sol";
 import {ERC7201} from "./ERC7201.sol";
 import {ISmartWallet} from "./interfaces/ISmartWallet.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {EnumerableSetLib} from "solady/utils/EnumerableSetLib.sol";
-import {OwnerManager} from "./OwnerManager.sol";
-import {NonceManager} from "./NonceManager.sol";
-import {ValidationManager} from "./ValidationManager.sol";
+import {NonceManager, ChainlessLib} from "./NonceManager.sol";
 import {ExecutionManager} from "./ExecutionManager.sol";
+import {
+    TransferWithAuthorization,
+    ERC712,
+    OwnerManager,
+    ValidationManager
+} from "./TransferWithAuthorization.sol";
 import {FallbackHandler} from "./FallbackHandler.sol";
 import {Call, BatchedCall, InitialOwner} from "./Types.sol";
 import {Static} from "./libraries/Static.sol";
-import {IHook} from "./interfaces/IHook.sol";
+import {HookLib} from "./libraries/HookLib.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {ERC4337Account} from "./ERC4337Account.sol";
 import {PackedUserOperation} from "account-abstraction/interfaces/PackedUserOperation.sol";
@@ -22,7 +25,6 @@ import {CallLib, BatchedCallLib} from "./libraries/BatchedCallLib.sol";
 import {AllowanceManager} from "./AllowanceManager.sol";
 import {UUPSUpgradeable} from "solady/utils/UUPSUpgradeable.sol";
 import {DecodeLib} from "./libraries/DecodeLib.sol";
-import {ChainlessLib} from "./libraries/ChainlessLib.sol";
 import {MessageSignLib} from "./libraries/MessageSignLib.sol";
 
 /// @dev This contract uses UUPS upgradeable pattern. All state is stored via inherited contracts.
@@ -35,6 +37,7 @@ abstract contract SmartWallet is
     ValidationManager,
     ExecutionManager,
     ERC712,
+    TransferWithAuthorization,
     FallbackHandler,
     Initializable,
     AllowanceManager,
@@ -54,17 +57,6 @@ abstract contract SmartWallet is
         _disableInitializers();
     }
 
-    modifier onlyOwner() {
-        bytes32 keyHash = keccak256(abi.encodePacked(msg.sender));
-        address validator = getVerifiedValidator(keyHash);
-
-        if (validator == address(0)) {
-            revert ISmartWallet.InvalidCaller(msg.sender);
-        }
-
-        _;
-    }
-
     /// @notice Initializes the smart wallet with initial owners
     /// @dev Can only be called by factory during deployment. For EIP-7702 scenarios,
     ///      use execute/executeWithRelayer to add owners after delegation
@@ -73,8 +65,7 @@ abstract contract SmartWallet is
         InitialOwner[] calldata initialOwners
     ) external initializer onlyFactory {
         // Set up initial owners
-        // isAdmin = true, expiration = 0 (never expires), hook = address(0)
-        uint256 settings = packSettings(true, 0, address(0));
+        uint256 settings = Static.ROOT_KEY_SETTINGS;
         uint256 len = initialOwners.length;
         if (len == 0) {
             revert InitialOwnersLengthIsZero();
@@ -92,8 +83,13 @@ abstract contract SmartWallet is
     /// @notice Executes multiple contract calls in a single transaction
     /// @dev Only callable by the account owner
     /// @param calls Array of Call structs containing destination address, value, and calldata
-    function execute(Call[] calldata calls) external onlyOwner {
-        _batchCall(calls, keccak256(abi.encodePacked(msg.sender)));
+    function execute(Call[] calldata calls) external {
+        bytes32 keyHash = keccak256(abi.encodePacked(msg.sender));
+        (address validator, uint256 settings) = getOwnerConfig(keyHash);
+        if (validator == address(0)) {
+            revert ISmartWallet.InvalidCaller(msg.sender);
+        }
+        _batchCall(calls, settings);
         emit ExecuteSuccessEvent(CallLib.hash(calls), msg.sender);
     }
 
@@ -112,9 +108,14 @@ abstract contract SmartWallet is
             userOp.signature
         );
 
-        Call[] calldata calls = DecodeLib.decodeCalls(userOp.callData[4:]);
+        (address validator, uint256 settings) = getOwnerConfig(keyHash);
+        if (validator == address(0)) {
+            revert ISmartWallet.InvalidKeyHash(keyHash);
+        }
 
-        _batchCall(calls, keyHash);
+        Call[] memory calls = abi.decode(userOp.callData[4:], (Call[]));
+
+        _batchCall(calls, settings);
     }
 
     /// @notice Executes a validated call and subsequent batch of user's calls sent by a relayer
@@ -126,12 +127,12 @@ abstract contract SmartWallet is
         BatchedCall calldata batchedCall,
         bytes calldata validatorData
     ) external {
-        (bytes32 pubKeyHash, bytes32 dataHash) = _validateAndExtractRelayerData(
+        (uint256 settings, bytes32 dataHash) = _validateAndExtractRelayerData(
             batchedCall,
             validatorData
         );
 
-        _batchCall(batchedCall.calls, pubKeyHash);
+        _batchCall(batchedCall.calls, settings);
 
         emit RelayerExecuteSuccessEvent(
             dataHash,
@@ -143,44 +144,34 @@ abstract contract SmartWallet is
     /// @notice Executes multiple contract calls in a single transaction
     /// @dev Reverts if any of the calls fail
     /// @param calls Array of Call structs containing destination address, value, and calldata
-    function _batchCall(Call[] calldata calls, bytes32 keyHash) internal {
-        uint256 settings = _ownerSettings[keyHash];
+    function _batchCall(Call[] memory calls, uint256 settings) internal {
         address hookAddress = getHook(settings);
+        bool canSelfCall = isAdmin(settings);
+
+        bytes memory ret = HookLib.preCheck(hookAddress, calls, msg.sender);
 
         // Allow self-calls for EIP-7702 EOAs or admins
         // Built-in address(this) owner is treated as admin by default
-        bool allowSelfCall = keyHash ==
-            keccak256(abi.encodePacked(address(this))) ||
-            isAdmin(settings);
-
-        bytes memory ret;
-        if (hookAddress != address(0)) {
-            ret = IHook(hookAddress).preCheck(calls, msg.sender);
-        }
-
         for (uint256 i; i < calls.length; i++) {
-            if (calls[i].target == address(this) && !allowSelfCall) {
+            if (calls[i].target == address(this) && !canSelfCall) {
                 revert ISmartWallet.NonAdminSelfCall();
             }
             _call(calls[i]);
         }
 
-        // Only call postCheck if hook exists
-        if (hookAddress != address(0)) {
-            IHook(hookAddress).postCheck(ret, msg.sender);
-        }
+        HookLib.postCheck(hookAddress, ret, msg.sender);
     }
 
     /// @notice Validates and extracts data for relayer execution
     /// @dev Comprehensive validation function for executeWithRelayer
     /// @param batchedCall The batched call data
     /// @param validatorData The validator data containing pubKeyHash, validUntil, and signature
-    /// @return pubKeyHash The extracted public key hash
+    /// @return settings The verified owner's packed settings
     /// @return dataHash The computed data hash for event emission
     function _validateAndExtractRelayerData(
-        BatchedCall calldata batchedCall,
+        BatchedCall memory batchedCall,
         bytes calldata validatorData
-    ) internal returns (bytes32 pubKeyHash, bytes32 dataHash) {
+    ) internal returns (uint256 settings, bytes32 dataHash) {
         // Step 1: Validate and consume nonce
         if (!validateAndUpdateNonce(batchedCall.nonce))
             revert ISmartWallet.InvalidNonce(batchedCall.nonce);
@@ -193,8 +184,7 @@ abstract contract SmartWallet is
             );
         }
         // Step 2: Extract validation components from validatorData
-        uint48 validUntil;
-        (pubKeyHash, validUntil) = DecodeLib.decodeSignatureComponents(
+        (bytes32 pubKeyHash, uint48 validUntil) = DecodeLib.decodeSignatureComponents(
             validatorData
         );
 
@@ -203,16 +193,17 @@ abstract contract SmartWallet is
             revert ISmartWallet.ExpiryPassed(validUntil);
 
         // Step 4: Verify validator exists and is not expired
-        address validator = getVerifiedValidator(pubKeyHash);
-        if (validator == address(0))
+        address validator;
+        (validator, settings) = getOwnerConfig(pubKeyHash);
+        if (validator == address(0)) {
             revert ISmartWallet.InvalidKeyHash(pubKeyHash);
+        }
 
         // Step 5: Compute the data hash based on nonce type
-        uint256 nonceKey = batchedCall.nonce >> 64;
         bytes32 intentHash = batchedCall.hash(validUntil, IMPLEMENTATION);
 
         // Step 6: Handle chainless execution if applicable
-        if (nonceKey == Static.CHAINLESS_NONCE_KEY) {
+        if (ChainlessLib.isChainlessNonce(batchedCall.nonce)) {
             // Validate all calls are allowed for chainless execution
             if (
                 !ChainlessLib.validateChainlessNonceCallData(
@@ -220,7 +211,15 @@ abstract contract SmartWallet is
                     address(this)
                 )
             ) {
-                revert ISmartWallet.InvalidNonceKey(nonceKey);
+                revert ISmartWallet.InvalidNonceKey(
+                    batchedCall.nonce >> 96
+                );
+            }
+            
+            if (!_validateAndUpdateChainlessQueue(batchedCall.nonce)) {
+                revert ISmartWallet.InvalidNonceKey(
+                    batchedCall.nonce >> 96
+                );
             }
             // Hash without chain ID for cross-chain compatibility
             dataHash = hashTypedDataSansChainId(intentHash);
@@ -263,14 +262,13 @@ abstract contract SmartWallet is
             .decodeSignatureComponents(userOp.signature);
 
         // Step 4: Verify validator exists and is not expired
-        address validator = getVerifiedValidator(pubKeyHash);
+        (address validator, ) = getOwnerConfig(pubKeyHash);
         if (validator == address(0)) return Static.SIG_VALIDATION_FAILED;
 
         // Step 5: Handle chainless execution if applicable
-        uint256 nonceKey = userOp.nonce >> 64;
-        if (nonceKey == Static.CHAINLESS_NONCE_KEY) {
+        if (ChainlessLib.isChainlessNonce(userOp.nonce)) {
             // Decode calls from userOp.callData
-            Call[] calldata calls = DecodeLib.decodeCalls(userOp.callData[4:]);
+            Call[] memory calls = abi.decode(userOp.callData[4:], (Call[]));
 
             // Validate all calls are allowed to skip chain ID validation
             if (
@@ -279,6 +277,12 @@ abstract contract SmartWallet is
                     address(this)
                 )
             ) {
+                return Static.SIG_VALIDATION_FAILED;
+            }
+
+            // EntryPoint owns the 64-bit sequence, while the wallet owns the
+            // per-operation-type chainless queue watermark.
+            if (!_validateAndUpdateChainlessQueue(userOp.nonce)) {
                 return Static.SIG_VALIDATION_FAILED;
             }
 
@@ -338,7 +342,7 @@ abstract contract SmartWallet is
             if (_isExpired(validUntil)) return Static.INVALID_VALUE;
 
             // Step 3: Get and verify validator exists
-            address validator = getVerifiedValidator(pubKeyHash);
+            (address validator, uint256 settings) = getOwnerConfig(pubKeyHash);
             if (validator == address(0)) return Static.INVALID_VALUE;
 
             // Step 4: Hash the message with EIP-712 standard
@@ -346,17 +350,29 @@ abstract contract SmartWallet is
                 MessageSignLib.hash(_hash, validUntil, IMPLEMENTATION)
             );
 
-            // Step 5: Validate the signature and return result
-            return
-                _validateSignature(
+            // Step 5: Cryptographic validation first (cheap fail-fast, before any hook staticcall).
+            if (
+                !_validateSignature(
                     validator,
                     pubKeyHash,
                     typedDataHash,
                     signature[38:]
                 )
-                    ? Static.MAGIC_VALUE
-                    : Static.INVALID_VALUE;
+            ) {
+                return Static.INVALID_VALUE;
+            }
+
+            // Step 6: Fail closed — if the signing key has a spending-policy hook, that hook MUST
+            //         advertise `IHook` and approve this EIP-1271 signature, otherwise it is rejected.
+            //         This stops a restricted key from using EIP-1271 (e.g. a Permit) as an escape
+            //         hatch around the policy its hook enforces on the execute / TWA paths.
+            address hookAddress = getHook(settings);
+            if (!HookLib.isValidSignatureCheck(hookAddress, msg.sender, _hash, signature)) {
+                return Static.INVALID_VALUE;
+            }
+            return Static.MAGIC_VALUE;
         }
+
         return Static.INVALID_VALUE;
     }
 
