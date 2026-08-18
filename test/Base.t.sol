@@ -492,8 +492,8 @@ contract Base is Test {
     // Helper function for tests to check if a signer is expired
     function _isSignerExpired(address wallet, bytes32 keyHash) internal view returns (bool) {
         IOwnerManager manager = IOwnerManager(wallet);
-        (address validator, ) = manager.getOwnerConfig(keyHash);
-        return manager.hasOwner(keyHash) && validator == address(0);
+        (, uint256 settings) = manager.getOwnerConfig(keyHash);
+        return manager.hasOwner(keyHash) && manager.isSettingsExpired(settings);
     }
 
     // Helper function for tests to get signer expiration

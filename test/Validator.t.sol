@@ -343,7 +343,7 @@ contract ValidatorTest is Base {
         assertTrue(_isSignerExpired(_aliceWallet, keyHash));
     }
 
-    function test_GetVerifiedValidator_ReturnsZeroForExpiredOwner() public {
+    function test_GetOwnerConfig_ReturnsRawConfigForExpiredOwner() public {
         // Add a validator with short expiration time
         bytes32 keyHash = _makeKeyHash(_charlie);
         address validatorAddress = Static.ECDSA_VALIDATOR_ADDRESS;
@@ -383,14 +383,14 @@ contract ValidatorTest is Base {
         // Fast forward time past expiration
         vm.warp(block.timestamp + 101);
 
-        // After expiration, getOwnerConfig should return address(0)
+        // After expiration, getOwnerConfig should still return the raw validator.
         (verifiedValidator, ) = IOwnerManager(_aliceWallet).getOwnerConfig(
             keyHash
         );
         assertEq(
             verifiedValidator,
-            address(0),
-            "getOwnerConfig should return address(0) for expired validator"
+            validatorAddress,
+            "getOwnerConfig should retain the expired owner's validator"
         );
 
         assertEq(
@@ -406,7 +406,7 @@ contract ValidatorTest is Base {
         );
     }
 
-    function test_GetVerifiedValidator_ReturnsZeroForExpiredOwnerWithVerification()
+    function test_GetOwnerConfig_RequiresExplicitExpirationCheck()
         public
     {
         // Add a validator with short expiration time
@@ -448,14 +448,14 @@ contract ValidatorTest is Base {
         // Fast forward time past expiration
         vm.warp(block.timestamp + 101);
 
-        // After expiration, getOwnerConfig should return address(0)
+        // Raw lookup still returns the validator; expiration is a separate check.
         (verifiedValidator, ) = IOwnerManager(_aliceWallet).getOwnerConfig(
             keyHash
         );
         assertEq(
             verifiedValidator,
-            address(0),
-            "getOwnerConfig should return address(0) for expired validator"
+            validatorAddress,
+            "getOwnerConfig should retain the expired owner's validator"
         );
 
         assertEq(

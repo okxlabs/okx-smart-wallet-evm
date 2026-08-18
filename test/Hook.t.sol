@@ -1622,11 +1622,19 @@ contract HookTest is Base {
         // Fast forward to expire Bob's ownership
         vm.warp(block.timestamp + 2);
 
-        // Bob's validator should be expired
-        (address bobValidator, ) = IOwnerManager(_aliceWallet).getOwnerConfig(
-            bobKeyHash
+        // Raw configuration remains readable, while expiration is checked separately.
+        (address bobValidator, uint256 bobSettings) = IOwnerManager(
+            _aliceWallet
+        ).getOwnerConfig(bobKeyHash);
+        assertEq(
+            bobValidator,
+            Static.ECDSA_VALIDATOR_ADDRESS,
+            "Bob's raw validator should remain readable"
         );
-        assertEq(bobValidator, address(0), "Bob's validator should be expired");
+        assertTrue(
+            IOwnerManager(_aliceWallet).isSettingsExpired(bobSettings),
+            "Bob's settings should be expired"
+        );
 
         // But address(this) should still work
         bytes32 selfKeyHash = keccak256(abi.encodePacked(_aliceWallet));
