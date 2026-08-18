@@ -86,7 +86,7 @@ abstract contract SmartWallet is
     function execute(Call[] calldata calls) external {
         bytes32 keyHash = keccak256(abi.encodePacked(msg.sender));
         (address validator, uint256 settings) = getOwnerConfig(keyHash);
-        if (validator == address(0)) {
+        if (validator == address(0) || isSettingsExpired(settings)) {
             revert ISmartWallet.InvalidCaller(msg.sender);
         }
         _batchCall(calls, settings);
@@ -109,7 +109,7 @@ abstract contract SmartWallet is
         );
 
         (address validator, uint256 settings) = getOwnerConfig(keyHash);
-        if (validator == address(0)) {
+        if (validator == address(0) || isSettingsExpired(settings)) {
             revert ISmartWallet.InvalidKeyHash(keyHash);
         }
 
@@ -195,7 +195,7 @@ abstract contract SmartWallet is
         // Step 4: Verify validator exists and is not expired
         address validator;
         (validator, settings) = getOwnerConfig(pubKeyHash);
-        if (validator == address(0)) {
+        if (validator == address(0) || isSettingsExpired(settings)) {
             revert ISmartWallet.InvalidKeyHash(pubKeyHash);
         }
 
@@ -262,7 +262,7 @@ abstract contract SmartWallet is
             .decodeSignatureComponents(userOp.signature);
 
         // Step 4: Verify validator exists and is not expired
-        (address validator, ) = getOwnerConfig(pubKeyHash);
+        (address validator, uint256 settings) = getOwnerConfig(pubKeyHash);
         if (validator == address(0)) return Static.SIG_VALIDATION_FAILED;
 
         // Step 5: Handle chainless execution if applicable
@@ -304,8 +304,7 @@ abstract contract SmartWallet is
             )
         ) return Static.SIG_VALIDATION_FAILED;
 
-        // Step 8: Return the validation data in EntryPoint-compatible format
-        return uint256(validUntil) << 160;
+        validationData = uint256(_getEffectiveValidUntil(validUntil, uint48(getExpiration(settings)))) << 160;
     }
 
     /// @notice Implements EIP-1271 signature validation standard
@@ -343,7 +342,7 @@ abstract contract SmartWallet is
 
             // Step 3: Get and verify validator exists
             (address validator, uint256 settings) = getOwnerConfig(pubKeyHash);
-            if (validator == address(0)) return Static.INVALID_VALUE;
+            if (validator == address(0) || isSettingsExpired(settings)) return Static.INVALID_VALUE;
 
             // Step 4: Hash the message with EIP-712 standard
             bytes32 typedDataHash = hashTypedData(

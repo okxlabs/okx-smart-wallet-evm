@@ -142,7 +142,7 @@ abstract contract TransferWithAuthorization is
         keyHash = bytes32(signature[:SIGNATURE_ENVELOPE_MIN_LENGTH]);
         address validator;
         (validator, settings) = getOwnerConfig(keyHash);
-        if (validator == address(0)) revert ISmartWallet.InvalidSignature();
+        if (validator == address(0) || isSettingsExpired(settings)) revert ISmartWallet.InvalidSignature();
 
         bytes32 digest = hashTypedData(structHash);
         if (!_validateSignature(validator, keyHash, digest, signature[SIGNATURE_ENVELOPE_MIN_LENGTH:])) {

@@ -15,6 +15,22 @@ abstract contract ValidationManager {
         return expiry != 0 && expiry < block.timestamp;
     }
 
+    /// @notice Computes the effective ERC-4337 expiration for a signed operation
+    /// @dev A zero value means no expiration and is therefore treated as infinity.
+    ///      Returns zero only when both inputs are zero; otherwise returns the
+    ///      finite input or the earlier of the two finite expirations.
+    /// @param validUntil Expiration authenticated by the operation signature
+    /// @param keyExpiration Expiration configured for the signing owner
+    /// @return effectiveValidUntil The upper time bound to encode in validationData
+    function _getEffectiveValidUntil(
+        uint48 validUntil,
+        uint48 keyExpiration
+    ) internal pure returns (uint48 effectiveValidUntil) {
+        if (validUntil == 0) return keyExpiration;
+        if (keyExpiration == 0) return validUntil;
+        return validUntil > keyExpiration ? keyExpiration : validUntil;
+    }
+
     /// @notice Validates a signature using built-in validators or external validator contracts
     /// @dev Three validation methods are supported:
     ///      1. ECDSA validation (when validator == address(1)): Uses ECDSAValidatorLib for validation
