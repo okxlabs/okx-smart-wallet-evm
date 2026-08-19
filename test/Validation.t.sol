@@ -819,6 +819,106 @@ contract ValidationTest is Base {
         );
     }
 
+    function test_RevertWhen_ExecuteWithRelayer_NonAdminCannotAdvanceChainlessQueue()
+        public
+    {
+        bytes32 bobKeyHash = _makeKeyHash(_bob);
+        _addOwnerToAccount(
+            _alice,
+            _aliceWallet,
+            bobKeyHash,
+            address(_ecdsaValidator),
+            _packSettings(false, 0, address(0))
+        );
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: _aliceWallet,
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnerManager.addOwner.selector,
+                _makeKeyHash(_charlie),
+                address(_ecdsaValidator),
+                0
+            )
+        });
+        uint256 chainlessNonce = _chainlessNonce(
+            CHAINLESS_OPERATION_TYPE_1,
+            type(uint16).max - 1,
+            0
+        );
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: chainlessNonce
+        });
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _bob,
+            _bobPk,
+            batchedCall,
+            uint48(0)
+        );
+
+        assertEq(
+            INonceManager(_aliceWallet).getChainlessQueueState(
+                CHAINLESS_OPERATION_TYPE_1
+            ),
+            0
+        );
+
+        vm.prank(relayer);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISmartWallet.InvalidNonceKey.selector,
+                Static.CHAINLESS_NONCE_KEY
+            )
+        );
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
+
+        assertEq(
+            INonceManager(_aliceWallet).getChainlessQueueState(
+                CHAINLESS_OPERATION_TYPE_1
+            ),
+            0
+        );
+    }
+
+    function test_ExecuteWithRelayer_AllowsAdminEmptyChainlessCalls() public {
+        Call[] memory calls = new Call[](0);
+        uint256 chainlessNonce = _chainlessNonce(
+            CHAINLESS_OPERATION_TYPE_1,
+            1,
+            0
+        );
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: chainlessNonce
+        });
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
+        );
+
+        vm.prank(relayer);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
+
+        assertEq(
+            INonceManager(_aliceWallet).getChainlessQueueState(
+                CHAINLESS_OPERATION_TYPE_1
+            ),
+            2
+        );
+    }
+
     function test_RevertWhen_ExecuteWithRelayer_DoesNotAllowChainlessNonceForUpdateOwner()
         public
     {

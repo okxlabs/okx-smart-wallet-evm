@@ -36,13 +36,14 @@ interface IOwnerManager {
     /// @param keyHash The public key hash to associate with this validator
     function removeOwner(bytes32 keyHash) external;
 
-    /// @notice Returns the active validator and packed settings for a keyHash
+    /// @notice Returns the stored validator and packed settings for a keyHash
     /// @dev For EIP-7702 compatibility, the root key always returns the built-in
-    ///      ECDSA validator and root-key settings. Missing or expired owners return
-    ///      address(0) as validator.
+    ///      ECDSA validator and root-key settings. Missing owners return
+    ///      `(address(0), 0)`. Registered owners return their raw configuration,
+    ///      including expired settings; callers must enforce expiration where required.
     /// @param keyHash The owner key hash to query
-    /// @return validator The active validator, or address(0) if missing or expired
-    /// @return settings The owner's packed settings
+    /// @return validator The stored validator, or address(0) if the owner is missing
+    /// @return settings The owner's raw packed settings
     function getOwnerConfig(
         bytes32 keyHash
     ) external view returns (address validator, uint256 settings);

@@ -191,9 +191,6 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
         }
 
         settings = _ownerSettings[keyHash];
-        if (isSettingsExpired(settings)) {
-            validator = address(0);
-        }
     }
 
     /// @notice Internal function to remove an owner's validator mapping

@@ -17,6 +17,7 @@ import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
 import {Call} from "src/Types.sol";
 import {OwnerManager} from "src/OwnerManager.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {INonceManager} from "src/interfaces/INonceManager.sol";
 
 // Mock contract moved from end of file
 contract MockEntryPoint {
@@ -1047,6 +1048,86 @@ contract ValidateUserOpTest is Base {
             _testValidateUserOp(_aliceWallet, userOp, missingAccountFunds),
             0,
             "addOwner should succeed with chainless nonce"
+        );
+    }
+
+    function test_ValidateUserOp_NonAdminCannotAdvanceChainlessQueue_ReturnsSigValidationFailed()
+        external
+    {
+        bytes32 bobKeyHash = _makeKeyHash(_bob);
+        _addOwnerToAccount(
+            _alice,
+            _aliceWallet,
+            bobKeyHash,
+            address(_ecdsaValidator),
+            _packSettings(false, 0, address(0))
+        );
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: _aliceWallet,
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnerManager.addOwner.selector,
+                _makeKeyHash(_charlie),
+                address(_ecdsaValidator),
+                0
+            )
+        });
+
+        PackedUserOperation memory userOp;
+        userOp.sender = _aliceWallet;
+        userOp.nonce = _chainlessNonce(
+            CHAINLESS_OPERATION_TYPE_1,
+            type(uint16).max - 1,
+            0
+        );
+        userOp.callData = _encodeExecuteUserOpCalls(calls);
+        (userOp.signature, ) = _prepareAndSignUserOp(
+            userOp,
+            _bob,
+            _bobPk,
+            _aliceWallet
+        );
+
+        assertEq(
+            _testValidateUserOp(_aliceWallet, userOp, 0),
+            Static.SIG_VALIDATION_FAILED
+        );
+        assertEq(
+            INonceManager(_aliceWallet).getChainlessQueueState(
+                CHAINLESS_OPERATION_TYPE_1
+            ),
+            0
+        );
+    }
+
+    function test_ValidateUserOp_AllowsAdminEmptyChainlessCalls() external {
+        Call[] memory calls = new Call[](0);
+        PackedUserOperation memory userOp;
+        userOp.sender = _aliceWallet;
+        userOp.nonce = _chainlessNonce(
+            CHAINLESS_OPERATION_TYPE_1,
+            1,
+            0
+        );
+        userOp.callData = _encodeExecuteUserOpCalls(calls);
+        (userOp.signature, ) = _prepareAndSignUserOp(
+            userOp,
+            _alice,
+            _alicePk,
+            _aliceWallet
+        );
+
+        assertEq(
+            _testValidateUserOp(_aliceWallet, userOp, 0),
+            0
+        );
+        assertEq(
+            INonceManager(_aliceWallet).getChainlessQueueState(
+                CHAINLESS_OPERATION_TYPE_1
+            ),
+            2
         );
     }
 
