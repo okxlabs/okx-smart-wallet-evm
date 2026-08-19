@@ -83,7 +83,7 @@ abstract contract SmartWallet is
     /// @notice Executes multiple contract calls in a single transaction
     /// @dev Only callable by the account owner
     /// @param calls Array of Call structs containing destination address, value, and calldata
-    function execute(Call[] calldata calls) external {
+    function execute(Call[] memory calls) external {
         bytes32 keyHash = keccak256(abi.encodePacked(msg.sender));
         (address validator, uint256 settings) = getOwnerConfig(keyHash);
         if (validator == address(0) || isSettingsExpired(settings)) {
@@ -204,6 +204,14 @@ abstract contract SmartWallet is
 
         // Step 6: Handle chainless execution if applicable
         if (ChainlessLib.isChainlessNonce(batchedCall.nonce)) {
+            // Chainless queues control privileged owner-management and upgrade
+            // operations, so non-admin owners must not be able to advance them.
+            if (!isAdmin(settings)) {
+                revert ISmartWallet.InvalidNonceKey(
+                    batchedCall.nonce >> 96
+                );
+            }
+
             // Validate all calls are allowed for chainless execution
             if (
                 !ChainlessLib.validateChainlessNonceCallData(
@@ -215,7 +223,7 @@ abstract contract SmartWallet is
                     batchedCall.nonce >> 96
                 );
             }
-            
+
             if (!_validateAndUpdateChainlessQueue(batchedCall.nonce)) {
                 revert ISmartWallet.InvalidNonceKey(
                     batchedCall.nonce >> 96
@@ -267,6 +275,10 @@ abstract contract SmartWallet is
 
         // Step 5: Handle chainless execution if applicable
         if (ChainlessLib.isChainlessNonce(userOp.nonce)) {
+            // Reject before updating the queue floor: EntryPoint validation
+            // state persists even when the subsequent execution fails.
+            if (!isAdmin(settings)) return Static.SIG_VALIDATION_FAILED;
+
             // Decode calls from userOp.callData
             Call[] memory calls = abi.decode(userOp.callData[4:], (Call[]));
 
