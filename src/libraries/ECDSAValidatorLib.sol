@@ -27,7 +27,6 @@ library ECDSAValidatorLib {
             return false;
         }
 
-        bytes memory signature = validatorData[:ECDSA_SIGNATURE_LENGTH];
         if (validatorData.length > ECDSA_SIGNATURE_LENGTH) {
             bytes32[] memory proofs = abi.decode(
                 validatorData[ECDSA_SIGNATURE_LENGTH:],
@@ -37,7 +36,7 @@ library ECDSAValidatorLib {
         }
 
         // Recover signer and verify against keyHash
-        (address recoveredSigner, , ) = messageHash.tryRecover(signature);
+        (address recoveredSigner, , ) = messageHash.tryRecover(validatorData[:ECDSA_SIGNATURE_LENGTH]);
         if (recoveredSigner == address(0)) {
             return false;
         }
