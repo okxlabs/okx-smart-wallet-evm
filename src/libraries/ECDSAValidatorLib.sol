@@ -36,7 +36,7 @@ library ECDSAValidatorLib {
         }
 
         // Recover signer and verify against keyHash
-        (address recoveredSigner, , ) = messageHash.tryRecover(validatorData[:ECDSA_SIGNATURE_LENGTH]);
+        (address recoveredSigner, , ) = messageHash.tryRecoverCalldata(validatorData[:ECDSA_SIGNATURE_LENGTH]);
         if (recoveredSigner == address(0)) {
             return false;
         }
