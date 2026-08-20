@@ -96,8 +96,12 @@ contract RevokedOwnerUserOpTest is Base {
         );
         assertEq(
             validator,
-            address(0),
-            "expired owner must not have an active validator"
+            address(1),
+            "expired owner's raw validator must remain readable"
+        );
+        assertTrue(
+            IOwnerManager(_aliceWallet).isSettingsExpired(expiredSettings),
+            "owner settings must be expired"
         );
         assertEq(
             _bob.balance,
