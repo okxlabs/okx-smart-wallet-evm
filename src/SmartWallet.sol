@@ -124,7 +124,7 @@ abstract contract SmartWallet is
     /// @param batchedCall BatchedCall struct containing calls and nonce
     /// @param validatorData Encoded data containing keyHash and signature (pubkeyHash + validUntil 6 bytes + signatures)
     function executeWithRelayer(
-        BatchedCall calldata batchedCall,
+        BatchedCall memory batchedCall,
         bytes calldata validatorData
     ) external {
         (uint256 settings, bytes32 dataHash) = _validateAndExtractRelayerData(
@@ -335,7 +335,7 @@ abstract contract SmartWallet is
         // 7702 Post upgrade compatibility: try validate signature for EOA sigs
         // Make sure the _signature can be decoded
         if (signature.length == 65) {
-            (address recovered, , ) = ECDSA.tryRecover(_hash, signature);
+            (address recovered, , ) = ECDSA.tryRecoverCalldata(_hash, signature);
             return
                 recovered == address(this)
                     ? Static.MAGIC_VALUE
