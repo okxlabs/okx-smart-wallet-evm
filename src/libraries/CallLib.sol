@@ -18,8 +18,14 @@ library CallLib {
         for (uint256 i; i < length; ++i) {
             callHashes[i] = hash(calls[i]);
         }
-
-        return keccak256(abi.encodePacked(callHashes));
+        // Equivalent to keccak256(abi.encodePacked(callHashes)),
+        // without allocating and copying an additional bytes buffer.
+        assembly ("memory-safe") {
+            result := keccak256(
+                add(callHashes, 0x20),
+                shl(5, length)
+            )
+        }
     }
 
     /// @notice Computes a keccak256 hash for a single Call struct.

@@ -4,10 +4,11 @@ A modular and secure smart contract wallet implementation unifying EOA and smart
 
 ## Overview
 
-- **EIP-4337**: Full Account Abstraction via `EntryPoint.handleOps()`
+- **EIP-4337 v0.7**: Account Abstraction via `EntryPoint.handleOps()`
 - **EIP-7702**: EOA delegation to smart wallet implementation
 - **Relayer mode**: `executeWithRelayer()` for gasless meta-transactions
-- **Dual validators**: Built-in ECDSA and Passkey (WebAuthn/P256) validation
+- **Built-in validators**: ECDSA and Passkey (WebAuthn/P256), with support for external validators
+- **Authorized transfers**: EIP-712 native ETH and ERC-20 settlement via `TransferWithAuthorization`
 - **Modular managers**: Owners, nonces, allowances, execution, and validation as separate modules
 - **UUPS upgradeable**: Authorized upgrade path via `UUPSUpgradeable`
 
@@ -15,71 +16,113 @@ A modular and secure smart contract wallet implementation unifying EOA and smart
 
 ### Core Contracts
 
-
 | Contract             | Description                                                                      |
 | -------------------- | -------------------------------------------------------------------------------- |
 | `SmartWalletEntry`   | Production implementation; concrete contract with ERC-7201 custom storage layout |
 | `SmartWallet`        | Abstract base inheriting all manager modules and core execution logic            |
 | `SmartWalletFactory` | Deploys ERC-1967 proxy wallets at deterministic addresses via CREATE2            |
-| `BaseAuthorization`  | Access control base for self-executed (owner-only) functions                     |
-
+| `BaseAuthorization`  | `onlySelf` authorization and factory-bound initialization guards                 |
 
 ### Manager Modules
 
-
-| Module              | Description                                                                    |
-| ------------------- | ------------------------------------------------------------------------------ |
-| `OwnerManager`      | Owner registration, settings (admin flag, expiry, hook), and permission checks |
-| `ValidationManager` | Signature dispatch to built-in or external validators                          |
-| `ExecutionManager`  | Low-level `Call` and `BatchedCall` execution                                   |
-| `NonceManager`      | Nonce validation and replay protection                                         |
-| `AllowanceManager`  | Persistent ETH and ERC-20 spending allowances                                  |
-| `ERC4337Account`    | EIP-4337 `validateUserOp` and `executeUserOp` integration                      |
-
+| Module              | Description                                                                     |
+| ------------------- | ------------------------------------------------------------------------------- |
+| `OwnerManager`      | Owner registration, settings (admin flag, expiry, hook), and permission checks  |
+| `ValidationManager` | Signature dispatch to built-in or external validators                           |
+| `ExecutionManager`  | Low-level execution of a single `Call` and bounded revert-data forwarding       |
+| `NonceManager`      | Relayer nonce validation and per-operation-type chainless queue floors          |
+| `AllowanceManager`  | Persistent native ETH and ERC-20 spending allowances                            |
+| `ERC4337Account`    | EntryPoint access control, prefunding, and chainless UserOperation hash helpers |
 
 ### Supporting Components
 
-
-| Component         | Description                                                |
-| ----------------- | ---------------------------------------------------------- |
-| `FallbackHandler` | ERC-1155/721 token receiving and ERC-165 interface support |
-| `ERC712`          | EIP-712 structured data signing                            |
-| `ERC7201`         | ERC-7201 storage namespace implementation                  |
-
+| Component                   | Description                                                          |
+| --------------------------- | -------------------------------------------------------------------- |
+| `TransferWithAuthorization` | Signature-authorized native ETH and ERC-20 settlement and revocation |
+| `FallbackHandler`           | ERC-721/ERC-1155 token receiving and ERC-165 interface support       |
+| `ERC712`                    | EIP-712 domain and typed-data hashing                                |
+| `ERC7201`                   | ERC-7201 namespace and storage-root metadata                         |
 
 ### Built-in Validators
 
 Validators are implemented as libraries and invoked via sentinel addresses defined in `Static.sol`:
-
 
 | Sentinel Address | Validator               | Library               |
 | ---------------- | ----------------------- | --------------------- |
 | `address(1)`     | ECDSA                   | `ECDSAValidatorLib`   |
 | `address(2)`     | Passkey (WebAuthn/P256) | `PasskeyValidatorLib` |
 
-
 External validator contracts implementing `IValidator` are also supported for custom validation logic.
+
+### Chainless Transactions
+
+Chainless transactions omit the chain ID from the signed hash, allowing the same signed operation to be submitted on multiple chains. They are supported by both ERC-4337 `UserOperation` execution and `executeWithRelayer()`.
+
+Cross-chain submission requires compatible wallet addresses, implementations, owner configuration, nonce sequences, and queue state on every target chain.
+
+The packed nonce uses the following layout:
+
+```text
+[chainless prefix: 160 bits][operation type: 16 bits][queue ID: 16 bits][sequence: 64 bits]
+```
+
+It can be constructed as:
+
+```solidity
+uint256 nonce =
+    (Static.CHAINLESS_NONCE_KEY << 96) |
+    (uint256(operationType) << 80) |
+    (uint256(queueId) << 64) |
+    sequence;
+```
+
+- `operationType` selects an independent queue namespace. The recommended convention is `0` for `addOwner` and `1` for `upgradeToAndCall`; this mapping is not enforced on-chain.
+- `queueId` controls invalidation within one operation type. The initial queue floor is `0`. Once queue `N` is accepted, every queue ID less than or equal to `N` becomes invalid for that operation type, while other operation types remain unaffected.
+- `sequence` is the standard 64-bit nonce sequence managed by the EntryPoint in ERC-4337 mode or by the wallet nonce manager in relayer mode.
+- Chainless calls must be admin-authorized self-calls, and currently only `addOwner` and `upgradeToAndCall` selectors are allowed.
+
+Use `getChainlessQueueState(operationType)` to read the current queue floor before constructing a transaction. A floor below `65535` is the next minimum usable queue ID. Queue ID `65535` is reserved and rejected, so the maximum usable queue ID is `65534`; a floor of `65535` means that operation type is exhausted.
+
+### TransferWithAuthorization
+
+`TransferWithAuthorization` allows a registered owner to sign an EIP-712 transfer authorization off-chain and lets a relayer or payee submit it on-chain. The signed data binds the token, wallet, recipient, amount, validity window, and a random single-use `authorizationNonce`. Use `Static.NATIVE_ETH` for native ETH or the token contract address for an ERC-20 transfer.
+
+The signature envelope is:
+
+```text
+[keyHash: 32 bytes][owner validator signature]
+```
+
+| Function                           | Usage                                                                                                      |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `executeTransferWithAuthorization` | Permissionless settlement; any relayer may submit the signed authorization.                                |
+| `receiveWithAuthorization`         | Payee-submitted settlement; `msg.sender` must equal the signed recipient.                                  |
+| `cancelTransferAuthorization`      | Permanently cancels an unused nonce using an owner signature, or an empty signature in a wallet self-call. |
+| `transferAuthorizationState`       | Returns whether a nonce has already been settled or canceled.                                              |
+
+An authorization is valid only when `block.timestamp > validAfter` and `block.timestamp < validBefore`. Once its nonce is settled or canceled, it cannot be reused. Execute, receive, and cancel use distinct EIP-712 type hashes, and the account's EIP-712 domain binds signed authorizations to the wallet and current chain.
+
+If the signing owner has a spending-policy hook, the hook must advertise `IHookTransferAuthorization` through ERC-165. Settlement fails closed when the configured hook is incompatible or rejects the transfer.
 
 ### Libraries
 
-
-| Library                | Description                                                       |
-| ---------------------- | ----------------------------------------------------------------- |
-| `ECDSAValidatorLib`    | ECDSA signature recovery with optional Merkle proof               |
-| `PasskeyValidatorLib`  | P256/WebAuthn signature verification with optional Merkle proof   |
-| `MerkleProofProcessor` | Merkle proof verification for cross-chain / multi-call signatures |
-| `ChainlessLib`         | Chain-agnostic (chainless) hash computation                       |
-| `BatchedCallLib`       | Encoding and hashing of `BatchedCall` structs                     |
-| `CallLib`              | Low-level `Call` struct helpers                                   |
-| `MessageSignLib`       | Personal message signing utilities                                |
-| `DecodeLib`            | Calldata decoding helpers                                         |
-| `Static`               | Shared sentinel addresses and constants                           |
-
+| Library               | Description                                                                     |
+| --------------------- | ------------------------------------------------------------------------------- |
+| `ECDSAValidatorLib`   | ECDSA signature recovery with optional Merkle proofs                            |
+| `PasskeyValidatorLib` | P256/WebAuthn signature verification with optional Merkle proofs                |
+| `HookLib`             | ERC-165 checks and hook dispatch for execution, TWA, and ERC-1271               |
+| `ChainlessLib`        | Chainless nonce parsing, selector allowlisting, and self-call validation        |
+| `BatchedCallLib`      | EIP-712 struct hashing for `BatchedCall`                                        |
+| `CallLib`             | EIP-712-style hashing for individual calls and call arrays                      |
+| `MessageSignLib`      | EIP-712 struct hashing for ERC-1271 wallet messages                             |
+| `DecodeLib`           | Decoding of call arrays and signature envelope components                       |
+| `Static`              | Shared validator sentinels, nonce prefix, return values, and protocol constants |
 
 ## Deployments & Audits
 
-> Ethereum / X Layer / Base / Optimism / Arbitrum / BSC / Polygon 
+> Ethereum / X Layer / Base / Optimism / Arbitrum / BSC / Polygon
 
+The addresses below are the documented deterministic deployments. Verify the deployed runtime bytecode on the target network before production use.
 
 | Contract             | Address                                      |
 | -------------------- | -------------------------------------------- |
@@ -125,19 +168,24 @@ yarn coverage
 ### Deploy
 
 ```bash
-# deploy contracts
-forge script script/deploy.s.sol
+# Set DEPLOYER_PRIVATE_KEY and a 32-byte DEPLOY_FACTORY_SALT first.
+
+# Dry-run and verify the deployment flow.
+forge script script/deploy.s.sol:DeployInit --rpc-url <RPC_URL>
+
+# Broadcast the deployment.
+forge script script/deploy.s.sol:DeployInit --rpc-url <RPC_URL> --broadcast
 ```
 
 ## Security Considerations
 
-- Signatures are bound to `keyHash` (not raw address) — validator and owner are decoupled
-- Cross-chain replay protection via `ChainlessLib` and Merkle proof signatures
-- Nonce manager prevents transaction replay
-- Admin privileges support per-owner expiry and hook-based validation
-- ERC-7201 storage namespacing prevents slot collisions across upgrades
-- UUPS upgrade path is access-controlled via `BaseAuthorization`
-
+- Signatures are routed by `keyHash`, decoupling owner identifiers from validator implementations.
+- Standard relayer, ERC-4337, and TWA hashes are chain-bound; chainless operations deliberately omit the chain ID and are restricted to admin-authorized, allowlisted self-calls with independent queue invalidation.
+- ERC-4337 sequences, relayer nonces, chainless queue floors, and TWA authorization nonces provide replay protection for their respective execution paths.
+- Owner settings support administrator privileges, expiration, and spending-policy hooks.
+- TWA and ERC-1271 hook paths fail closed when a configured hook is incompatible or rejects an operation.
+- ERC-7201 namespacing isolates wallet and TWA storage across upgrades.
+- UUPS upgrades require a wallet self-call, which is permitted only through an authorized admin execution path.
 
 ## Documentation
 
