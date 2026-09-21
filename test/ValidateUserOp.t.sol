@@ -435,6 +435,7 @@ contract ValidateUserOpTest is Base {
         assertEq(address(account).balance, 1 ether);
 
         PackedUserOperation memory userOp;
+        userOp.callData = _encodeExecuteUserOpCalls(new Call[](0));
         // Use helper function to construct signature
         userOp.signature = _constructUserOpSignature(
             userOp,
@@ -655,6 +656,7 @@ contract ValidateUserOpTest is Base {
         vm.deal(address(account), 2 ether);
 
         PackedUserOperation memory userOp;
+        userOp.callData = _encodeExecuteUserOpCalls(new Call[](0));
 
         // Use helper function to construct signature
         userOp.signature = _constructUserOpSignature(
@@ -754,6 +756,7 @@ contract ValidateUserOpTest is Base {
         );
 
         PackedUserOperation memory userOp;
+        userOp.callData = _encodeExecuteUserOpCalls(new Call[](0));
         // Note: Passkey validator uses different format - keyHash + validatorData
         // The validatorData already contains validUntil (6 bytes at offset after pubkey)
         userOp.signature = abi.encodePacked(passkeyHash, validatorData);
@@ -805,6 +808,7 @@ contract ValidateUserOpTest is Base {
         );
 
         PackedUserOperation memory userOp;
+        userOp.callData = _encodeExecuteUserOpCalls(new Call[](0));
         bytes32 userOpHash = keccak256("test");
         uint256 missingAccountFunds = 100;
 
@@ -869,6 +873,7 @@ contract ValidateUserOpTest is Base {
         vm.deal(account, 1 ether);
 
         PackedUserOperation memory userOp;
+        userOp.callData = _encodeExecuteUserOpCalls(new Call[](0));
         bytes32 userOpHash = keccak256("edge_case_test");
         uint256 missingAccountFunds = 100;
 
@@ -957,7 +962,7 @@ contract ValidateUserOpTest is Base {
             nonce: 0,
             initCode: bytes(""),
             callData: abi.encodeWithSelector(
-                ISmartWallet.execute.selector,
+                IERC4337Account.executeUserOp.selector,
                 constructCallsData()
             ),
             accountGasLimits: bytes32((uint256(3000000) << 128) | 100000),

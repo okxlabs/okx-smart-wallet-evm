@@ -57,6 +57,11 @@ abstract contract SmartWallet is
         _disableInitializers();
     }
 
+    /// @inheritdoc TransferWithAuthorization
+    function _getWalletImplementation() internal view override returns (address) {
+        return IMPLEMENTATION;
+    }
+
     /// @notice Initializes the smart wallet with initial owners
     /// @dev Can only be called by factory during deployment. For EIP-7702 scenarios,
     ///      use execute/executeWithRelayer to add owners after delegation
@@ -94,7 +99,7 @@ abstract contract SmartWallet is
     }
 
     /// @dev This function is executable only by the EntryPoint contract, and is the main pathway for UserOperations to be executed.
-    /// UserOperations can be executed through the execute function, but another method of authorization (ie through a passed in signature) is required.
+    /// validateUserOp requires this execution selector for both regular and chainless UserOperations.
     /// userOp.callData is abi.encodePacked(IAccountExecute.executeUserOp.selector, (abi.encode(Call[]))
     /// Note that this contract is only compatible with Entrypoint versions v0.7.0.
     function executeUserOp(
@@ -260,7 +265,15 @@ abstract contract SmartWallet is
         // Step 1: Pay the prefund
         _payPrefund(missingAccountFunds);
 
-        // Step 2: Check minimum signature length first
+        // Require the same execution path for regular and chainless UserOperations.
+        if (
+            userOp.callData.length < 4 ||
+            bytes4(userOp.callData[:4]) != this.executeUserOp.selector
+        ) {
+            return Static.SIG_VALIDATION_FAILED;
+        }
+
+        // Step 2: Check minimum signature length
         if (userOp.signature.length < 38) {
             return Static.SIG_VALIDATION_FAILED;
         }
@@ -321,10 +334,10 @@ abstract contract SmartWallet is
 
     /// @notice Implements EIP-1271 signature validation standard
     /// @dev There are two types of signatures:
-    ///      1. 65 bytes: ECDSA signature for EOA compatibility
-    ///      2. >65 bytes: abi.encode(keyHash, signature) for validator-based validation
-    /// @dev This function does NOT support chainless validation - all signatures are validated with chain ID
-    ///      to prevent cross-chain replay attacks per EIP-1271 security best practices
+    ///      1. Exactly 65 bytes: ECDSA signature over _hash; the recovered signer must be address(this).
+    ///      2. >38 bytes (except 65): packed pubKeyHash (32 bytes) + validUntil (6 bytes) + validator signature.
+    /// @dev Validator-based signatures bind the chain ID through EIP-712; the 65-byte EOA path
+    ///      validates _hash directly without adding a domain separator.
     /// @param _hash Hash of the data to be validated
     /// @param signature Signature to be validated
     /// @return Magic value (0x1626ba7e) if valid, invalid value (0xffffffff) if invalid

@@ -85,9 +85,9 @@ Use `getChainlessQueueState(operationType)` to read the current queue floor befo
 
 ### TransferWithAuthorization
 
-`TransferWithAuthorization` allows a registered owner to sign an EIP-712 transfer authorization off-chain and lets a relayer or payee submit it on-chain. The signed data binds the token, wallet, recipient, amount, validity window, and a random single-use `authorizationNonce`. Use `Static.NATIVE_ETH` for native ETH or the token contract address for an ERC-20 transfer.
+`TransferWithAuthorization` allows a registered owner to sign an implementation-bound transfer authorization off-chain and lets a relayer or payee submit it on-chain. The signed data binds the signing owner key, token, wallet, recipient, amount, validity window, a random single-use `authorizationNonce`, and the current wallet implementation. Use `Static.NATIVE_ETH` for native ETH or the token contract address for an ERC-20 transfer.
 
-The signature envelope is:
+The execute/receive signature envelope is:
 
 ```text
 [keyHash: 32 bytes][owner validator signature]
@@ -97,10 +97,33 @@ The signature envelope is:
 | ---------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `executeTransferWithAuthorization` | Permissionless settlement; any relayer may submit the signed authorization.                                |
 | `receiveWithAuthorization`         | Payee-submitted settlement; `msg.sender` must equal the signed recipient.                                  |
-| `cancelTransferAuthorization`      | Permanently cancels an unused nonce using an owner signature, or an empty signature in a wallet self-call. |
-| `transferAuthorizationState`       | Returns whether a nonce has already been settled or canceled.                                              |
+| `cancelTransferAuthorization`      | Takes `(targetKeyHash, authorizationNonce, signature)`; the target owner or a valid admin may sign.        |
+| `transferAuthorizationState`       | Takes `(ownerKeyHash, authorizationNonce)` and returns whether that owner's nonce was settled or canceled. |
 
-An authorization is valid only when `block.timestamp > validAfter` and `block.timestamp < validBefore`. Once its nonce is settled or canceled, it cannot be reused. Execute, receive, and cancel use distinct EIP-712 type hashes, and the account's EIP-712 domain binds signed authorizations to the wallet and current chain.
+An authorization is valid only when `block.timestamp > validAfter` and `block.timestamp < validBefore`. Nonces are tracked by `authorizationStates[ownerKeyHash][authorizationNonce]`: different owners may independently use the same nonce, but execute, receive and cancel share one terminal state for a given owner/nonce pair. Removing and re-adding the same owner key does not reset its nonce state. This intentionally differs from ERC-8335's account-wide, single-use nonce semantics; this interface is not a drop-in ERC-8335 implementation. The account's EIP-712 domain binds authorizations to the wallet and current chain.
+
+All three signed paths bind the implementation outside the existing authorization type hashes:
+
+```solidity
+bytes32 boundHash =
+    keccak256(abi.encode(structHash, signerKeyHash, wallet.IMPLEMENTATION()));
+bytes32 digest = wallet.hashTypedData(boundHash);
+```
+
+Sign the resulting `digest` using the owner's validator-specific signing scheme. Calling `signTypedData` on the original authorization fields alone does not produce this digest; do not add a `personal_sign` prefix or ERC-1271 message wrapper. Clients using the implementation-only `abi.encode(structHash, IMPLEMENTATION)` formula must add `signerKeyHash` and re-sign. The execute/receive envelopes are unchanged. Cancellation takes an explicit target key, and the state getter and both authorization events include the owner key.
+
+The signing `keyHash` is present in both the envelope and the digest. It selects validator routing, nonce lookup, and the signing owner's settings while preventing a relayer from rerouting an unchanged validator signature to another owner's nonce namespace or spending-policy hook.
+
+Cancellation uses `cancelTransferAuthorization(bytes32 targetKeyHash, bytes32 authorizationNonce, bytes signature)`:
+
+```text
+Signed:    [signerKeyHash: 32 bytes][validator signature]
+Self-call: empty signature (0 bytes)
+```
+
+For signed cancellation, use the EIP-712 type `CancelTransferAuthorization(bytes32 targetKeyHash,bytes32 authorizationNonce)` and compute `structHash = keccak256(abi.encode(CANCEL_TRANSFER_AUTHORIZATION_TYPEHASH, targetKeyHash, authorizationNonce))` before applying the implementation-binding digest formula above. Signing `targetKeyHash` prevents a relay from switching the owner being canceled. A non-admin may cancel only its own nonce; an unexpired admin may cancel a nonce for any owner (including a removed owner). An empty signature requires `msg.sender == address(this)` and must pass the wallet's admin-authorized self-call execution path.
+
+Changing to a different implementation invalidates pending signatures bound to the previous implementation; used and canceled owner-scoped nonces remain terminal across upgrades that preserve the current storage layout.
 
 If the signing owner has a spending-policy hook, the hook must advertise `IHookTransferAuthorization` through ERC-165. Settlement fails closed when the configured hook is incompatible or rejects the transfer.
 
