@@ -114,7 +114,8 @@ abstract contract TwaIntegrationBase is Base {
         RECV_TYPEHASH = keccak256(
             "ReceiveWithAuthorization(address token,address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 authorizationNonce)"
         );
-        CANCEL_TYPEHASH = keccak256("CancelTransferAuthorization(bytes32 authorizationNonce)");
+        CANCEL_TYPEHASH =
+            keccak256("CancelTransferAuthorization(bytes32 targetKeyHash,bytes32 authorizationNonce)");
         NATIVE = Static.NATIVE_ETH;
 
         _relayerA = makeAddr("relayerA");
@@ -127,8 +128,9 @@ abstract contract TwaIntegrationBase is Base {
 
     // ---- signing helpers, parametric on the account so cross-account binding is exercised honestly ----
 
-    function _digest(address account, bytes32 structHash) internal view returns (bytes32) {
-        return TransferWithAuthorization(payable(account)).hashTypedData(structHash);
+    function _digest(address account, bytes32 keyHash, bytes32 structHash) internal view returns (bytes32) {
+        bytes32 boundHash = keccak256(abi.encode(structHash, keyHash, ISmartWallet(account).IMPLEMENTATION()));
+        return TransferWithAuthorization(payable(account)).hashTypedData(boundHash);
     }
 
     /// @dev Reconstructs the account's EIP-712 domain separator from its ERC-5267 eip712Domain() fields
@@ -163,7 +165,7 @@ abstract contract TwaIntegrationBase is Base {
         view
         returns (bytes memory)
     {
-        bytes32 digest = _digest(account, structHash);
+        bytes32 digest = _digest(account, keyHash, structHash);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
         return abi.encodePacked(keyHash, r, s, v);
     }
@@ -197,7 +199,8 @@ abstract contract TwaIntegrationBase is Base {
         view
         returns (bytes memory)
     {
-        return _envelope(account, signerPk, keyHash, keccak256(abi.encode(CANCEL_TYPEHASH, nonce)));
+        bytes32 structHash = keccak256(abi.encode(CANCEL_TYPEHASH, keyHash, nonce));
+        return _envelope(account, signerPk, keyHash, structHash);
     }
 }
 
@@ -230,7 +233,12 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         // The dedicated separator getter was removed; reconstruct it from ERC-5267 eip712Domain() fields.
         bytes32 sep = _domainSeparatorOf(account);
         bytes32 probe = _transferStructHash(EXEC_TYPEHASH, account, address(token), _bob, 1, keccak256("probe"));
-        assertEq(_digest(account, probe), keccak256(abi.encodePacked(hex"1901", sep, probe)), "domain separator wired");
+        bytes32 boundProbe = keccak256(abi.encode(probe, aliceKeyHash, ISmartWallet(account).IMPLEMENTATION()));
+        assertEq(
+            _digest(account, aliceKeyHash, probe),
+            keccak256(abi.encodePacked(hex"1901", sep, boundProbe)),
+            "domain, signer key, and implementation bound"
+        );
 
         // a happy-path settle works on the freshly initialized account
         token.mint(account, 100 ether);
@@ -245,7 +253,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         );
 
         assertEq(token.balanceOf(_bob) - before, value, "recipient credited on fresh account");
-        assertTrue(ITransferWithAuthorization(account).transferAuthorizationState(nonce), "nonce terminal");
+        assertTrue(ITransferWithAuthorization(account).transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce terminal");
     }
 
     /// @notice The deployed account cannot be re-initialized.
@@ -284,7 +292,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
             address(token), _bob, value, VALID_AFTER, VALID_BEFORE, nonce, sigForA
         );
         assertEq(token.balanceOf(accountB), bBefore, "account B unchanged");
-        assertFalse(ITransferWithAuthorization(accountB).transferAuthorizationState(nonce), "B nonce unused");
+        assertFalse(ITransferWithAuthorization(accountB).transferAuthorizationState(_aliceWalletKeyHash, nonce), "B nonce unused");
 
         // the same authorization still settles on its intended account A
         vm.prank(_relayerA);
@@ -292,7 +300,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
             address(token), _bob, value, VALID_AFTER, VALID_BEFORE, nonce, sigForA
         );
         assertEq(token.balanceOf(_bob) - bobBefore, value, "recipient credited on account A");
-        assertTrue(ITransferWithAuthorization(accountA).transferAuthorizationState(nonce), "A nonce terminal");
+        assertTrue(ITransferWithAuthorization(accountA).transferAuthorizationState(_aliceWalletKeyHash, nonce), "A nonce terminal");
     }
 
     // -------------------------------------------------- user journeys / lifecycle
@@ -309,7 +317,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         uint256 recipientBefore = token.balanceOf(_charlie);
 
         vm.expectEmit(true, true, true, true, _aliceWallet);
-        emit ITransferWithAuthorization.TransferAuthorizationUsed(address(token), _aliceWallet, _charlie, value, nonce);
+        emit ITransferWithAuthorization.TransferAuthorizationUsed(address(token), _aliceWallet, _charlie, value, nonce, _aliceWalletKeyHash);
         vm.prank(_relayerA);
         itwa.executeTransferWithAuthorization(address(token), _charlie, value, VALID_AFTER, VALID_BEFORE, nonce, sig);
 
@@ -332,20 +340,20 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         bytes32 aliceKeyHash = keccak256(abi.encodePacked(_alice));
         bytes32 nonce = keccak256("journey-cancel");
 
-        // owner cancels by having the account call itself (empty-signature form), routed through execute
+        // Owner cancels via execute with an explicit target key and an empty signature.
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
             target: _aliceWallet,
             value: 0,
-            data: abi.encodeCall(ITransferWithAuthorization.cancelTransferAuthorization, (nonce, bytes("")))
+            data: abi.encodeCall(ITransferWithAuthorization.cancelTransferAuthorization, (aliceKeyHash, nonce, bytes("")))
         });
 
         vm.expectEmit(true, false, false, false, _aliceWallet);
-        emit ITransferWithAuthorization.TransferAuthorizationCanceled(nonce);
+        emit ITransferWithAuthorization.TransferAuthorizationCanceled(_aliceWalletKeyHash, nonce);
         vm.prank(_alice);
         ISmartWallet(_aliceWallet).execute(calls);
 
-        assertTrue(itwa.transferAuthorizationState(nonce), "nonce terminal after cancel");
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce terminal after cancel");
 
         // a later settle of the canceled nonce is rejected and moves no funds
         uint256 value = 5 ether;
@@ -368,7 +376,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         assertEq(_getNonce(_aliceWallet), 0, "4337 nonce starts at 0");
 
         bytes32 twaNonce = keccak256("isolation-twa");
-        assertFalse(itwa.transferAuthorizationState(twaNonce), "twa nonce unused");
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, twaNonce), "twa nonce unused");
 
         // a normal relayer execution consumes the 4337 nonce (0 -> 1)
         Call[] memory calls = new Call[](1);
@@ -385,7 +393,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         vm.prank(_relayerB);
         itwa.executeTransferWithAuthorization(address(token), _bob, value, VALID_AFTER, VALID_BEFORE, twaNonce, sig);
 
-        assertTrue(itwa.transferAuthorizationState(twaNonce), "twa nonce terminal");
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, twaNonce), "twa nonce terminal");
         assertEq(_getNonce(_aliceWallet), 1, "4337 nonce unchanged by twa settle");
     }
 
@@ -407,11 +415,11 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         // n2 -> canceled (signed form, relayed)
         bytes memory cancelSig = _cancelEnvelope(_aliceWallet, _alicePk, aliceKeyHash, n2);
         vm.prank(_relayerB);
-        itwa.cancelTransferAuthorization(n2, cancelSig);
+        itwa.cancelTransferAuthorization(_aliceWalletKeyHash, n2, cancelSig);
 
-        assertTrue(itwa.transferAuthorizationState(n1), "n1 terminal");
-        assertTrue(itwa.transferAuthorizationState(n2), "n2 terminal");
-        assertFalse(itwa.transferAuthorizationState(n3), "n3 still unused");
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, n1), "n1 terminal");
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, n2), "n2 terminal");
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, n3), "n3 still unused");
 
         // both terminal nonces reject further transitions
         vm.prank(_relayerA);
@@ -423,7 +431,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         bytes memory s3 = _execEnvelope(_aliceWallet, _alicePk, aliceKeyHash, address(token), _charlie, v3, n3);
         vm.prank(_relayerA);
         itwa.executeTransferWithAuthorization(address(token), _charlie, v3, VALID_AFTER, VALID_BEFORE, n3, s3);
-        assertTrue(itwa.transferAuthorizationState(n3), "n3 terminal after settle");
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, n3), "n3 terminal after settle");
     }
 
     /// @notice Authorization-nonce state survives a UUPS upgrade of the account implementation.
@@ -437,9 +445,101 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         bytes memory sig = _execEnvelope(_aliceWallet, _alicePk, aliceKeyHash, address(token), _bob, value, nonce);
         vm.prank(_relayerA);
         itwa.executeTransferWithAuthorization(address(token), _bob, value, VALID_AFTER, VALID_BEFORE, nonce, sig);
-        assertTrue(itwa.transferAuthorizationState(nonce), "nonce terminal before upgrade");
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce terminal before upgrade");
 
-        // upgrade the implementation through an owner-authorized self-call
+        bytes32 canceledNonce = keccak256("upgrade-canceled");
+        bytes memory cancelSig = _cancelEnvelope(_aliceWallet, _alicePk, aliceKeyHash, canceledNonce);
+        itwa.cancelTransferAuthorization(_aliceWalletKeyHash, canceledNonce, cancelSig);
+
+        _upgradeWallet();
+
+        // The nonce state persists. The old implementation-bound signature now fails validation
+        // before the verified key's terminal nonce state is checked.
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce still terminal after upgrade");
+        vm.prank(_relayerB);
+        vm.expectRevert(ISmartWallet.InvalidSignature.selector);
+        itwa.executeTransferWithAuthorization(address(token), _bob, value, VALID_AFTER, VALID_BEFORE, nonce, sig);
+
+        // Even a fresh signature for the new implementation cannot revive a canceled nonce.
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, canceledNonce), "canceled nonce still terminal");
+        bytes memory freshSig = _execEnvelope(
+            _aliceWallet, _alicePk, aliceKeyHash, address(token), _bob, value, canceledNonce
+        );
+        vm.expectRevert(abi.encodeWithSelector(ITransferWithAuthorization.AuthorizationAlreadyUsed.selector, canceledNonce));
+        itwa.executeTransferWithAuthorization(address(token), _bob, value, VALID_AFTER, VALID_BEFORE, canceledNonce, freshSig);
+    }
+
+    function test_upgrade_pendingExecuteRequiresNewSignature() public {
+        ITransferWithAuthorization itwa = ITransferWithAuthorization(_aliceWallet);
+        bytes32 nonce = keccak256("pending-execute-upgrade");
+        uint256 value = 2 ether;
+        bytes memory oldSig = _execEnvelope(
+            _aliceWallet, _alicePk, _aliceWalletKeyHash, address(token), _bob, value, nonce
+        );
+        uint256 balanceBefore = token.balanceOf(_bob);
+
+        _upgradeWallet();
+
+        vm.expectRevert(ISmartWallet.InvalidSignature.selector);
+        vm.prank(_relayerA);
+        itwa.executeTransferWithAuthorization(address(token), _bob, value, VALID_AFTER, VALID_BEFORE, nonce, oldSig);
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "old signature must not consume nonce");
+        assertEq(token.balanceOf(_bob), balanceBefore);
+
+        bytes memory freshSig = _execEnvelope(
+            _aliceWallet, _alicePk, _aliceWalletKeyHash, address(token), _bob, value, nonce
+        );
+        vm.prank(_relayerA);
+        itwa.executeTransferWithAuthorization(address(token), _bob, value, VALID_AFTER, VALID_BEFORE, nonce, freshSig);
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce));
+        assertEq(token.balanceOf(_bob), balanceBefore + value);
+    }
+
+    function test_upgrade_pendingReceiveRequiresNewSignature() public {
+        ITransferWithAuthorization itwa = ITransferWithAuthorization(_aliceWallet);
+        bytes32 nonce = keccak256("pending-receive-upgrade");
+        uint256 value = 2 ether;
+        bytes memory oldSig = _receiveEnvelope(
+            _aliceWallet, _alicePk, _aliceWalletKeyHash, address(token), _bob, value, nonce
+        );
+        uint256 balanceBefore = token.balanceOf(_bob);
+
+        _upgradeWallet();
+
+        vm.expectRevert(ISmartWallet.InvalidSignature.selector);
+        vm.prank(_bob);
+        itwa.receiveWithAuthorization(address(token), _bob, value, VALID_AFTER, VALID_BEFORE, nonce, oldSig);
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "old signature must not consume nonce");
+        assertEq(token.balanceOf(_bob), balanceBefore);
+
+        bytes memory freshSig = _receiveEnvelope(
+            _aliceWallet, _alicePk, _aliceWalletKeyHash, address(token), _bob, value, nonce
+        );
+        vm.prank(_bob);
+        itwa.receiveWithAuthorization(address(token), _bob, value, VALID_AFTER, VALID_BEFORE, nonce, freshSig);
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce));
+        assertEq(token.balanceOf(_bob), balanceBefore + value);
+    }
+
+    function test_upgrade_pendingCancelRequiresNewSignature() public {
+        ITransferWithAuthorization itwa = ITransferWithAuthorization(_aliceWallet);
+        bytes32 nonce = keccak256("pending-cancel-upgrade");
+        bytes memory oldSig = _cancelEnvelope(_aliceWallet, _alicePk, _aliceWalletKeyHash, nonce);
+
+        _upgradeWallet();
+
+        vm.expectRevert(ISmartWallet.InvalidSignature.selector);
+        vm.prank(_relayerA);
+        itwa.cancelTransferAuthorization(_aliceWalletKeyHash, nonce, oldSig);
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "old signature must not cancel nonce");
+
+        bytes memory freshSig = _cancelEnvelope(_aliceWallet, _alicePk, _aliceWalletKeyHash, nonce);
+        vm.prank(_relayerA);
+        itwa.cancelTransferAuthorization(_aliceWalletKeyHash, nonce, freshSig);
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce));
+    }
+
+    function _upgradeWallet() private {
         TwaWalletV2 v2 = new TwaWalletV2();
         Call[] memory upgradeCalls = new Call[](1);
         upgradeCalls[0] = Call({
@@ -453,12 +553,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         ISmartWallet(_aliceWallet).executeWithRelayer(batchedCall, validatorData);
 
         assertTrue(TwaWalletV2(payable(_aliceWallet)).isUpgraded(), "implementation upgraded");
-
-        // the authorization-nonce state persists and replay is still rejected after the upgrade
-        assertTrue(itwa.transferAuthorizationState(nonce), "nonce still terminal after upgrade");
-        vm.prank(_relayerB);
-        vm.expectRevert(abi.encodeWithSelector(ITransferWithAuthorization.AuthorizationAlreadyUsed.selector, nonce));
-        itwa.executeTransferWithAuthorization(address(token), _bob, value, VALID_AFTER, VALID_BEFORE, nonce, sig);
+        assertEq(ISmartWallet(_aliceWallet).IMPLEMENTATION(), address(v2));
     }
 
     // -------------------------------------------------- multi-actor
@@ -549,7 +644,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         uint256 payeeBefore = token.balanceOf(address(payee));
         payee.pull(itwa, address(token), vr, VALID_AFTER, VALID_BEFORE, rNonce, recvSig);
         assertEq(token.balanceOf(address(payee)) - payeeBefore, vr, "payee credited via receive");
-        assertTrue(itwa.transferAuthorizationState(rNonce), "receive nonce terminal");
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, rNonce), "receive nonce terminal");
     }
 
     /// @notice A front-running relayer cannot change the settlement outcome: funds reach the signed recipient,
@@ -667,14 +762,14 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
 
         // the event logs the nominal value, regardless of the fee the token applies
         vm.expectEmit(true, true, true, true, _aliceWallet);
-        emit ITransferWithAuthorization.TransferAuthorizationUsed(address(feeToken), _aliceWallet, _bob, value, nonce);
+        emit ITransferWithAuthorization.TransferAuthorizationUsed(address(feeToken), _aliceWallet, _bob, value, nonce, _aliceWalletKeyHash);
         vm.prank(_relayerA);
         itwa.executeTransferWithAuthorization(address(feeToken), _bob, value, VALID_AFTER, VALID_BEFORE, nonce, sig);
 
         assertEq(accountBefore - feeToken.balanceOf(_aliceWallet), value, "account debited full nominal value");
         assertEq(feeToken.balanceOf(_bob), value - expectedFee, "recipient received value minus fee");
         assertEq(feeToken.balanceOf(_feeSink), expectedFee, "fee routed to sink");
-        assertTrue(itwa.transferAuthorizationState(nonce), "nonce terminal");
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce terminal");
     }
 
     // -------------------------------------------------- failure / recovery (no partial effect)
@@ -700,7 +795,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         vm.prank(_relayerA);
         vm.expectRevert(RevertingHook.HookBlocked.selector);
         itwa.executeTransferWithAuthorization(address(token), _charlie, value, VALID_AFTER, VALID_BEFORE, nonce, sig);
-        assertFalse(itwa.transferAuthorizationState(nonce), "nonce unused after block");
+        assertFalse(itwa.transferAuthorizationState(bobKeyHash, nonce), "nonce unused after block");
         assertEq(token.balanceOf(_aliceWallet), accountBefore, "account unchanged after block");
         assertEq(token.balanceOf(_charlie), recipientBefore, "recipient unchanged after block");
 
@@ -719,7 +814,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         vm.prank(_relayerA);
         itwa.executeTransferWithAuthorization(address(token), _charlie, value, VALID_AFTER, VALID_BEFORE, nonce, sig);
         assertEq(token.balanceOf(_charlie) - recipientBefore, value, "recipient credited after recovery");
-        assertTrue(itwa.transferAuthorizationState(nonce), "nonce terminal after recovery");
+        assertTrue(itwa.transferAuthorizationState(bobKeyHash, nonce), "nonce terminal after recovery");
     }
 
     /// @notice An under-funded settle reverts without partial effect; after the account is funded, the same
@@ -737,7 +832,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         vm.prank(_relayerA);
         vm.expectRevert();
         itwa.executeTransferWithAuthorization(address(token), _bob, value, VALID_AFTER, VALID_BEFORE, nonce, sig);
-        assertFalse(itwa.transferAuthorizationState(nonce), "nonce unused after insufficient balance");
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce unused after insufficient balance");
         assertEq(token.balanceOf(_bob), recipientBefore, "recipient unchanged after revert");
 
         // fund the account so the same authorization can settle
@@ -745,7 +840,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         vm.prank(_relayerA);
         itwa.executeTransferWithAuthorization(address(token), _bob, value, VALID_AFTER, VALID_BEFORE, nonce, sig);
         assertEq(token.balanceOf(_bob) - recipientBefore, value, "recipient credited after funding");
-        assertTrue(itwa.transferAuthorizationState(nonce), "nonce terminal after recovery");
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce terminal after recovery");
     }
 
     /// @notice An expired authorization cannot be settled; a freshly signed authorization with a new window does.
@@ -762,7 +857,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         vm.prank(_relayerA);
         vm.expectRevert(abi.encodeWithSelector(ITransferWithAuthorization.AuthorizationExpired.selector, VALID_BEFORE));
         itwa.executeTransferWithAuthorization(address(token), _bob, value, VALID_AFTER, VALID_BEFORE, nonce, sig);
-        assertFalse(itwa.transferAuthorizationState(nonce), "expired nonce unused");
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "expired nonce unused");
 
         // a fresh authorization with an open window around the new time settles
         uint256 freshAfter = VALID_BEFORE; // current time is VALID_BEFORE + 1, strictly after
@@ -794,7 +889,7 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
 
         assertEq(_aliceWallet.balance, accountBefore, "account native balance unchanged");
         assertEq(address(rejector).balance, 0, "rejector received nothing");
-        assertFalse(itwa.transferAuthorizationState(nonce), "nonce unused after native revert");
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce unused after native revert");
     }
 
     // -------------------------------------------------- observability
@@ -819,14 +914,14 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         // cancel a different nonce (signed form)
         bytes memory cancelSig = _cancelEnvelope(_aliceWallet, _alicePk, aliceKeyHash, canceledNonce);
         vm.prank(_relayerB);
-        itwa.cancelTransferAuthorization(canceledNonce, cancelSig);
+        itwa.cancelTransferAuthorization(_aliceWalletKeyHash, canceledNonce, cancelSig);
 
         // both nonces are terminal and on-chain indistinguishable by state
-        assertTrue(itwa.transferAuthorizationState(usedNonce), "used nonce terminal");
-        assertTrue(itwa.transferAuthorizationState(canceledNonce), "canceled nonce terminal");
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, usedNonce), "used nonce terminal");
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, canceledNonce), "canceled nonce terminal");
 
-        bytes32 usedTopic = keccak256("TransferAuthorizationUsed(address,address,address,uint256,bytes32)");
-        bytes32 canceledTopic = keccak256("TransferAuthorizationCanceled(bytes32)");
+        bytes32 usedTopic = keccak256("TransferAuthorizationUsed(address,address,address,uint256,bytes32,bytes32)");
+        bytes32 canceledTopic = keccak256("TransferAuthorizationCanceled(bytes32,bytes32)");
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bool sawUsed;
@@ -834,17 +929,19 @@ contract TransferWithAuthorizationIntegrationTest is TwaIntegrationBase {
         for (uint256 i; i < logs.length; i++) {
             if (logs[i].emitter != _aliceWallet) continue;
             if (logs[i].topics[0] == usedTopic) {
-                // Used: token/from/to indexed; value + nonce live in data (nonce is NOT a topic)
+                // Used: token/from/to indexed; value, nonce and owner key live in data.
                 assertEq(logs[i].topics.length, 4, "used has 3 indexed fields");
                 assertEq(address(uint160(uint256(logs[i].topics[2]))), _aliceWallet, "used from == account");
-                (uint256 evValue, bytes32 evNonce) = abi.decode(logs[i].data, (uint256, bytes32));
+                (uint256 evValue, bytes32 evNonce, bytes32 evOwner) = abi.decode(logs[i].data, (uint256, bytes32, bytes32));
+                assertEq(evOwner, aliceKeyHash, "used owner in data");
                 assertEq(evValue, value, "used value in data");
                 assertEq(evNonce, usedNonce, "used nonce in data");
                 sawUsed = true;
             } else if (logs[i].topics[0] == canceledTopic) {
-                // Canceled: only authorizationNonce indexed (nonce IS a topic, cheaply filterable)
-                assertEq(logs[i].topics.length, 2, "canceled has 1 indexed field");
-                assertEq(logs[i].topics[1], canceledNonce, "canceled nonce is a topic");
+                // Canceled: owner key and nonce are both indexed.
+                assertEq(logs[i].topics.length, 3, "canceled has 2 indexed fields");
+                assertEq(logs[i].topics[1], aliceKeyHash, "canceled owner is a topic");
+                assertEq(logs[i].topics[2], canceledNonce, "canceled nonce is a topic");
                 sawCanceled = true;
             }
         }

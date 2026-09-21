@@ -23,6 +23,22 @@ import {HelperLib} from "./utils/Helper.s.sol";
 import {WebAuthn} from "webauthn-sol/WebAuthn.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IValidator} from "src/interfaces/IValidator.sol";
+import {ECDSAValidatorLib} from "src/libraries/ECDSAValidatorLib.sol";
+import {Call} from "src/Types.sol";
+
+/// @dev Models distinct owner namespaces backed by the same signing credential.
+contract SharedCredentialValidator is IValidator {
+    bytes32 internal immutable credentialHash;
+
+    constructor(bytes32 credentialHash_) {
+        credentialHash = credentialHash_;
+    }
+
+    function validateSignature(bytes32, bytes32 digest, bytes calldata signature) external view returns (bool) {
+        return ECDSAValidatorLib.validateSignature(credentialHash, digest, signature);
+    }
+}
 
 contract FalseReturnERC20 {
     mapping(address => uint256) public balanceOf;
@@ -123,7 +139,8 @@ contract TransferWithAuthorizationTest is Base {
         _receiveTypeHash = keccak256(
             "ReceiveWithAuthorization(address token,address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 authorizationNonce)"
         );
-        _cancelTypeHash = keccak256("CancelTransferAuthorization(bytes32 authorizationNonce)");
+        _cancelTypeHash =
+            keccak256("CancelTransferAuthorization(bytes32 targetKeyHash,bytes32 authorizationNonce)");
         _nativeAsset = Static.NATIVE_ETH;
 
         token = new MockERC20();
@@ -144,9 +161,16 @@ contract TransferWithAuthorizationTest is Base {
         return keccak256(abi.encode(typeHash, tkn, _aliceWallet, to, value, validAfter, validBefore, nonce));
     }
 
-    /// @dev Builds the on-chain envelope `keyHash(32) || r,s,v(65)` over the direct EIP-712 digest.
+    function _digest(bytes32 structHash, bytes32 keyHash) internal view returns (bytes32) {
+        bytes32 boundHash = keccak256(
+            abi.encode(structHash, keyHash, ISmartWallet(_aliceWallet).IMPLEMENTATION())
+        );
+        return twa.hashTypedData(boundHash);
+    }
+
+    /// @dev Builds `keyHash(32) || r,s,v(65)` over the implementation-bound authorization digest.
     function _envelope(uint256 signerPk, bytes32 keyHash, bytes32 structHash) internal view returns (bytes memory) {
-        bytes32 digest = twa.hashTypedData(structHash);
+        bytes32 digest = _digest(structHash, keyHash);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
         return abi.encodePacked(keyHash, r, s, v);
     }
@@ -174,7 +198,14 @@ contract TransferWithAuthorizationTest is Base {
     }
 
     function _cancelSignature(uint256 signerPk, bytes32 keyHash, bytes32 nonce) internal view returns (bytes memory) {
-        return _envelope(signerPk, keyHash, keccak256(abi.encode(_cancelTypeHash, nonce)));
+        return _cancelSignatureFor(signerPk, keyHash, keyHash, nonce);
+    }
+
+    function _cancelSignatureFor(uint256 signerPk, bytes32 signerKeyHash, bytes32 targetKeyHash, bytes32 nonce)
+        internal view returns (bytes memory)
+    {
+        bytes32 structHash = keccak256(abi.encode(_cancelTypeHash, targetKeyHash, nonce));
+        return _envelope(signerPk, signerKeyHash, structHash);
     }
 
     function _registerBuiltinPasskeyOwner() internal returns (bytes32 passkeyKeyHash) {
@@ -194,7 +225,7 @@ contract TransferWithAuthorizationTest is Base {
     }
 
     function _passkeyEnvelope(bytes32 keyHash, bytes32 structHash) internal view returns (bytes memory) {
-        return abi.encodePacked(keyHash, _passkeyOwnerSignature(twa.hashTypedData(structHash)));
+        return abi.encodePacked(keyHash, _passkeyOwnerSignature(_digest(structHash, keyHash)));
     }
 
     // ---------------------------------------------------------------- discovery / getters
@@ -214,7 +245,7 @@ contract TransferWithAuthorizationTest is Base {
         );
         assertEq(
             _cancelTypeHash,
-            0xf30be15aedf9b01d0dac5525241af3753865a4968ffb9fb1a7ad6d2553d29f8e,
+            0x2b37597a859605dd9945fe0ef2dcd48659d0da30c8f24aae553ae8bfb9b5f466,
             "cancel typehash"
         );
         assertEq(Static.NATIVE_ETH, 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE, "native sentinel");
@@ -246,12 +277,16 @@ contract TransferWithAuthorizationTest is Base {
         );
         assertTrue(sep != bytes32(0), "non-zero domain separator");
         bytes32 sh = _structHash(_execTypeHash, address(token), _bob, 1, 9_000, 11_000, keccak256("x"));
-        // hashTypedData == keccak256(0x1901 || domainSeparator || structHash)
-        assertEq(twa.hashTypedData(sh), keccak256(abi.encodePacked(hex"1901", sep, sh)), "domain separator wired");
+        bytes32 boundHash = keccak256(abi.encode(sh, _aliceWalletKeyHash, ISmartWallet(_aliceWallet).IMPLEMENTATION()));
+        assertEq(
+            _digest(sh, _aliceWalletKeyHash),
+            keccak256(abi.encodePacked(hex"1901", sep, boundHash)),
+            "domain, signer key, and implementation bound"
+        );
     }
 
     function test_transferAuthorizationState_unusedFalse() public view {
-        assertFalse(itwa.transferAuthorizationState(keccak256("unused")), "unused nonce is false");
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, keccak256("unused")), "unused nonce is false");
     }
 
     // ---------------------------------------------------------------- happy paths
@@ -265,13 +300,13 @@ contract TransferWithAuthorizationTest is Base {
         uint256 balBefore = token.balanceOf(_bob);
 
         vm.expectEmit(true, true, true, true, _aliceWallet);
-        emit ITransferWithAuthorization.TransferAuthorizationUsed(address(token), _aliceWallet, _bob, value, nonce);
+        emit ITransferWithAuthorization.TransferAuthorizationUsed(address(token), _aliceWallet, _bob, value, nonce, _aliceWalletKeyHash);
 
         vm.prank(_relayer);
         itwa.executeTransferWithAuthorization(address(token), _bob, value, 9_000, 11_000, nonce, sig);
 
         assertEq(token.balanceOf(_bob) - balBefore, value, "erc20 received");
-        assertTrue(itwa.transferAuthorizationState(nonce), "nonce consumed");
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce consumed");
     }
 
     function test_executeNative_happy() public {
@@ -285,7 +320,7 @@ contract TransferWithAuthorizationTest is Base {
         itwa.executeTransferWithAuthorization(_nativeAsset, _bob, value, 9_000, 11_000, nonce, sig);
 
         assertEq(_bob.balance - balBefore, value, "native received");
-        assertTrue(itwa.transferAuthorizationState(nonce), "nonce consumed");
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce consumed");
     }
 
     function test_noReturnToken_settlesViaSafeERC20() public {
@@ -301,7 +336,7 @@ contract TransferWithAuthorizationTest is Base {
         itwa.executeTransferWithAuthorization(address(noReturnToken), _bob, value, 9_000, 11_000, nonce, sig);
 
         assertEq(noReturnToken.balanceOf(_bob), value, "recipient received no-return token");
-        assertTrue(itwa.transferAuthorizationState(nonce), "nonce consumed");
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce consumed");
     }
 
     function test_passkeyEnvelope32BytePrefix_settlesErc20() public {
@@ -316,7 +351,7 @@ contract TransferWithAuthorizationTest is Base {
         itwa.executeTransferWithAuthorization(address(token), _bob, value, 9_000, 11_000, nonce, sig);
 
         assertEq(token.balanceOf(_bob) - balBefore, value, "passkey recipient credited");
-        assertTrue(itwa.transferAuthorizationState(nonce), "nonce consumed");
+        assertTrue(itwa.transferAuthorizationState(passkeyKeyHash, nonce), "nonce consumed");
     }
 
     function test_receive_happy_byPayee() public {
@@ -330,10 +365,56 @@ contract TransferWithAuthorizationTest is Base {
         itwa.receiveWithAuthorization(address(token), _bob, value, 9_000, 11_000, nonce, sig);
 
         assertEq(token.balanceOf(_bob) - balBefore, value, "payee received");
-        assertTrue(itwa.transferAuthorizationState(nonce), "nonce consumed");
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce consumed");
     }
 
     // ---------------------------------------------------------------- replay / signature
+
+    function test_legacyExecuteDigest_revertsAndNonceUnused() public {
+        bytes32 nonce = keccak256("legacy-execute");
+        bytes32 sh = _structHash(_execTypeHash, address(token), _bob, 1 ether, 9_000, 11_000, nonce);
+        bytes memory sig = _envelopeForDigest(_alicePk, _aliceWalletKeyHash, twa.hashTypedData(sh));
+
+        vm.expectRevert(ISmartWallet.InvalidSignature.selector);
+        vm.prank(_relayer);
+        itwa.executeTransferWithAuthorization(address(token), _bob, 1 ether, 9_000, 11_000, nonce, sig);
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "legacy signature must not consume nonce");
+    }
+
+    function test_legacyReceiveDigest_revertsAndNonceUnused() public {
+        bytes32 nonce = keccak256("legacy-receive");
+        bytes32 sh = _structHash(_receiveTypeHash, address(token), _bob, 1 ether, 9_000, 11_000, nonce);
+        bytes memory sig = _envelopeForDigest(_alicePk, _aliceWalletKeyHash, twa.hashTypedData(sh));
+
+        vm.expectRevert(ISmartWallet.InvalidSignature.selector);
+        vm.prank(_bob);
+        itwa.receiveWithAuthorization(address(token), _bob, 1 ether, 9_000, 11_000, nonce, sig);
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "legacy signature must not consume nonce");
+    }
+
+    function test_legacyCancelDigest_revertsAndNonceUnused() public {
+        bytes32 nonce = keccak256("legacy-cancel");
+        bytes32 sh = keccak256(abi.encode(_cancelTypeHash, _aliceWalletKeyHash, nonce));
+        bytes memory sig = _envelopeForDigest(_alicePk, _aliceWalletKeyHash, twa.hashTypedData(sh));
+
+        vm.expectRevert(ISmartWallet.InvalidSignature.selector);
+        vm.prank(_relayer);
+        itwa.cancelTransferAuthorization(_aliceWalletKeyHash, nonce, sig);
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "legacy signature must not cancel nonce");
+    }
+
+    function testFuzz_wrongImplementation_revertsAndNonceUnused(address walletImpl) public {
+        vm.assume(walletImpl != ISmartWallet(_aliceWallet).IMPLEMENTATION());
+        bytes32 nonce = keccak256("wrong-implementation");
+        bytes32 sh = _structHash(_execTypeHash, address(token), _bob, 1 ether, 9_000, 11_000, nonce);
+        bytes32 wrongDigest = twa.hashTypedData(keccak256(abi.encode(sh, _aliceWalletKeyHash, walletImpl)));
+        bytes memory sig = _envelopeForDigest(_alicePk, _aliceWalletKeyHash, wrongDigest);
+
+        vm.expectRevert(ISmartWallet.InvalidSignature.selector);
+        vm.prank(_relayer);
+        itwa.executeTransferWithAuthorization(address(token), _bob, 1 ether, 9_000, 11_000, nonce, sig);
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "wrong implementation must not consume nonce");
+    }
 
     function test_replay_reverts() public {
         bytes32 nonce = keccak256("replay");
@@ -370,14 +451,14 @@ contract TransferWithAuthorizationTest is Base {
         vm.prank(_relayer);
         itwa.executeTransferWithAuthorization(address(token), _bob, 1 ether, 9_000, 11_000, nonce, sig);
 
-        assertFalse(itwa.transferAuthorizationState(nonce), "nonce remains unused");
+        assertFalse(itwa.transferAuthorizationState(eveKeyHash, nonce), "nonce remains unused");
     }
 
     function test_wrappedDigestSignature_revertsAndNonceUnused() public {
         bytes32 nonce = keccak256("wrapped");
         uint256 value = 1 ether;
         bytes32 sh = _structHash(_execTypeHash, address(token), _bob, value, 9_000, 11_000, nonce);
-        bytes32 directDigest = twa.hashTypedData(sh);
+        bytes32 directDigest = _digest(sh, _aliceWalletKeyHash);
         bytes32 wrappedDigest = twa.hashTypedData(
             MessageSignLib.hash(directDigest, uint48(0), SmartWallet(payable(_aliceWallet)).IMPLEMENTATION())
         );
@@ -387,7 +468,7 @@ contract TransferWithAuthorizationTest is Base {
         vm.prank(_relayer);
         itwa.executeTransferWithAuthorization(address(token), _bob, value, 9_000, 11_000, nonce, sig);
 
-        assertFalse(itwa.transferAuthorizationState(nonce), "nonce remains unused");
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce remains unused");
     }
 
     function test_shortEnvelope_reverts() public {
@@ -404,7 +485,7 @@ contract TransferWithAuthorizationTest is Base {
         bytes32 nonce = keccak256("passkey-valid-until-prefix");
         uint256 value = 2 ether;
         bytes32 sh = _structHash(_execTypeHash, address(token), _bob, value, 9_000, 11_000, nonce);
-        bytes memory ownerSignature = _passkeyOwnerSignature(twa.hashTypedData(sh));
+        bytes memory ownerSignature = _passkeyOwnerSignature(_digest(sh, passkeyKeyHash));
 
         bytes memory executeStyleEnvelope = abi.encodePacked(passkeyKeyHash, uint48(0), ownerSignature);
 
@@ -412,7 +493,7 @@ contract TransferWithAuthorizationTest is Base {
         vm.prank(_relayer);
         itwa.executeTransferWithAuthorization(address(token), _bob, value, 9_000, 11_000, nonce, executeStyleEnvelope);
 
-        assertFalse(itwa.transferAuthorizationState(nonce), "nonce remains unused");
+        assertFalse(itwa.transferAuthorizationState(passkeyKeyHash, nonce), "nonce remains unused");
     }
 
     function test_crossTypeReplay_reverts() public {
@@ -465,7 +546,7 @@ contract TransferWithAuthorizationTest is Base {
         vm.prank(_relayer);
         itwa.executeTransferWithAuthorization(address(falseToken), _bob, 1 ether, 9_000, 11_000, nonce, sig);
 
-        assertFalse(itwa.transferAuthorizationState(nonce), "nonce remains unused");
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce remains unused");
         assertEq(falseToken.balanceOf(_aliceWallet), 100 ether, "account balance unchanged");
     }
 
@@ -479,7 +560,7 @@ contract TransferWithAuthorizationTest is Base {
         vm.prank(_relayer);
         itwa.executeTransferWithAuthorization(address(token), _bob, value, 9_000, 11_000, nonce, sig);
 
-        assertFalse(itwa.transferAuthorizationState(nonce), "nonce remains unused");
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce remains unused");
         assertEq(token.balanceOf(_bob), 0, "recipient unchanged");
     }
 
@@ -493,7 +574,7 @@ contract TransferWithAuthorizationTest is Base {
         vm.prank(_relayer);
         itwa.executeTransferWithAuthorization(_nativeAsset, _bob, value, 9_000, 11_000, nonce, sig);
 
-        assertFalse(itwa.transferAuthorizationState(nonce), "nonce remains unused");
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce remains unused");
     }
 
     function test_msgValueRejected() public {
@@ -508,7 +589,7 @@ contract TransferWithAuthorizationTest is Base {
         (bool ok,) = address(itwa).call{value: 1 wei}(data);
 
         assertFalse(ok, "nonpayable call rejected");
-        assertFalse(itwa.transferAuthorizationState(nonce), "nonce remains unused");
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce remains unused");
     }
 
     function test_receive_callerNotPayee_reverts() public {
@@ -528,12 +609,12 @@ contract TransferWithAuthorizationTest is Base {
         bytes32 nonce = keccak256("cancelB");
 
         vm.expectEmit(true, false, false, false, _aliceWallet);
-        emit ITransferWithAuthorization.TransferAuthorizationCanceled(nonce);
+        emit ITransferWithAuthorization.TransferAuthorizationCanceled(_aliceWalletKeyHash, nonce);
 
         vm.prank(_aliceWallet); // self-call form (empty signature)
-        itwa.cancelTransferAuthorization(nonce, "");
+        itwa.cancelTransferAuthorization(_aliceWalletKeyHash, nonce, "");
 
-        assertTrue(itwa.transferAuthorizationState(nonce), "canceled is terminal");
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "canceled is terminal");
 
         bytes32 sh = _structHash(_execTypeHash, address(token), _bob, 1 ether, 9_000, 11_000, nonce);
         bytes memory sig = _envelope(_alicePk, _aliceWalletKeyHash, sh);
@@ -545,33 +626,31 @@ contract TransferWithAuthorizationTest is Base {
     function test_cancelFormB_nonSelf_reverts() public {
         vm.expectRevert(BaseAuthorization.NotFromSelf.selector);
         vm.prank(_relayer);
-        itwa.cancelTransferAuthorization(keccak256("x"), "");
+        itwa.cancelTransferAuthorization(_aliceWalletKeyHash, keccak256("x"), "");
     }
 
     function test_cancelFormA_signed() public {
         bytes32 nonce = keccak256("cancelA");
-        bytes32 sh = keccak256(abi.encode(_cancelTypeHash, nonce));
-        bytes memory sig = _envelope(_alicePk, _aliceWalletKeyHash, sh);
+        bytes memory sig = _cancelSignature(_alicePk, _aliceWalletKeyHash, nonce);
 
         vm.expectEmit(true, false, false, false, _aliceWallet);
-        emit ITransferWithAuthorization.TransferAuthorizationCanceled(nonce);
+        emit ITransferWithAuthorization.TransferAuthorizationCanceled(_aliceWalletKeyHash, nonce);
 
         vm.prank(_relayer); // form A may be relayed by anyone
-        itwa.cancelTransferAuthorization(nonce, sig);
+        itwa.cancelTransferAuthorization(_aliceWalletKeyHash, nonce, sig);
 
-        assertTrue(itwa.transferAuthorizationState(nonce), "canceled is terminal");
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "canceled is terminal");
     }
 
     function test_cancelFormA_invalidSignature_revertsAndNonceUnused() public {
         bytes32 nonce = keccak256("bad-cancel");
-        bytes32 sh = keccak256(abi.encode(_cancelTypeHash, nonce));
-        bytes memory sig = _envelope(_bobPk, _aliceWalletKeyHash, sh);
+        bytes memory sig = _cancelSignature(_bobPk, _aliceWalletKeyHash, nonce);
 
         vm.expectRevert(ISmartWallet.InvalidSignature.selector);
         vm.prank(_relayer);
-        itwa.cancelTransferAuthorization(nonce, sig);
+        itwa.cancelTransferAuthorization(_aliceWalletKeyHash, nonce, sig);
 
-        assertFalse(itwa.transferAuthorizationState(nonce), "nonce remains unused");
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce remains unused");
     }
 
     function test_cancelAlreadyUsedNonce_reverts() public {
@@ -585,7 +664,214 @@ contract TransferWithAuthorizationTest is Base {
         bytes memory cancelSig = _cancelSignature(_alicePk, _aliceWalletKeyHash, nonce);
         vm.expectRevert(abi.encodeWithSelector(ITransferWithAuthorization.AuthorizationAlreadyUsed.selector, nonce));
         vm.prank(_relayer);
-        itwa.cancelTransferAuthorization(nonce, cancelSig);
+        itwa.cancelTransferAuthorization(_aliceWalletKeyHash, nonce, cancelSig);
+    }
+
+    // ---------------------------------------------------------------- owner-scoped nonces / cancellation permissions
+
+    function _registerBob() internal returns (bytes32 keyHash) {
+        keyHash = keccak256(abi.encodePacked(_bob));
+        _addOwnerToAccount(_alice, _aliceWallet, keyHash, Static.ECDSA_VALIDATOR_ADDRESS, 0);
+    }
+
+    function testFuzz_sameNonceIndependentAcrossOwners(bytes32 nonce) public {
+        bytes32 bobKeyHash = _registerBob();
+        bytes memory aliceSig = _executeSignature(_alicePk, _aliceWalletKeyHash, address(token), _charlie, 1 ether, 9_000, 11_000, nonce);
+        bytes memory bobSig = _executeSignature(_bobPk, bobKeyHash, address(token), _charlie, 1 ether, 9_000, 11_000, nonce);
+
+        itwa.executeTransferWithAuthorization(address(token), _charlie, 1 ether, 9_000, 11_000, nonce, aliceSig);
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce));
+        assertFalse(itwa.transferAuthorizationState(bobKeyHash, nonce));
+
+        itwa.executeTransferWithAuthorization(address(token), _charlie, 1 ether, 9_000, 11_000, nonce, bobSig);
+        assertTrue(itwa.transferAuthorizationState(bobKeyHash, nonce));
+        assertEq(token.balanceOf(_charlie), 2 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(ITransferWithAuthorization.AuthorizationAlreadyUsed.selector, nonce));
+        itwa.executeTransferWithAuthorization(address(token), _charlie, 1 ether, 9_000, 11_000, nonce, bobSig);
+        // Execute and receive share a namespace for the same owner.
+        bytes memory receiveSig = _envelope(_bobPk, bobKeyHash, _structHash(_receiveTypeHash, address(token), _charlie, 1 ether, 9_000, 11_000, nonce));
+        vm.expectRevert(abi.encodeWithSelector(ITransferWithAuthorization.AuthorizationAlreadyUsed.selector, nonce));
+        vm.prank(_charlie);
+        itwa.receiveWithAuthorization(address(token), _charlie, 1 ether, 9_000, 11_000, nonce, receiveSig);
+    }
+
+    function test_ownerCancelOnlyConsumesOwnNamespace() public {
+        bytes32 bobKeyHash = _registerBob();
+        bytes32 nonce = keccak256("own-cancel");
+        itwa.cancelTransferAuthorization(bobKeyHash, nonce, _cancelSignature(_bobPk, bobKeyHash, nonce));
+        assertTrue(itwa.transferAuthorizationState(bobKeyHash, nonce));
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce));
+
+        bytes memory aliceSig = _executeSignature(_alicePk, _aliceWalletKeyHash, address(token), _charlie, 1 ether, 9_000, 11_000, nonce);
+        itwa.executeTransferWithAuthorization(address(token), _charlie, 1 ether, 9_000, 11_000, nonce, aliceSig);
+        bytes memory bobSig = _executeSignature(_bobPk, bobKeyHash, address(token), _charlie, 1 ether, 9_000, 11_000, nonce);
+        vm.expectRevert(abi.encodeWithSelector(ITransferWithAuthorization.AuthorizationAlreadyUsed.selector, nonce));
+        itwa.executeTransferWithAuthorization(address(token), _charlie, 1 ether, 9_000, 11_000, nonce, bobSig);
+    }
+
+    function test_nonAdminCannotCancelOtherOwner() public {
+        bytes32 bobKeyHash = _registerBob();
+        bytes32 nonce = keccak256("unauthorized-cancel");
+        bytes memory sig = _cancelSignatureFor(_bobPk, bobKeyHash, _aliceWalletKeyHash, nonce);
+        vm.expectRevert(abi.encodeWithSelector(ITransferWithAuthorization.UnauthorizedCancellation.selector, bobKeyHash, _aliceWalletKeyHash));
+        itwa.cancelTransferAuthorization(_aliceWalletKeyHash, nonce, sig);
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce));
+        assertFalse(itwa.transferAuthorizationState(bobKeyHash, nonce));
+    }
+
+    function test_adminCanCancelOtherOwnerWithoutConsumingOwnNonce() public {
+        bytes32 bobKeyHash = _registerBob();
+        bytes32 nonce = keccak256("admin-cancel");
+        bytes memory sig = _cancelSignatureFor(_alicePk, _aliceWalletKeyHash, bobKeyHash, nonce);
+        vm.expectEmit(true, true, false, true, _aliceWallet);
+        emit ITransferWithAuthorization.TransferAuthorizationCanceled(bobKeyHash, nonce);
+        itwa.cancelTransferAuthorization(bobKeyHash, nonce, sig);
+        assertTrue(itwa.transferAuthorizationState(bobKeyHash, nonce));
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce));
+
+        bytes memory bobSig = _envelope(_bobPk, bobKeyHash, _structHash(_receiveTypeHash, address(token), _charlie, 1 ether, 9_000, 11_000, nonce));
+        vm.expectRevert(abi.encodeWithSelector(ITransferWithAuthorization.AuthorizationAlreadyUsed.selector, nonce));
+        vm.prank(_charlie);
+        itwa.receiveWithAuthorization(address(token), _charlie, 1 ether, 9_000, 11_000, nonce, bobSig);
+    }
+
+    function test_cancelTargetTamperingFailsEvenForAdmin() public {
+        bytes32 bobKeyHash = _registerBob();
+        bytes32 nonce = keccak256("tampered-target");
+        bytes32 structHash = keccak256(abi.encode(_cancelTypeHash, _aliceWalletKeyHash, nonce));
+        // Signature authorizes Alice's namespace; the relay substitutes Bob as the target argument.
+        bytes memory tampered = _envelope(_alicePk, _aliceWalletKeyHash, structHash);
+        vm.expectRevert(ISmartWallet.InvalidSignature.selector);
+        itwa.cancelTransferAuthorization(bobKeyHash, nonce, tampered);
+        assertFalse(itwa.transferAuthorizationState(bobKeyHash, nonce));
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce));
+    }
+
+    function test_unsignedCancelTargetRequiresAdminExecution() public {
+        bytes32 bobKeyHash = _registerBob();
+        bytes32 nonce = keccak256("self-cancel-target");
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _aliceWallet, value: 0, data: abi.encodeCall(ITransferWithAuthorization.cancelTransferAuthorization, (bobKeyHash, nonce, bytes("")))});
+        vm.expectRevert(ISmartWallet.NonAdminSelfCall.selector);
+        vm.prank(_bob);
+        ISmartWallet(_aliceWallet).execute(calls);
+        assertFalse(itwa.transferAuthorizationState(bobKeyHash, nonce));
+
+        vm.prank(_alice);
+        ISmartWallet(_aliceWallet).execute(calls);
+        assertTrue(itwa.transferAuthorizationState(bobKeyHash, nonce));
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce));
+    }
+
+    function testFuzz_shortCancelEnvelopeRejected(uint8 length) public {
+        length = uint8(bound(length, 1, 31));
+        bytes memory sig = new bytes(length);
+        vm.expectRevert(ISmartWallet.InvalidSignature.selector);
+        vm.prank(_relayer);
+        itwa.cancelTransferAuthorization(_aliceWalletKeyHash, keccak256("short-cancel"), sig);
+    }
+
+    function test_signerKeyOnlyCannotBypassValidationEvenForSelf() public {
+        vm.expectRevert(ISmartWallet.InvalidSignature.selector);
+        vm.prank(_aliceWallet);
+        itwa.cancelTransferAuthorization(_aliceWalletKeyHash, keccak256("signer-key-only"), abi.encodePacked(_aliceWalletKeyHash));
+    }
+
+    function test_expiredAdminCannotCancelOtherOwner() public {
+        bytes32 bobKeyHash = _registerBob();
+        bytes32 nonce = keccak256("expired-admin");
+        bytes memory sig = _cancelSignatureFor(_alicePk, _aliceWalletKeyHash, bobKeyHash, nonce);
+        vm.prank(_aliceWallet);
+        IOwnerManager(_aliceWallet).updateOwner(_aliceWalletKeyHash, address(_ecdsaValidator), _packSettings(true, 9_999, address(0)));
+        vm.expectRevert(ISmartWallet.InvalidSignature.selector);
+        itwa.cancelTransferAuthorization(bobKeyHash, nonce, sig);
+        assertFalse(itwa.transferAuthorizationState(bobKeyHash, nonce));
+    }
+
+    function test_downgradedAdminCannotCancelOtherOwner() public {
+        bytes32 bobKeyHash = _registerBob();
+        bytes32 nonce = keccak256("downgraded-admin");
+        bytes memory sig = _cancelSignatureFor(_alicePk, _aliceWalletKeyHash, bobKeyHash, nonce);
+        vm.prank(_aliceWallet);
+        IOwnerManager(_aliceWallet).updateOwner(_aliceWalletKeyHash, address(_ecdsaValidator), 0);
+        vm.expectRevert(abi.encodeWithSelector(ITransferWithAuthorization.UnauthorizedCancellation.selector, _aliceWalletKeyHash, bobKeyHash));
+        itwa.cancelTransferAuthorization(bobKeyHash, nonce, sig);
+        assertFalse(itwa.transferAuthorizationState(bobKeyHash, nonce));
+    }
+
+    function test_removedAdminCannotCancelOtherOwner() public {
+        bytes32 bobKeyHash = _registerBob();
+        bytes32 nonce = keccak256("removed-admin");
+        bytes memory sig = _cancelSignatureFor(_alicePk, _aliceWalletKeyHash, bobKeyHash, nonce);
+        vm.prank(_aliceWallet);
+        IOwnerManager(_aliceWallet).removeOwner(_aliceWalletKeyHash);
+        vm.expectRevert(ISmartWallet.InvalidSignature.selector);
+        itwa.cancelTransferAuthorization(bobKeyHash, nonce, sig);
+        assertFalse(itwa.transferAuthorizationState(bobKeyHash, nonce));
+    }
+
+    function test_removeAndReaddOwnerDoesNotResetNonce() public {
+        bytes32 bobKeyHash = _registerBob();
+        bytes32 nonce = keccak256("readded-owner");
+        itwa.cancelTransferAuthorization(bobKeyHash, nonce, _cancelSignature(_bobPk, bobKeyHash, nonce));
+        vm.prank(_aliceWallet);
+        IOwnerManager(_aliceWallet).removeOwner(bobKeyHash);
+        assertTrue(itwa.transferAuthorizationState(bobKeyHash, nonce));
+        _registerBob();
+        assertTrue(itwa.transferAuthorizationState(bobKeyHash, nonce));
+    }
+
+    function test_passkeyOwnerCanCancelOwnAuthorization() public {
+        bytes32 passkeyKeyHash = _registerBuiltinPasskeyOwner();
+        bytes32 nonce = keccak256("passkey-cancel");
+        bytes32 structHash = keccak256(abi.encode(_cancelTypeHash, passkeyKeyHash, nonce));
+        bytes memory sig = _passkeyEnvelope(passkeyKeyHash, structHash);
+        itwa.cancelTransferAuthorization(passkeyKeyHash, nonce, sig);
+        assertTrue(itwa.transferAuthorizationState(passkeyKeyHash, nonce));
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce));
+    }
+
+    function test_newNonceWritesOnlyOwnerScopedStorage() public {
+        bytes32 nonce = keccak256("nested-storage");
+        itwa.cancelTransferAuthorization(_aliceWalletKeyHash, nonce, _cancelSignature(_alicePk, _aliceWalletKeyHash, nonce));
+        bytes32 root = 0xd0d1bd54e9d038badf8c6e8604633a46480fa6b609616e73025b209a31512900;
+        bytes32 ownerSlot = keccak256(abi.encode(_aliceWalletKeyHash, root));
+        assertEq(vm.load(_aliceWallet, keccak256(abi.encode(nonce, ownerSlot))), bytes32(uint256(1)));
+        assertEq(vm.load(_aliceWallet, keccak256(abi.encode(nonce, root))), bytes32(0));
+    }
+
+    function test_sharedCredentialValidatorCannotReplayAcrossOwnerNamespaces() public {
+        SharedCredentialValidator validator = new SharedCredentialValidator(_aliceWalletKeyHash);
+        bytes32 ownerA = keccak256("alias-a");
+        bytes32 ownerB = keccak256("alias-b");
+        _addOwnerToAccount(_alice, _aliceWallet, ownerA, address(validator), 0);
+        _addOwnerToAccount(_alice, _aliceWallet, ownerB, address(validator), 0);
+        bytes32 nonce = keccak256("alias-replay");
+        bytes32 sh = _structHash(_execTypeHash, address(token), _charlie, 1 ether, 9_000, 11_000, nonce);
+        bytes memory sigA = _envelope(_alicePk, ownerA, sh);
+        itwa.executeTransferWithAuthorization(address(token), _charlie, 1 ether, 9_000, 11_000, nonce, sigA);
+
+        assertFalse(itwa.transferAuthorizationState(ownerB, nonce));
+        // Reuse the original validator signature, changing only its routing prefix.
+        assembly ("memory-safe") {
+            mstore(add(sigA, 0x20), ownerB)
+        }
+        vm.expectRevert(ISmartWallet.InvalidSignature.selector);
+        itwa.executeTransferWithAuthorization(address(token), _charlie, 1 ether, 9_000, 11_000, nonce, sigA);
+        assertTrue(itwa.transferAuthorizationState(ownerA, nonce));
+        assertFalse(itwa.transferAuthorizationState(ownerB, nonce));
+        assertEq(token.balanceOf(_charlie), 1 ether);
+    }
+
+    function test_signerUnboundDigestRejected() public {
+        bytes32 nonce = keccak256("signer-unbound-digest");
+        bytes32 sh = _structHash(_execTypeHash, address(token), _charlie, 1 ether, 9_000, 11_000, nonce);
+        bytes32 oldDigest = twa.hashTypedData(keccak256(abi.encode(sh, ISmartWallet(_aliceWallet).IMPLEMENTATION())));
+        bytes memory sig = _envelopeForDigest(_alicePk, _aliceWalletKeyHash, oldDigest);
+        vm.expectRevert(ISmartWallet.InvalidSignature.selector);
+        itwa.executeTransferWithAuthorization(address(token), _charlie, 1 ether, 9_000, 11_000, nonce, sig);
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce));
     }
 
     // ---------------------------------------------------------------- hook wiring + CEI rollback
@@ -609,7 +895,7 @@ contract TransferWithAuthorizationTest is Base {
         itwa.executeTransferWithAuthorization(address(token), _charlie, value, 9_000, 11_000, nonce, sig);
 
         // Hook revert rolled back the CEI nonce write: the authorization is still unused.
-        assertFalse(itwa.transferAuthorizationState(nonce), "nonce not consumed on revert");
+        assertFalse(itwa.transferAuthorizationState(bobKeyHash, nonce), "nonce not consumed on revert");
     }
 
     function test_recordingHookReceivesErc20FieldsAndKeyHash() public {
@@ -688,7 +974,7 @@ contract TransferWithAuthorizationTest is Base {
 
         assertEq(hook.preCount(), 0, "legacy hook is never invoked on the TWA path");
         assertEq(token.balanceOf(_charlie), charlieBefore, "no transfer on fail-closed revert");
-        assertFalse(itwa.transferAuthorizationState(nonce), "nonce not consumed on revert");
+        assertFalse(itwa.transferAuthorizationState(bobKeyHash, nonce), "nonce not consumed on revert");
     }
 
     function test_truthyFallbackHook_reverts_failClosed() public {
@@ -736,7 +1022,7 @@ contract TransferWithAuthorizationTest is Base {
             sig
         );
 
-        assertFalse(itwa.transferAuthorizationState(nonce));
+        assertFalse(itwa.transferAuthorizationState(bobKeyHash, nonce));
     }
 
     /// @dev Fail-closed: a hook that implements the TWA callbacks but does NOT advertise the interface via
@@ -765,7 +1051,7 @@ contract TransferWithAuthorizationTest is Base {
 
         assertEq(hook.preCount(), 0, "non-advertising hook is never invoked");
         assertEq(token.balanceOf(_charlie), charlieBefore, "no transfer on fail-closed revert");
-        assertFalse(itwa.transferAuthorizationState(nonce), "nonce not consumed on revert");
+        assertFalse(itwa.transferAuthorizationState(bobKeyHash, nonce), "nonce not consumed on revert");
     }
 
     function test_nonAdminNativeSelfTarget_succeedsNetZero() public {
@@ -787,7 +1073,7 @@ contract TransferWithAuthorizationTest is Base {
         itwa.executeTransferWithAuthorization(_nativeAsset, _aliceWallet, 1 ether, 9_000, 11_000, nonce, sig);
 
         assertEq(_aliceWallet.balance, balanceBefore, "self-send net zero");
-        assertTrue(itwa.transferAuthorizationState(nonce), "nonce consumed");
+        assertTrue(itwa.transferAuthorizationState(bobKeyHash, nonce), "nonce consumed");
     }
 
     function test_adminNativeSelfTarget_succeedsNetZero() public {
@@ -800,7 +1086,7 @@ contract TransferWithAuthorizationTest is Base {
         itwa.executeTransferWithAuthorization(_nativeAsset, _aliceWallet, 1 ether, 9_000, 11_000, nonce, sig);
 
         assertEq(_aliceWallet.balance, balanceBefore, "self-send net zero");
-        assertTrue(itwa.transferAuthorizationState(nonce), "nonce consumed");
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce consumed");
     }
 
     function test_externalTokenToWalletRecipient_succeedsForNonAdmin() public {
@@ -822,7 +1108,7 @@ contract TransferWithAuthorizationTest is Base {
         itwa.executeTransferWithAuthorization(address(token), _aliceWallet, 1 ether, 9_000, 11_000, nonce, sig);
 
         assertEq(token.balanceOf(_aliceWallet), beforeBalance, "self-recipient token transfer net zero");
-        assertTrue(itwa.transferAuthorizationState(nonce), "nonce consumed");
+        assertTrue(itwa.transferAuthorizationState(bobKeyHash, nonce), "nonce consumed");
     }
 
     function test_nativeReentrancyCannotConsumeNestedNonce() public {
@@ -846,8 +1132,8 @@ contract TransferWithAuthorizationTest is Base {
 
         assertTrue(receiver.attempted(), "nested call attempted");
         assertFalse(receiver.nestedSucceeded(), "nested settle blocked");
-        assertTrue(itwa.transferAuthorizationState(outerNonce), "outer consumed");
-        assertFalse(itwa.transferAuthorizationState(nestedNonce), "nested nonce unused");
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, outerNonce), "outer consumed");
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nestedNonce), "nested nonce unused");
         assertEq(address(receiver).balance, outerValue, "receiver got outer value");
     }
 
@@ -869,7 +1155,7 @@ contract TransferWithAuthorizationTest is Base {
 
         assertEq(token.balanceOf(_aliceWallet), accountBefore - value, "account debited");
         assertEq(token.balanceOf(to), recipientBefore + value, "recipient credited");
-        assertTrue(itwa.transferAuthorizationState(nonce), "nonce consumed");
+        assertTrue(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce consumed");
     }
 
     function testFuzz_mutatedValueInvalidatesSignature(uint96 signedAmount, uint96 mutatedAmount, uint256 nonceSeed)
@@ -886,7 +1172,7 @@ contract TransferWithAuthorizationTest is Base {
         vm.prank(_relayer);
         itwa.executeTransferWithAuthorization(address(token), _bob, mutatedValue, 9_000, 11_000, nonce, sig);
 
-        assertFalse(itwa.transferAuthorizationState(nonce), "nonce remains unused");
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce remains unused");
     }
 
     function testFuzz_mutatedRecipientInvalidatesSignature(address signedTo, address mutatedTo, uint256 nonceSeed)
@@ -901,6 +1187,6 @@ contract TransferWithAuthorizationTest is Base {
         vm.prank(_relayer);
         itwa.executeTransferWithAuthorization(address(token), mutatedTo, 1 ether, 9_000, 11_000, nonce, sig);
 
-        assertFalse(itwa.transferAuthorizationState(nonce), "nonce remains unused");
+        assertFalse(itwa.transferAuthorizationState(_aliceWalletKeyHash, nonce), "nonce remains unused");
     }
 }

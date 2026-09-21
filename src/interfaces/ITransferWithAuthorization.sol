@@ -5,29 +5,39 @@ pragma solidity ^0.8.29;
 /// @notice Account-level, signature-authorized asset settlement interface for the SmartWallet account.
 /// @dev An owner signs an off-chain EIP-712 authorization binding {token, from, to, value, time window,
 ///      random nonce}; a relayer (or the payee) submits it on-chain to move funds out of the account
-///      exactly once. Native ETH is selected with the `NATIVE_ASSET` sentinel; any other `token` is an
-///      ERC-20. Function/event/error signatures are stable backend ABI surface and must not change.
+///      exactly once per owner key. Native ETH is selected with the `NATIVE_ASSET` sentinel; any other
+///      `token` is an ERC-20. Nonces are owner-scoped, unlike ERC-8335's account-scoped nonce semantics.
+///      All signed paths use hashTypedData(keccak256(abi.encode(structHash, signerKeyHash, IMPLEMENTATION))).
+///      Cancellation includes `targetKeyHash` directly in its EIP-712 struct.
+///      The implementation is bound outside the authorization typehash; signing the original typed
+///      data directly is not sufficient. No personal-sign or ERC-1271 wrapping is applied.
+///      The signer key is bound into the digest so the envelope cannot be rerouted to another owner.
 interface ITransferWithAuthorization {
     /// @notice Emitted exactly once when an authorization settles, via `executeTransferWithAuthorization`
     ///         or `receiveWithAuthorization`, carrying the full transfer detail. `token`, `from`, and `to`
     ///         are indexed so consumers can filter by asset or counterparty; `value` and
-    ///         `authorizationNonce` are in the data section (the nonce is a topic only on cancellation).
+    ///         `authorizationNonce` and `ownerKeyHash` are in the data section.
     /// @param token The asset transferred (`NATIVE_ASSET` for native ETH, else the ERC-20 address).
     /// @param from The paying account (always this account).
     /// @param to The recipient that received `value`.
     /// @param value The amount moved, in wei or token base units.
     /// @param authorizationNonce The authorization nonce that was consumed (now terminal).
+    /// @param ownerKeyHash The owner whose nonce was consumed.
     event TransferAuthorizationUsed(
-        address indexed token, address indexed from, address indexed to, uint256 value, bytes32 authorizationNonce
+        address indexed token, address indexed from, address indexed to, uint256 value, bytes32 authorizationNonce,
+        bytes32 ownerKeyHash
     );
 
     /// @notice Emitted when an unused authorization is revoked via `cancelTransferAuthorization`. The nonce
-    ///         is indexed and becomes terminal — it can no longer settle, exactly as if it had been used.
+    ///         and owner key are indexed. The nonce becomes terminal only for that owner.
+    /// @param ownerKeyHash The owner whose nonce was canceled.
     /// @param authorizationNonce The authorization nonce that was canceled (now terminal).
-    event TransferAuthorizationCanceled(bytes32 indexed authorizationNonce);
+    event TransferAuthorizationCanceled(bytes32 indexed ownerKeyHash, bytes32 indexed authorizationNonce);
 
     /// @notice The authorization nonce is already in a terminal state (settled or canceled).
     error AuthorizationAlreadyUsed(bytes32 authorizationNonce);
+    /// @notice A non-admin signer attempted to cancel another owner's authorization.
+    error UnauthorizedCancellation(bytes32 signerKeyHash, bytes32 ownerKeyHash);
     /// @notice The current block timestamp has not reached the authorization's `validAfter` bound.
     error AuthorizationNotYetValid(uint256 validAfter);
     /// @notice The current block timestamp has reached or passed the authorization's `validBefore` bound.
@@ -45,7 +55,7 @@ interface ITransferWithAuthorization {
     /// @param value The amount to transfer, in wei or token base units.
     /// @param validAfter Unix timestamp; settlement is only valid strictly after this bound.
     /// @param validBefore Unix timestamp; settlement is only valid strictly before this bound.
-    /// @param authorizationNonce A random, single-use authorization nonce.
+    /// @param authorizationNonce A random authorization nonce, single-use for the signing owner.
     /// @param signature The envelope `keyHash(32) || ownerSignature` over the EIP-712 execute digest.
     function executeTransferWithAuthorization(
         address token,
@@ -65,7 +75,7 @@ interface ITransferWithAuthorization {
     /// @param value The amount to transfer, in wei or token base units.
     /// @param validAfter Unix timestamp; settlement is only valid strictly after this bound.
     /// @param validBefore Unix timestamp; settlement is only valid strictly before this bound.
-    /// @param authorizationNonce A random, single-use authorization nonce.
+    /// @param authorizationNonce A random authorization nonce, single-use for the signing owner.
     /// @param signature The envelope `keyHash(32) || ownerSignature` over the EIP-712 receive digest.
     function receiveWithAuthorization(
         address token,
@@ -77,15 +87,22 @@ interface ITransferWithAuthorization {
         bytes calldata signature
     ) external;
 
-    /// @notice Cancels (revokes) an unused authorization nonce, making it terminal.
-    /// @dev Two forms: a non-empty `signature` is an owner-key authorization over the cancel digest and may
-    ///      be relayed by anyone; an empty `signature` requires the caller to be the account itself.
+    /// @notice Cancels an unused nonce for `targetKeyHash`.
+    /// @dev Signed form: only the target owner or a currently valid admin may cancel. The target owner
+    ///      is bound into the cancel digest. An empty signature requires a wallet self-call,
+    ///      authorized through the wallet's execution path.
+    /// @param targetKeyHash The owner whose authorization nonce to cancel.
     /// @param authorizationNonce The authorization nonce to cancel.
-    /// @param signature The envelope `keyHash(32) || ownerSignature` over the EIP-712 cancel digest, or empty for a self-call.
-    function cancelTransferAuthorization(bytes32 authorizationNonce, bytes calldata signature) external;
+    /// @param signature `signerKeyHash(32) || validatorSignature`, or empty for an authorized self-call.
+    function cancelTransferAuthorization(
+        bytes32 targetKeyHash,
+        bytes32 authorizationNonce,
+        bytes calldata signature
+    ) external;
 
-    /// @notice Returns whether an authorization nonce is terminal (settled or canceled).
+    /// @notice Returns whether an owner's authorization nonce is terminal (settled or canceled).
+    /// @param ownerKeyHash The owner whose nonce namespace to query.
     /// @param authorizationNonce The authorization nonce to query.
     /// @return used True if the nonce has been settled or canceled, false if still unused.
-    function transferAuthorizationState(bytes32 authorizationNonce) external view returns (bool used);
+    function transferAuthorizationState(bytes32 ownerKeyHash, bytes32 authorizationNonce) external view returns (bool used);
 }
