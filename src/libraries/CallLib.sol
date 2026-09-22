@@ -10,13 +10,22 @@ library CallLib {
     /// @notice Computes a keccak256 hash over an array of Call structs.
     /// @dev Iterates through the calls and encodes each individual call hash, then hashes the concatenation.
     /// @param calls Array of Call structs to hash.
-    /// @return Hash representing the full sequence of calls.
-    function hash(Call[] memory calls) internal pure returns (bytes32) {
-        bytes memory encoded;
-        for (uint i = 0; i < calls.length; i++) {
-            encoded = abi.encodePacked(encoded, hash(calls[i]));
+    /// @return result Hash representing the full sequence of calls.
+    function hash(Call[] memory calls) internal pure returns (bytes32 result) {
+        uint256 length = calls.length;
+        bytes32[] memory callHashes = new bytes32[](length);
+
+        for (uint256 i; i < length; ++i) {
+            callHashes[i] = hash(calls[i]);
         }
-        return keccak256(encoded);
+        // Equivalent to keccak256(abi.encodePacked(callHashes)),
+        // without allocating and copying an additional bytes buffer.
+        assembly ("memory-safe") {
+            result := keccak256(
+                add(callHashes, 0x20),
+                shl(5, length)
+            )
+        }
     }
 
     /// @notice Computes a keccak256 hash for a single Call struct.

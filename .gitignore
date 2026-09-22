@@ -38,3 +38,33 @@ node_modules
 
 # Wake framework
 .wake/
+
+# Oli pipeline safety baseline
+.env.*
+*.key
+*.pem
+*.p12
+keystore/
+mnemonic*
+.idea/
+.DS_Store
+.claude/skills/
+.claude/settings.local.json
+.claude/.cache/
+.oli-work/
+broadcast/
+lib/
+.github/
+.forge-snapshots/
+coverage/
+.audit-workspace/
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+
+# Oli delivery safety baseline
+*.keystore
+*mnemonic*

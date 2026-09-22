@@ -2,7 +2,7 @@
 pragma solidity ^0.8.29;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {MerkleProofProcessor} from "./MerkleProofProcessor.sol";
+import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 /// @title ECDSAValidatorLib
 /// @notice Library for ECDSA signature validation with Merkle proof support
@@ -27,20 +27,16 @@ library ECDSAValidatorLib {
             return false;
         }
 
-        bytes memory signature = validatorData[:ECDSA_SIGNATURE_LENGTH];
         if (validatorData.length > ECDSA_SIGNATURE_LENGTH) {
             bytes32[] memory proofs = abi.decode(
                 validatorData[ECDSA_SIGNATURE_LENGTH:],
                 (bytes32[])
             );
-            messageHash = MerkleProofProcessor.processWithMerkleProof(
-                proofs,
-                messageHash
-            );
+            messageHash = MerkleProof.processProof(proofs, messageHash);
         }
 
         // Recover signer and verify against keyHash
-        (address recoveredSigner, , ) = messageHash.tryRecover(signature);
+        (address recoveredSigner, , ) = messageHash.tryRecoverCalldata(validatorData[:ECDSA_SIGNATURE_LENGTH]);
         if (recoveredSigner == address(0)) {
             return false;
         }

@@ -238,7 +238,7 @@ contract ValidationTest is Base {
         bytes32 bobKeyHash = _makeKeyHash(_bob);
         uint40 expiry = uint40(block.timestamp + 1 days);
 
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings = _packSettings(
             false,
             expiry,
             address(0)
@@ -275,7 +275,7 @@ contract ValidationTest is Base {
         bytes32 bobKeyHash = _makeKeyHash(_bob);
         uint40 expiry = uint40(block.timestamp + 7 days);
 
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings = _packSettings(
             false,
             expiry,
             address(0)
@@ -773,7 +773,7 @@ contract ValidationTest is Base {
     {
         // Create addOwner call
         bytes32 newOwnerKeyHash = _makeKeyHash(_bob);
-        uint256 newOwnerSettings = OwnerManager(_aliceWallet).packSettings(
+        uint256 newOwnerSettings = _packSettings(
             false,
             0,
             address(0)
@@ -791,7 +791,7 @@ contract ValidationTest is Base {
         });
 
         // Use chainless nonce key (Static.CHAINLESS_NONCE_KEY = 196)
-        uint256 chainlessNonce = Static.CHAINLESS_NONCE_KEY << 64; // nonce key = 196, sequence = 0
+        uint256 chainlessNonce = _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0); // nonce key = 196, sequence = 0
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: chainlessNonce
@@ -819,12 +819,112 @@ contract ValidationTest is Base {
         );
     }
 
+    function test_RevertWhen_ExecuteWithRelayer_NonAdminCannotAdvanceChainlessQueue()
+        public
+    {
+        bytes32 bobKeyHash = _makeKeyHash(_bob);
+        _addOwnerToAccount(
+            _alice,
+            _aliceWallet,
+            bobKeyHash,
+            address(_ecdsaValidator),
+            _packSettings(false, 0, address(0))
+        );
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: _aliceWallet,
+            value: 0,
+            data: abi.encodeWithSelector(
+                OwnerManager.addOwner.selector,
+                _makeKeyHash(_charlie),
+                address(_ecdsaValidator),
+                0
+            )
+        });
+        uint256 chainlessNonce = _chainlessNonce(
+            CHAINLESS_OPERATION_TYPE_1,
+            type(uint16).max - 1,
+            0
+        );
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: chainlessNonce
+        });
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _bob,
+            _bobPk,
+            batchedCall,
+            uint48(0)
+        );
+
+        assertEq(
+            INonceManager(_aliceWallet).getChainlessQueueState(
+                CHAINLESS_OPERATION_TYPE_1
+            ),
+            0
+        );
+
+        vm.prank(relayer);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISmartWallet.InvalidNonceKey.selector,
+                Static.CHAINLESS_NONCE_KEY
+            )
+        );
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
+
+        assertEq(
+            INonceManager(_aliceWallet).getChainlessQueueState(
+                CHAINLESS_OPERATION_TYPE_1
+            ),
+            0
+        );
+    }
+
+    function test_ExecuteWithRelayer_AllowsAdminEmptyChainlessCalls() public {
+        Call[] memory calls = new Call[](0);
+        uint256 chainlessNonce = _chainlessNonce(
+            CHAINLESS_OPERATION_TYPE_1,
+            1,
+            0
+        );
+        BatchedCall memory batchedCall = BatchedCall({
+            calls: calls,
+            nonce: chainlessNonce
+        });
+        bytes memory validatorData = _constructRelayerSignature(
+            _aliceWallet,
+            _alice,
+            _alicePk,
+            batchedCall,
+            uint48(0)
+        );
+
+        vm.prank(relayer);
+        ISmartWallet(_aliceWallet).executeWithRelayer(
+            batchedCall,
+            validatorData
+        );
+
+        assertEq(
+            INonceManager(_aliceWallet).getChainlessQueueState(
+                CHAINLESS_OPERATION_TYPE_1
+            ),
+            2
+        );
+    }
+
     function test_RevertWhen_ExecuteWithRelayer_DoesNotAllowChainlessNonceForUpdateOwner()
         public
     {
         // First add an owner to update
         bytes32 ownerKeyHash = _makeKeyHash(_bob);
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings = _packSettings(
             false,
             0,
             address(0)
@@ -838,7 +938,7 @@ contract ValidationTest is Base {
         );
 
         // Create updateOwner call
-        uint256 newSettings = IOwnerManager(_aliceWallet).packSettings(
+        uint256 newSettings = _packSettings(
             true, // Make admin
             uint40(block.timestamp + 1 days), // Set expiry
             address(0) // No hook
@@ -855,7 +955,7 @@ contract ValidationTest is Base {
             )
         });
 
-        uint256 chainlessNonce = Static.CHAINLESS_NONCE_KEY << 64;
+        uint256 chainlessNonce = _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0);
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: chainlessNonce
@@ -888,7 +988,7 @@ contract ValidationTest is Base {
     {
         // First add an owner to remove
         bytes32 ownerKeyHash = _makeKeyHash(_bob);
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings = _packSettings(
             false,
             0,
             address(0)
@@ -912,7 +1012,7 @@ contract ValidationTest is Base {
             )
         });
 
-        uint256 chainlessNonce = Static.CHAINLESS_NONCE_KEY << 64;
+        uint256 chainlessNonce = _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0);
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: chainlessNonce
@@ -947,7 +1047,7 @@ contract ValidationTest is Base {
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _bob, value: 1 ether, data: ""});
 
-        uint256 chainlessNonce = Static.CHAINLESS_NONCE_KEY << 64;
+        uint256 chainlessNonce = _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0);
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: chainlessNonce
@@ -996,7 +1096,7 @@ contract ValidationTest is Base {
 
         // updateOwner call (NOT supported for chainless)
         bytes32 aliceKeyHash = _makeKeyHash(_alice);
-        uint256 adminSettings = IOwnerManager(_aliceWallet).packSettings(
+        uint256 adminSettings = _packSettings(
             true, // Make admin
             0, // No expiry
             address(0) // No hook
@@ -1012,7 +1112,7 @@ contract ValidationTest is Base {
             )
         });
 
-        uint256 chainlessNonce = Static.CHAINLESS_NONCE_KEY << 64;
+        uint256 chainlessNonce = _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0);
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: chainlessNonce
@@ -1056,7 +1156,11 @@ contract ValidationTest is Base {
             )
         });
 
-        uint256 chainlessNonce = Static.CHAINLESS_NONCE_KEY << 64;
+        uint256 chainlessNonce = _chainlessNonce(
+            CHAINLESS_OPERATION_TYPE_2,
+            1,
+            0
+        );
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: chainlessNonce
@@ -1101,7 +1205,7 @@ contract ValidationTest is Base {
         bytes32 aliceKeyHash = _makeKeyHash(_alice);
 
         // First add an owner that we can later remove
-        uint256 settings = OwnerManager(_aliceWallet).packSettings(
+        uint256 settings = _packSettings(
             false,
             0,
             address(0)
@@ -1130,7 +1234,7 @@ contract ValidationTest is Base {
         });
 
         // 2. updateOwner call (NOT supported for chainless)
-        uint256 adminSettings = IOwnerManager(_aliceWallet).packSettings(
+        uint256 adminSettings = _packSettings(
             true,
             0,
             address(0)
@@ -1156,7 +1260,7 @@ contract ValidationTest is Base {
             )
         });
 
-        uint256 chainlessNonce = Static.CHAINLESS_NONCE_KEY << 64;
+        uint256 chainlessNonce = _chainlessNonce(CHAINLESS_OPERATION_TYPE_1, 1, 0);
         BatchedCall memory batchedCall = BatchedCall({
             calls: calls,
             nonce: chainlessNonce

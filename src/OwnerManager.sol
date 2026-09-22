@@ -17,15 +17,15 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
 
     EnumerableSetLib.Bytes32Set internal _ownerKeys; // Set of all owner keyHashes
     mapping(bytes32 => address) internal _ownerValidators; // keyHash => validator address for this owner
-    mapping(bytes32 => uint256) internal _ownerSettings; // keyHash => packed settings (isAdmin + expiration + hook)
+    mapping(bytes32 => uint256) internal _ownerSettings; // Bit layout: [255-208: UNUSED] [207-200: isAdmin] [199-160: expiration] [159-0: hook]
 
     // External Functions
 
     /// @notice Registers a validator with optional settings
-    /// @dev Only callable by the wallet itself. Use packSettings() to create the settings parameter.
+    /// @dev Only callable by the wallet itself. The settings parameter uses the packed layout documented below.
     /// @param keyHash The public key hash to associate with this validator
     /// @param validator The address of the validator contract to be registered
-    /// @param settings Packed settings value (use packSettings to create)
+    /// @param settings Packed settings value
     function addOwner(
         bytes32 keyHash,
         address validator,
@@ -37,7 +37,7 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
     /// @dev Internal function to add an owner
     /// @param keyHash The public key hash to associate with this validator
     /// @param validator The address of the validator contract to be registered
-    /// @param settings Packed settings value (use packSettings to create)
+    /// @param settings Packed settings value
     function _addOwner(
         bytes32 keyHash,
         address validator,
@@ -48,7 +48,7 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
             revert IOwnerManager.ValidatorAlreadyExists();
         }
         // Prevent adding address(this) - it's a built-in owner
-        if (keyHash == keccak256(abi.encodePacked(address(this)))) {
+        if (keyHash == _getRootKey()) {
             revert ISmartWallet.InvalidKeyHash(keyHash);
         }
 
@@ -62,10 +62,10 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
     }
 
     /// @notice Updates an existing validator's address and/or settings
-    /// @dev Only callable by the wallet itself. Use packSettings() to create the settings parameter.
+    /// @dev Only callable by the wallet itself. The settings parameter uses the packed layout documented below.
     /// @param keyHash The public key hash to update
     /// @param newValidator The new validator address
-    /// @param newSettings New packed settings value (use packSettings to create)
+    /// @param newSettings New packed settings value
     function updateOwner(
         bytes32 keyHash,
         address newValidator,
@@ -128,69 +128,6 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
         return _ownerKeys.contains(keyHash);
     }
 
-    /// @notice Get comprehensive validator settings including hook, expiration, and admin status
-    /// @param keyHash The public key hash to query
-    /// @return validator The validator address
-    /// @return hook The hook address (address(0) if no hook)
-    /// @return expiration Unix timestamp when validator expires (0 = never expires)
-    /// @return adminStatus Whether this validator has admin privileges
-    /// @return expired Whether the validator is currently expired
-    function getOwnerSettings(
-        bytes32 keyHash
-    )
-        external
-        view
-        override
-        returns (
-            address validator,
-            address hook,
-            uint40 expiration,
-            bool adminStatus,
-            bool expired
-        )
-    {
-        validator = _ownerValidators[keyHash];
-        uint256 settings = _ownerSettings[keyHash];
-
-        if (settings == 0) {
-            // No additional settings, return defaults
-            return (validator, address(0), 0, false, false);
-        }
-
-        hook = getHook(settings);
-        expiration = getExpiration(settings);
-        adminStatus = isAdmin(settings);
-        expired = isSettingsExpired(settings);
-    }
-
-    // Public View Functions
-
-    /// @notice Get the active validator address for a given `keyHash`
-    /// @dev Returns the configured validator address if present and not expired; otherwise returns address(0).
-    ///      For EIP-7702 compatibility, address(this) ALWAYS returns ECDSA validator and cannot be overridden.
-    /// @param keyHash The public key hash to look up
-    /// @return The validator address to use for validation (address(0) if none or expired)
-    function getVerifiedValidator(
-        bytes32 keyHash
-    ) public view returns (address) {
-        // EIP-7702 compatible: Built-in owner for address(this)
-        if (keyHash == keccak256(abi.encodePacked(address(this)))) {
-            return Static.ECDSA_VALIDATOR_ADDRESS;
-        }
-
-        address validator = _ownerValidators[keyHash];
-
-        // Check if validator exists and is not expired
-        if (validator != address(0)) {
-            uint256 settings = _ownerSettings[keyHash];
-            if (settings != 0 && isSettingsExpired(settings)) {
-                validator = address(0); // Expired validator
-            }
-        }
-
-        return validator;
-    }
-
     /// @notice Check if settings are expired based on block timestamp
     /// @param settings Packed settings value
     /// @return expired True if settings are expired (expiration != 0 and < block.timestamp)
@@ -198,25 +135,6 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
         uint40 expiration = getExpiration(settings);
         // expiration = 0 means never expires
         return expiration != 0 && expiration < block.timestamp;
-    }
-
-    // Public Pure Functions (Settings Management)
-    // Bit layout: [255-208: UNUSED] [207-200: isAdmin] [199-160: expiration] [159-0: hook]
-
-    /// @notice Pack settings into uint256
-    /// @param adminFlag Admin flag
-    /// @param expiration Unix timestamp (0 = never expires)
-    /// @param hook Hook address (address(0) = no hook)
-    /// @return packed Packed settings value
-    function packSettings(
-        bool adminFlag,
-        uint40 expiration,
-        address hook
-    ) public pure returns (uint256) {
-        return
-            (uint256(adminFlag ? 1 : 0) << 200) |
-            (uint256(expiration) << 160) |
-            uint256(uint160(hook));
     }
 
     /// @notice Extract hook address from packed settings (bits 0-159)
@@ -256,6 +174,25 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
         _ownerKeys.add(keyHash); // Add to the set
     }
 
+    /// @inheritdoc IOwnerManager
+    function getOwnerConfig(
+        bytes32 keyHash
+    ) public view override returns (address validator, uint256 settings) {
+        if (keyHash == _getRootKey()) {
+            return (
+                Static.ECDSA_VALIDATOR_ADDRESS,
+                Static.ROOT_KEY_SETTINGS
+            );
+        }
+
+        validator = _ownerValidators[keyHash];
+        if (validator == address(0)) {
+            return (address(0), 0);
+        }
+
+        settings = _ownerSettings[keyHash];
+    }
+
     /// @notice Internal function to remove an owner's validator mapping
     /// @param keyHash The owner's public key hash to remove
     function _removeValidator(bytes32 keyHash) internal {
@@ -275,5 +212,10 @@ abstract contract OwnerManager is IOwnerManager, BaseAuthorization {
         ) {
             revert IOwnerManager.InvalidValidatorImpl(validator);
         }
+    }
+
+    /// @dev Returns the immutable EIP-7702 root key for this account.
+    function _getRootKey() private view returns (bytes32) {
+        return keccak256(abi.encodePacked(address(this)));
     }
 }

@@ -12,7 +12,7 @@ abstract contract FallbackHandler is IERC165 {
     /// @dev Fallback function that handles token receiving callbacks
     /// Returns the function selector for ERC721 and ERC1155 token receiving functions
     fallback() external payable {
-        assembly {
+        assembly ("memory-safe") {
             let s := shr(224, calldataload(0))
             // 0x150b7a02: `onERC721Received(address,address,uint256,bytes)`.
             // 0xf23a6e61: `onERC1155Received(address,address,uint256,uint256,bytes)`.
