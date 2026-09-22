@@ -632,10 +632,7 @@ contract PasskeyValidatorTest is Base {
             sender: passkeyWallet,
             nonce: 0,
             initCode: "",
-            callData: abi.encodePacked(
-                ISmartWallet.execute.selector,
-                abi.encode(calls)
-            ),
+            callData: _encodeExecuteUserOpCalls(calls),
             accountGasLimits: bytes32(
                 abi.encodePacked(uint128(200000), uint128(200000))
             ),
