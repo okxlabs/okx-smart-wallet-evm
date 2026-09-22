@@ -35,9 +35,9 @@ abstract contract TransferWithAuthorization is
     bytes32 constant RECEIVE_WITH_AUTHORIZATION_TYPEHASH =
         0xd8a04c474fcb45b6fb4b17a80506c180af4818903f1ace6c1ff59053338529fd;
 
-    // keccak256("CancelTransferAuthorization(bytes32 authorizationNonce)")
+    // keccak256("CancelTransferAuthorization(bytes32 targetKeyHash,bytes32 authorizationNonce)")
     bytes32 constant CANCEL_TRANSFER_AUTHORIZATION_TYPEHASH =
-        0xf30be15aedf9b01d0dac5525241af3753865a4968ffb9fb1a7ad6d2553d29f8e;
+        0x2b37597a859605dd9945fe0ef2dcd48659d0da30c8f24aae553ae8bfb9b5f466;
 
     /// @notice Minimum on-chain `signature` length: the 32-byte `keyHash` envelope prefix.
     uint256 public constant SIGNATURE_ENVELOPE_MIN_LENGTH = 32;
@@ -49,7 +49,7 @@ abstract contract TransferWithAuthorization is
 
     /// @custom:storage-location erc7201:SmartWallet.ERC7201.TransferAuthorization
     struct TransferAuthorizationStorage {
-        mapping(bytes32 => bool) authorizationStates;
+        mapping(bytes32 ownerKeyHash => mapping(bytes32 nonce => bool)) authorizationStates;
     }
 
     /// @inheritdoc ITransferWithAuthorization
@@ -98,34 +98,45 @@ abstract contract TransferWithAuthorization is
     }
 
     /// @inheritdoc ITransferWithAuthorization
-    function cancelTransferAuthorization(bytes32 authorizationNonce, bytes calldata signature) external {
+    function cancelTransferAuthorization(
+        bytes32 targetKeyHash,
+        bytes32 authorizationNonce,
+        bytes calldata signature
+    ) external {
         TransferAuthorizationStorage storage $ = _getTransferAuthorizationStorage();
-        if ($.authorizationStates[authorizationNonce]) {
+        if ($.authorizationStates[targetKeyHash][authorizationNonce]) {
             revert AuthorizationAlreadyUsed(authorizationNonce);
         }
 
         if (signature.length == 0) {
-            // Self-call form: only the account itself may cancel without a signature.
+            // Unsigned form: the account execution path authorizes the target owner.
             if (msg.sender != address(this)) revert NotFromSelf();
         } else {
-            // Signed form: any registered account key may cancel; the nonce is account-scoped.
-            bytes32 structHash = keccak256(abi.encode(CANCEL_TRANSFER_AUTHORIZATION_TYPEHASH, authorizationNonce));
-            _verifyTwaSignature(structHash, signature);
+            bytes32 structHash = keccak256(
+                abi.encode(CANCEL_TRANSFER_AUTHORIZATION_TYPEHASH, targetKeyHash, authorizationNonce)
+            );
+            (bytes32 signerKeyHash, uint256 settings) = _verifyTwaSignature(structHash, signature);
+            if (signerKeyHash != targetKeyHash && !isAdmin(settings)) {
+                revert UnauthorizedCancellation(signerKeyHash, targetKeyHash);
+            }
         }
 
-        $.authorizationStates[authorizationNonce] = true;
-        emit TransferAuthorizationCanceled(authorizationNonce);
+        $.authorizationStates[targetKeyHash][authorizationNonce] = true;
+        emit TransferAuthorizationCanceled(targetKeyHash, authorizationNonce);
     }
 
     /// @inheritdoc ITransferWithAuthorization
-    function transferAuthorizationState(bytes32 authorizationNonce) external view returns (bool used) {
-        return _getTransferAuthorizationStorage().authorizationStates[authorizationNonce];
+    function transferAuthorizationState(bytes32 ownerKeyHash, bytes32 authorizationNonce) external view returns (bool used) {
+        return _getTransferAuthorizationStorage().authorizationStates[ownerKeyHash][authorizationNonce];
     }
 
-    /// @dev Verifies the `keyHash(32) || ownerSignature` envelope against the direct EIP-712 typed-data
-    ///      digest of `structHash`, reusing the account's validator routing. Reverts `InvalidSignature`
-    ///      on a short envelope, an unregistered/expired key, or an invalid signature. The digest is the
-    ///      direct typed-data hash with no ERC-1271 / message-sign wrapping.
+    /// @dev Returns the implementation address used to bind signed authorizations.
+    function _getWalletImplementation() internal view virtual returns (address);
+
+    /// @dev Verifies the `keyHash(32) || ownerSignature` envelope over
+    ///      hashTypedData(keccak256(abi.encode(structHash, keyHash, _getWalletImplementation()))).
+    ///      Reuses the account's validator routing and rejects short envelopes, unregistered/expired
+    ///      keys, and invalid signatures. No ERC-1271 or personal-sign wrapping is applied.
     /// @param structHash The EIP-712 struct hash being authorized.
     /// @param signature The `keyHash(32) || ownerSignature` envelope.
     /// @return keyHash The verified signing key hash, used downstream to select the spending-policy hook.
@@ -144,14 +155,17 @@ abstract contract TransferWithAuthorization is
         (validator, settings) = getOwnerConfig(keyHash);
         if (validator == address(0) || isSettingsExpired(settings)) revert ISmartWallet.InvalidSignature();
 
-        bytes32 digest = hashTypedData(structHash);
+        bytes32 boundHash = keccak256(
+            abi.encode(structHash, keyHash, _getWalletImplementation())
+        );
+        bytes32 digest = hashTypedData(boundHash);
         if (!_validateSignature(validator, keyHash, digest, signature[SIGNATURE_ENVELOPE_MIN_LENGTH:])) {
             revert ISmartWallet.InvalidSignature();
         }
     }
 
-    /// @dev Shared settlement core for the execute and receive paths. Validates nonce freshness and the
-    ///      open time window, verifies the owner signature over the bound struct, marks the nonce used
+    /// @dev Shared settlement core for the execute and receive paths. Validates the open time window,
+    ///      verifies the owner signature and nonce freshness, marks the nonce used
     ///      before transferring (checks-effects-interactions), settles through the signing key's hook,
     ///      and emits the settlement event.
     function _authorizeAndSettle(
@@ -165,9 +179,6 @@ abstract contract TransferWithAuthorization is
         bytes calldata signature
     ) private {
         TransferAuthorizationStorage storage $ = _getTransferAuthorizationStorage();
-        if ($.authorizationStates[authorizationNonce]) {
-            revert AuthorizationAlreadyUsed(authorizationNonce);
-        }
         if (block.timestamp <= validAfter) {
             revert AuthorizationNotYetValid(validAfter);
         }
@@ -182,13 +193,16 @@ abstract contract TransferWithAuthorization is
             structHash,
             signature
         );
+        if ($.authorizationStates[keyHash][authorizationNonce]) {
+            revert AuthorizationAlreadyUsed(authorizationNonce);
+        }
 
         // Effect before interaction: a later revert rolls this write back, leaving the nonce unused.
-        $.authorizationStates[authorizationNonce] = true;
+        $.authorizationStates[keyHash][authorizationNonce] = true;
 
         _settleWithHook(keyHash, settings, token, to, value);
 
-        emit TransferAuthorizationUsed(token, address(this), to, value, authorizationNonce);
+        emit TransferAuthorizationUsed(token, address(this), to, value, authorizationNonce, keyHash);
     }
 
     /// @dev Settles a single transfer through the spending-policy hook selected by the verified signing

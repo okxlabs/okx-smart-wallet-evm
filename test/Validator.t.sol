@@ -1417,6 +1417,7 @@ contract ValidatorTest is Base {
         vm.deal(address(account), 1 ether);
 
         PackedUserOperation memory userOp;
+        userOp.callData = _encodeExecuteUserOpCalls(new Call[](0));
         // Signature too short (less than 38 bytes)
         userOp.signature = abi.encodePacked(
             bytes16(0x1234567890abcdef1234567890abcdef)
@@ -1453,6 +1454,7 @@ contract ValidatorTest is Base {
         vm.deal(address(account), 1 ether);
 
         PackedUserOperation memory userOp;
+        userOp.callData = _encodeExecuteUserOpCalls(new Call[](0));
         // Empty signature
         userOp.signature = bytes("");
 
@@ -1487,6 +1489,7 @@ contract ValidatorTest is Base {
         vm.deal(address(account), 1 ether);
 
         PackedUserOperation memory userOp;
+        userOp.callData = _encodeExecuteUserOpCalls(new Call[](0));
         bytes32 userOpHash = keccak256("test");
 
         // Use invalid keyHash (not registered)

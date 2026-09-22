@@ -6,6 +6,7 @@ import {ITransferWithAuthorization} from "src/interfaces/ITransferWithAuthorizat
 import {TransferWithAuthorization} from "src/TransferWithAuthorization.sol";
 import {INonceManager} from "src/interfaces/INonceManager.sol";
 import {ISmartWallet} from "src/interfaces/ISmartWallet.sol";
+import {Static} from "src/libraries/Static.sol";
 
 contract TransferWithAuthorizationHandler is Base {
     ITransferWithAuthorization internal itwa;
@@ -19,8 +20,10 @@ contract TransferWithAuthorizationHandler is Base {
     address internal relayerTwo;
 
     bytes32[8] internal trackedNonces;
-    mapping(bytes32 => uint256) public settleSuccesses;
-    mapping(bytes32 => uint256) public cancelSuccesses;
+    mapping(bytes32 ownerKeyHash => mapping(bytes32 nonce => uint256)) public settleSuccesses;
+    mapping(bytes32 ownerKeyHash => mapping(bytes32 nonce => uint256)) public cancelSuccesses;
+    bytes32 internal signingKeyHash;
+    uint256 internal signingPrivateKey;
     uint256 public successfulSettles;
     uint256 public successfulCancels;
     uint256 public tokenOut;
@@ -36,6 +39,7 @@ contract TransferWithAuthorizationHandler is Base {
         twa = TransferWithAuthorization(payable(_aliceWallet));
         token = new MockERC20();
         token.mint(_aliceWallet, 1_000 ether);
+        _addOwnerToAccount(_alice, _aliceWallet, keccak256(abi.encodePacked(_bob)), Static.ECDSA_VALIDATOR_ADDRESS, 0);
 
         recipientOne = makeAddr("twa invariant recipient one");
         recipientTwo = makeAddr("twa invariant recipient two");
@@ -52,7 +56,8 @@ contract TransferWithAuthorizationHandler is Base {
             token.balanceOf(recipientOne) + token.balanceOf(recipientTwo) + token.balanceOf(recipientThree);
     }
 
-    function execute(uint256 nonceSeed, uint96 amountSeed, uint256 recipientSeed, uint256 relayerSeed) external {
+    function execute(uint256 ownerSeed, uint256 nonceSeed, uint96 amountSeed, uint256 recipientSeed, uint256 relayerSeed) external {
+        _selectOwner(ownerSeed);
         bytes32 nonce = _nonce(nonceSeed);
         address to = _recipient(recipientSeed);
         address caller = _relayer(relayerSeed);
@@ -64,13 +69,14 @@ contract TransferWithAuthorizationHandler is Base {
 
         vm.prank(caller);
         try itwa.executeTransferWithAuthorization(address(token), to, value, 9_000, 11_000, nonce, sig) {
-            settleSuccesses[nonce]++;
+            settleSuccesses[signingKeyHash][nonce]++;
             successfulSettles++;
             tokenOut += value;
         } catch {}
     }
 
-    function receiveByPayee(uint256 nonceSeed, uint96 amountSeed, uint256 recipientSeed) external {
+    function receiveByPayee(uint256 ownerSeed, uint256 nonceSeed, uint96 amountSeed, uint256 recipientSeed) external {
+        _selectOwner(ownerSeed);
         bytes32 nonce = _nonce(nonceSeed);
         address to = _recipient(recipientSeed);
         uint256 value = bound(uint256(amountSeed), 0, 20 ether);
@@ -81,30 +87,32 @@ contract TransferWithAuthorizationHandler is Base {
 
         vm.prank(to);
         try itwa.receiveWithAuthorization(address(token), to, value, 9_000, 11_000, nonce, sig) {
-            settleSuccesses[nonce]++;
+            settleSuccesses[signingKeyHash][nonce]++;
             successfulSettles++;
             tokenOut += value;
         } catch {}
     }
 
-    function cancel(uint256 nonceSeed, uint256 relayerSeed) external {
+    function cancel(uint256 ownerSeed, uint256 nonceSeed, uint256 relayerSeed) external {
+        _selectOwner(ownerSeed);
         bytes32 nonce = _nonce(nonceSeed);
         bytes memory sig = _cancelSignature(nonce);
 
         vm.prank(_relayer(relayerSeed));
-        try itwa.cancelTransferAuthorization(nonce, sig) {
-            cancelSuccesses[nonce]++;
+        try itwa.cancelTransferAuthorization(signingKeyHash, nonce, sig) {
+            cancelSuccesses[signingKeyHash][nonce]++;
             successfulCancels++;
         } catch {}
     }
 
-    function replayExecute(uint256 nonceSeed, uint256 relayerSeed) external {
+    function replayExecute(uint256 ownerSeed, uint256 nonceSeed, uint256 relayerSeed) external {
+        _selectOwner(ownerSeed);
         bytes32 nonce = _nonce(nonceSeed);
         bytes memory sig = _executeSignature(address(token), recipientOne, 1 ether, nonce);
 
         vm.prank(_relayer(relayerSeed));
         try itwa.executeTransferWithAuthorization(address(token), recipientOne, 1 ether, 9_000, 11_000, nonce, sig) {
-            settleSuccesses[nonce]++;
+            settleSuccesses[signingKeyHash][nonce]++;
             successfulSettles++;
             tokenOut += 1 ether;
         } catch {}
@@ -120,6 +128,16 @@ contract TransferWithAuthorizationHandler is Base {
 
     function wallet() external view returns (address payable) {
         return _aliceWallet;
+    }
+
+    function trackedOwner(uint256 index) public view returns (bytes32) {
+        return index == 0 ? _aliceWalletKeyHash : keccak256(abi.encodePacked(_bob));
+    }
+
+    function _selectOwner(uint256 seed) internal {
+        uint256 index = seed % 2;
+        signingKeyHash = trackedOwner(index);
+        signingPrivateKey = index == 0 ? _alicePk : _bobPk;
     }
 
     function walletTokenBalance() external view returns (uint256) {
@@ -202,15 +220,17 @@ contract TransferWithAuthorizationHandler is Base {
     }
 
     function _cancelSignature(bytes32 nonce) internal view returns (bytes memory) {
-        return _envelope(
-            keccak256(abi.encode(keccak256("CancelTransferAuthorization(bytes32 authorizationNonce)"), nonce))
-        );
+        bytes32 typeHash =
+            keccak256("CancelTransferAuthorization(bytes32 targetKeyHash,bytes32 authorizationNonce)");
+        return _envelope(keccak256(abi.encode(typeHash, signingKeyHash, nonce)));
     }
 
     function _envelope(bytes32 structHash) internal view returns (bytes memory) {
-        bytes32 digest = twa.hashTypedData(structHash);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(_alicePk, digest);
-        return abi.encodePacked(_aliceWalletKeyHash, r, s, v);
+        bytes32 boundHash =
+            keccak256(abi.encode(structHash, signingKeyHash, ISmartWallet(_aliceWallet).IMPLEMENTATION()));
+        bytes32 digest = twa.hashTypedData(boundHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signingPrivateKey, digest);
+        return abi.encodePacked(signingKeyHash, r, s, v);
     }
 }
 
@@ -233,14 +253,15 @@ contract TransferWithAuthorizationInvariantTest is Base {
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
     }
 
-    function invariant_nonceSettlesAtMostOncePerTrackedNonce() public view {
+    function invariant_nonceSettlesAtMostOncePerOwnerAndNonce() public view {
         uint256 count = handler.trackedNonceCount();
         for (uint256 i; i < count; i++) {
             bytes32 nonce = handler.trackedNonce(i);
-            uint256 terminalTransitions = handler.settleSuccesses(nonce) + handler.cancelSuccesses(nonce);
-            assertLe(terminalTransitions, 1, "nonce terminal transition count");
-            if (terminalTransitions == 1) {
-                assertTrue(itwa.transferAuthorizationState(nonce), "terminal nonce state");
+            for (uint256 j; j < 2; j++) {
+                bytes32 ownerKeyHash = handler.trackedOwner(j);
+                uint256 terminalTransitions = handler.settleSuccesses(ownerKeyHash, nonce) + handler.cancelSuccesses(ownerKeyHash, nonce);
+                assertLe(terminalTransitions, 1, "owner nonce terminal transition count");
+                assertEq(itwa.transferAuthorizationState(ownerKeyHash, nonce), terminalTransitions == 1, "owner-scoped terminal state");
             }
         }
     }
