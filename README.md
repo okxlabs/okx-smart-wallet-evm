@@ -149,8 +149,8 @@ The addresses below are the documented deterministic deployments. Verify the dep
 
 | Contract             | Address                                      |
 | -------------------- | -------------------------------------------- |
-| `SmartWalletFactory` | `0xDd3FEa01cD550C9EFfC893f346690b9A649f35EF` |
-| `SmartWalletEntry`   | `0xe40ccB2D94975c51bff0C004eFDfd9B3a5796fA4` |
+| `SmartWalletFactory` | `0x25318c90A1565e9A3C46369D9e38B9E2658C7A2A` |
+| `SmartWalletEntry`   | `0xcEF0AAC642f0f9B9Cd575cc08Faa511aFDF54743` |
 
 - [Audits](./docs/audits/)
 
@@ -169,6 +169,8 @@ yarn install
 ```
 
 ### Build
+
+`foundry.toml` is the source of truth for release builds. Use Foundry artifacts for deployment and source verification. The optional Hardhat configuration reads the compiler version, EVM target, optimizer, IR, and metadata settings from `forge config --json`, including the active `FOUNDRY_PROFILE`.
 
 ```bash
 yarn build
