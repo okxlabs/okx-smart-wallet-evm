@@ -1,876 +1,515 @@
-# Smart Contracts
+# Smart Contract Reference
 
-## Overview
+This reference covers the interfaces implemented by the current repository. Use it to construct calls, encode signatures, and interpret results. For account lifecycle and execution flows, see [Architecture](./architecture.md); for build and deployment commands, see the [project README](../README.md#usage).
 
-The Smart Wallet system consists of several core smart contracts that work together to provide a Account Abstraction solution. This document provides detailed information about each contract's structure, functionality, relationships, and integration patterns.
+[SmartWalletEntry](../src/SmartWalletEntry.sol) is the concrete wallet implementation. [SmartWallet](../src/SmartWallet.sol) composes the inherited managers; applications call their methods at the **account address** (a factory-created proxy or a delegated EOA). [SmartWalletFactory](../src/SmartWalletFactory.sol) is a separate deployment contract. The current ERC-4337 integration uses **EntryPoint v0.7** at `0x0000000071727De22E5E9d8BAf0edAc6f37da032`.
 
-## Contract Architecture
+Individual files in [src/interfaces](../src/interfaces/) describe parts of the API. Generate the complete ABIs, including inherited methods, from the concrete contracts:
 
-### Core Contracts
-
-1. **[SmartWallet](#1-smartwallet)**: Main wallet implementation (abstract base contract)
-2. **[SmartWalletFactory](#2-smartwalletfactory)**: Account creation and deployment
-3. **[SmartWalletEntry](#3-smartwalletentry)**: Production implementation with ERC7201 storage
-4. **[OwnerManager](#4-ownermanager)**: Multi-owner management system with admin permissions
-5. **[NonceManager](#5-noncemanger)**: Nonce validation and management
-6. **[ValidationManager](#6-validationmanager)**: Authentication and signature validation
-7. **[AllowanceManager](#7-allowancemanager)**: Token allowance management
-8. **[FallbackHandler](#8-fallbackhandler)**: Token receiving and standard interface support
-
-### Utility Tools
-
-1. **[SmartWalletSimulator](#smartwalletsimulator)**: Gas estimation utility (located in scripts/utils/)
-
-## Contract Details
-
-### 1. SmartWallet
-
-The main smart contract wallet that implements the core functionality.
-
-#### Interface
-```solidity
-interface ISmartWallet is IERC165 {
-    /// @notice Initialize wallet with initial owners
-    /// @param initialOwners Array of initial owners with their validators
-    function initialize(InitialOwner[] calldata initialOwners) external;
-
-    /// @notice Execute multiple contract calls in a single transaction
-    /// @param calls Array of Call structs containing destination address, value, and calldata
-    function execute(Call[] calldata calls) external;
-
-    /// @notice Execute calls through a relayer with signature validation
-    /// @param batchedCall BatchedCall struct containing calls and nonce
-    /// @param validatorData Encoded validation data (keyHash + validUntil + signature + merkle proofs)
-    function executeWithRelayer(
-        BatchedCall calldata batchedCall,
-        bytes calldata validatorData
-    ) external;
-
-    /// @notice EIP-1271 signature validation
-    /// @param hash The hash of the data to be validated
-    /// @param signature The signature to be validated
-    /// @return The magic value if signature is valid
-    function isValidSignature(
-        bytes32 hash,
-        bytes calldata signature
-    ) external view returns (bytes4);
-
-    /// @notice Get the implementation address
-    /// @return The implementation contract address
-    function IMPLEMENTATION() external view returns (address);
-
-    /// @notice Delegate execution to external contracts (e.g., simulator)
-    /// @param target The target contract address
-    /// @param data The calldata to send to the target
-    function delegateAndRevert(address target, bytes calldata data) external;
-}
+```bash
+forge inspect src/SmartWalletEntry.sol:SmartWalletEntry abi --json
+forge inspect src/SmartWalletFactory.sol:SmartWalletFactory abi --json
 ```
 
-#### Key Functions
+## Contents
 
-**Initialization:**
-- `initialize(initialOwners[])`: Initialize wallet with initial owners and their validators
+- [Shared Types](#shared-types)
+- [Factory and Initialization](#factory-and-initialization)
+- [Batch Execution](#batch-execution)
+- [Owners and Permissions](#owners-and-permissions)
+- [Nonces and Chainless Queues](#nonces-and-chainless-queues)
+- [Signatures and Hashing](#signatures-and-hashing)
+- [Transfer Authorizations](#transfer-authorizations)
+- [Persistent Allowances](#persistent-allowances)
+- [External Validators and Hooks](#external-validators-and-hooks)
+- [Upgrades, Introspection, and Simulation](#upgrades-introspection-and-simulation)
+- [Events and Errors](#events-and-errors)
 
-**Execution Modes:**
-- `execute(calls[])`: Direct execution (owner only), supports EIP-7702 delegation
-- `executeWithRelayer(batchedCall, validatorData)`: Relayer execution with signature validation
-- `executeUserOp(userOp, userOpHash)`: ERC-4337 compatible execution (EntryPoint only)
+## Shared Types
 
-**Utilities:**
-- `isValidSignature(hash, signature)`: EIP-1271 signature validation
-- `delegateAndRevert(target, data)`: Delegate execution to external contracts but reverts (e.g., simulator)
-- `IMPLEMENTATION()`: Get the implementation contract address
+The following tuples are defined in [Types.sol](../src/Types.sol):
 
-#### Execution Modes
-
-The SmartWallet implements three execution modes:
-
-##### 1. Direct Execution
-- **Function**: `execute(Call[] calldata calls)`
-- **Access**: Owner only
-- **Use case**: Direct contract calls, supports EIP-7702 delegation
-- **Gas**: User pays directly
-
-##### 2. Relayer Execution  
-- **Function**: `executeWithRelayer(BatchedCall calldata batchedCall, bytes calldata validatorData)`
-- **Access**: Anyone (with valid signature)
-- **Use case**: Gasless transactions via relayer
-- **Gas**: Relayer pays, user provides signature
-- **Validator Data**: See [Validator Data Variations](#validator-data-variations) section
-
-##### 3. ERC-4337 Execution
-- **Function**: `executeUserOp(PackedUserOperation calldata userOp, bytes32 userOpHash)`
-- **Access**: EntryPoint only
-- **Use case**: ERC-4337 standard compliance
-- **Gas**: Handled by EntryPoint infrastructure
-
-
-## Data Structures
 ```solidity
 struct Call {
-    address target;    // Contract to call (address(0) = self)
-    uint256 value;     // ETH amount to send
-    bytes data;        // Calldata
+    address target;
+    uint256 value;
+    bytes data;
 }
 
 struct BatchedCall {
-    Call[] calls;      // Array of calls
-    uint256 nonce;     // Nonce for ordering
+    Call[] calls;
+    uint256 nonce;
 }
 
-// For 4337 compatability
-struct PackedUserOperation {
-    address sender;                // Account address
-    uint256 nonce;                 // Nonce value
-    bytes initCode;                // Contract initialization code
-    bytes callData;                // Execution calldata
-    bytes32 accountGasLimits;      // Gas limits for account
-    uint256 preVerificationGas;    // Pre-verification gas
-    bytes32 gasFees;               // Gas fee information
-    bytes paymasterAndData;        // Paymaster data
-    bytes signature;                // User operation signature
-}
-```
-### 2. SmartWalletFactory
-
-Responsible for creating and deploying new smart wallet instances.
-
-#### Interface
-```solidity
-interface ISmartWalletFactory {
-    /// @notice Create smart account with owners and validators
-    /// @param initialOwners Array of initial owners with their validators
-    /// @param salt Salt for deterministic address generation
-    /// @return account The deployed smart wallet address
-    function createAccount(
-        InitialOwner[] calldata initialOwners,
-        uint256 salt
-    ) external payable returns (address account);
-
-    /// @notice Create smart account and execute initial calls
-    /// @param initialOwners Array of initial owners with their validators
-    /// @param salt Salt for deterministic address generation
-    /// @param batchedCall BatchedCall struct containing calls and nonce
-    /// @param validatorData Encoded validation data for the initial calls
-    /// @return account The deployed smart wallet address
-    function createAccountWithCall(
-        InitialOwner[] calldata initialOwners,
-        uint256 salt,
-        BatchedCall calldata batchedCall,
-        bytes calldata validatorData
-    ) external payable returns (address account);
-
-    /// @notice Predict deterministic address for given parameters
-    /// @param initialOwners Array of initial owners with their validators
-    /// @param salt Salt for deterministic address generation
-    /// @return The predicted smart wallet address
-    function getAddress(
-        InitialOwner[] calldata initialOwners,
-        uint256 salt
-    ) external view returns (address);
-}
-```
-
-#### Key Functions
-
-**Account Creation:**
-- `createAccount(initialOwners[], salt)`: Deploy new wallet with initial owners
-- `createAccountWithCall(initialOwners[], salt, batchedCall, validatorData)`: Deploy and execute initial calls
-
-**Address Prediction:**
-- `getAddress(initialOwners[], salt)`: Predict deterministic wallet address before deployment
-
-#### InitialOwner Structure
-```solidity
 struct InitialOwner {
-    bytes32 keyHash;      // Public key hash
-    address validator;     // Validator contract address
+    bytes32 keyHash;
+    address validator;
 }
 ```
 
-### 3. SmartWalletEntry
+`Call.value` is denominated in wei and paid from the account balance. `target` is used literally: use the account address for a self-call; `address(0)` is not a self-call alias. `BatchedCall` contains no expiry field; relayer expiry is carried in the signature envelope.
 
-The production implementation of SmartWallet with custom ERC7201 storage layout.
+[IAllowanceManager](../src/interfaces/IAllowanceManager.sol) defines:
 
-#### Overview
-- **Purpose**: Production-ready wallet implementation
-- **Inheritance**: Extends SmartWallet abstract contract  
-- **Storage**: Uses ERC7201 standard for upgradeable storage layout
-- **Deployment**: This is the actual implementation deployed by SmartWalletFactory
-
-#### Key Features
-- Inherits all functionality from SmartWallet base contract
-- Implements custom storage layout following ERC7201 standard
-- Provides upgrade safety through storage slot separation
-- Production-optimized with gas efficiency considerations
-- Main entry point for all wallet operations in production
-
-#### Implementation Note
 ```solidity
-// SmartWalletEntry extends SmartWallet with production storage layout
-contract SmartWalletEntry is SmartWallet {
-    // Uses ERC7201 storage pattern for upgradeability
-    // All functionality inherited from SmartWallet abstract contract
+struct ApprovalInfo {
+    address token;
+    address spender;
+    uint256 amount;
 }
 ```
 
-### 4. OwnerManager
+Amounts use wei for native ETH and token base units for ERC-20 tokens. Both allowances and transfer authorizations identify native ETH with `Static.NATIVE_ETH`, whose value is `0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE`.
 
-Manages multiple owners with flexible permission settings.
+For UserOperations, use the dependency's [PackedUserOperation](../lib/account-abstraction/contracts/interfaces/PackedUserOperation.sol) v0.7 tuple. `accountGasLimits` packs the verification gas limit into the high 128 bits and the call gas limit into the low 128 bits; `gasFees` packs the priority fee into the high 128 bits and the maximum fee into the low 128 bits.
 
-#### Interface
-```solidity
-interface IOwnerManager {
-    // Public mappings (auto-generated getters)
-    /// @notice Get the validator address for a given keyHash
-    /// @param keyHash The public key hash to query
-    /// @return The validator address for this owner
-    function ownerValidators(bytes32 keyHash) external view returns (address);
-    
-    /// @notice Get the packed settings for a given keyHash
-    /// @param keyHash The public key hash to query
-    /// @return The packed settings value
-    function ownerSettings(bytes32 keyHash) external view returns (uint256);
+## Factory and Initialization
 
-    /// @notice Add an owner to the wallet
-    /// @param keyHash The public key hash to associate with this validator
-    /// @param validator The address of the validator contract to be registered
-    /// @param settings Packed settings value (use packSettings to create)
-    function addOwner(
-        bytes32 keyHash,
-        address validator,
-        uint256 settings
-    ) external;
+Sources: [SmartWalletFactory](../src/SmartWalletFactory.sol), [SmartWallet.initialize](../src/SmartWallet.sol), [BaseAuthorization](../src/BaseAuthorization.sol).
 
-    /// @notice Update an owner's validator and settings
-    /// @param keyHash The public key hash to associate with this validator
-    /// @param newValidator The address of the new validator contract
-    /// @param newSettings Packed settings value (use packSettings to create)
-    function updateOwner(
-        bytes32 keyHash,
-        address newValidator,
-        uint256 newSettings
-    ) external;
+Deploy `SmartWalletEntry` first, then pass its address to the factory constructor, `constructor(address implementation)`. The factory deploys account proxies using that implementation.
 
-    /// @notice Remove an owner from the wallet
-    /// @param keyHash The public key hash to remove
-    function removeOwner(bytes32 keyHash) external;
+| Factory method                                                                                                    | Mutability / result | Behavior                                                                                        |
+| ----------------------------------------------------------------------------------------------------------------- | ------------------- | ----------------------------------------------------------------------------------------------- |
+| `IMPLEMENTATION()`                                                                                                | `view → address`    | Implementation configured when the factory was deployed                                         |
+| `getAddress(InitialOwner[] initialOwners, uint256 salt)`                                                          | `view → address`    | Predicts the deterministic account address without deploying it                                 |
+| `createAccount(InitialOwner[] initialOwners, uint256 salt)`                                                       | `payable → address` | Creates and initializes the proxy, or returns the existing account; forwards ETH to the account |
+| `createAccountWithCall(InitialOwner[] initialOwners, uint256 salt, BatchedCall batchedCall, bytes validatorData)` | `payable → address` | Creates or retrieves the account, then calls its `executeWithRelayer`                           |
 
-    /// @notice Check if an owner exists
-    /// @param keyHash The public key hash to check
-    /// @return True if the owner exists
-    function hasOwner(bytes32 keyHash) external view returns (bool);
+The effective CREATE2 salt is `keccak256(abi.encode(initialOwners, salt))`. Owner ordering affects the address. Repeating a deployment does not reinitialize the account. `createAccountWithCall` requires a valid relayer signature and nonce even when the account is newly created; a failed execution reverts the entire factory call.
 
-    /// @notice Get the total number of owners
-    /// @return The number of owners
-    function ownerCount() external view returns (uint256);
+`createAccountWithCall` is implemented by the concrete factory but is not declared in `ISmartWalletFactory`. Use the concrete ABI when calling it.
 
-    /// @notice Get owner keyHash at specific index
-    /// @param index The index of the owner to retrieve
-    /// @return The keyHash at the specified index
-    function ownerAt(uint256 index) external view returns (bytes32);
+The wallet's `initialize(InitialOwner[] initialOwners)` is nonpayable, callable once, and restricted to the factory embedded in the proxy's immutable arguments. The list must be nonempty, and every initial owner receives admin settings with no expiry or hook (`uint256(1) << 200`). Duplicate keys, the implicit root key, and invalid validator addresses are rejected.
 
-    /// @notice Get all owner keyHashes
-    /// @return Array of all owner keyHashes
-    function getOwnerKeys() external view returns (bytes32[] memory);
+A delegated EOA uses its implicit root authority to add owners through an authorized execution path. It does not use factory initialization. See [account models](./architecture.md#account-models-and-lifecycle).
 
-    /// @notice Get comprehensive owner settings
-    /// @param keyHash The public key hash to query
-    /// @return validator The validator address
-    /// @return hook The hook address (address(0) if no hook)
-    /// @return expiration Unix timestamp when validator expires (0 = never expires)
-    /// @return adminStatus Whether this validator has admin privileges
-    /// @return expired Whether the validator is currently expired
-    function getOwnerSettings(
-        bytes32 keyHash
-    ) external view returns (
-        address validator,
-        address hook,
-        uint40 expiration,
-        bool adminStatus,
-        bool expired
-    );
+## Batch Execution
 
-    /// @notice Get the verified validator for a given keyHash
-    /// @param keyHash The public key hash to look up
-    /// @return The validator address to use for validation
-    function getVerifiedValidator(bytes32 keyHash) external view returns (address);
+Sources: [SmartWallet](../src/SmartWallet.sol), [ERC4337Account](../src/ERC4337Account.sol), [ExecutionManager](../src/ExecutionManager.sol).
 
-    /// @notice Pack settings into a single uint256 value
-    /// @param adminFlag Whether the owner has admin privileges
-    /// @param expiration Unix timestamp when validator expires (0 = never expires)
-    /// @param hook Hook address (address(0) = no hook)
-    /// @return Packed settings value
-    function packSettings(
-        bool adminFlag,
-        uint40 expiration,
-        address hook
-    ) external pure returns (uint256);
+| Wallet method                                                                                 | Caller / authorization                                             | Result                                                         |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------- |
+| `execute(Call[] calls)`                                                                       | Active owner selected by `keccak256(abi.encodePacked(msg.sender))` | Executes the batch; no return value                            |
+| `executeWithRelayer(BatchedCall batchedCall, bytes validatorData)`                            | Any caller with a valid owner signature, expiry, and relayer nonce | Executes the batch; no return value                            |
+| `validateUserOp(PackedUserOperation userOp, bytes32 userOpHash, uint256 missingAccountFunds)` | EntryPoint only                                                    | Returns ERC-4337 `uint256 validationData`                      |
+| `executeUserOp(PackedUserOperation userOp, bytes32 userOpHash)`                               | EntryPoint only, following validation                              | Executes calls decoded from `userOp.callData`; no return value |
+| `entryPoint()`                                                                                | Public, `pure`                                                     | Returns the fixed v0.7 EntryPoint address                      |
 
-    /// @notice Extract hook address from packed settings
-    /// @param settings Packed settings value
-    /// @return hook Hook address (address(0) = no hook)
-    function getHook(uint256 settings) external pure returns (address);
+All four execution/validation methods are **nonpayable**. Fund the account before execution, or through the payable factory deployment path. Calls inside a batch can transfer ETH from the account balance.
 
-    /// @notice Extract expiration timestamp from packed settings
-    /// @param settings Packed settings value
-    /// @return expiration Unix timestamp (0 = never expires)
-    function getExpiration(uint256 settings) external pure returns (uint40);
+Direct execution checks the sender's owner configuration and expiration; it does not call the owner's signature validator. Passkey signatures therefore use a signature-bearing entry point such as `executeWithRelayer` or a UserOperation.
 
-    /// @notice Extract admin flag from packed settings
-    /// @param settings Packed settings value
-    /// @return isAdmin True if signer has admin privileges
-    function isAdmin(uint256 settings) external pure returns (bool);
+Batch execution invokes the owner's pre-hook, performs calls in order, and invokes the post-hook. A call to the account itself requires admin settings. Successful return data is discarded. A failing call or hook reverts the batch; a failed low-level batch call forwards at most 256 bytes of revert data.
 
-    /// @notice Check if settings are currently expired
-    /// @param settings Packed settings value
-    /// @return True if the settings are expired
-    function isSettingsExpired(uint256 settings) external view returns (bool);
-}
-```
+### ERC-4337 Call Encoding
 
-#### Key Functions
-
-**Owner Management:**
-- `addOwner(keyHash, validator, settings)`: Register new owner with validator and settings
-- `updateOwner(keyHash, newValidator, newSettings)`: Update existing owner's validator and settings  
-- `removeOwner(keyHash)`: Remove owner from wallet
-- `hasOwner(keyHash)`: Check if keyHash exists
-- `ownerCount()`: Get total number of owners
-- `ownerAt(index)`: Get owner keyHash at specific index
-- `getOwnerKeys()`: Get all owner keyHashes as array
-
-**Owner Information:**
-- `ownerValidators(keyHash)`: Get validator address for keyHash (public mapping)
-- `ownerSettings(keyHash)`: Get packed settings for keyHash (public mapping)
-- `getOwnerSettings(keyHash)`: Get complete owner info (validator, hook, expiration, adminStatus, expired)
-- `getVerifiedValidator(keyHash)`: Get verified validator address for validation
-
-**Settings Utilities:**
-- `packSettings(adminFlag, expiration, hook)`: Pack settings into uint256
-- `getHook(settings)`: Extract hook address from packed settings
-- `getExpiration(settings)`: Extract expiration timestamp from packed settings
-- `isAdmin(settings)`: Extract admin flag from packed settings
-- `isSettingsExpired(settings)`: Check if settings are currently expired
-
-#### Settings Structure
-```solidity
-// Settings bit layout (uint256):
-// Bits [255-208]: not used (6 bytes)
-// Bits [207-200]: isAdmin flag (1 byte)
-// Bits [199-160]: expiration timestamp (5 bytes, uint40)
-// Bits [159-0]:   hook address (20 bytes, address)
-```
-
-#### Storage Structure
-```solidity
-// Core storage variables
-EnumerableSetLib.Bytes32Set internal _ownerKeys;
-mapping(bytes32 => address) public ownerValidators;
-mapping(bytes32 => uint256) public ownerSettings;
-```
-
-#### Admin Permissions
-
-The Smart Wallet implements a hierarchical permission system where certain operations require admin privileges.
-
-**Admin Capabilities:**
-
-**Admin owners can:**
-- Call `addOwner()` - Add new owners to the wallet
-- Call `updateOwner()` - Update existing owner settings and validators
-- Call `removeOwner()` - Remove owners from the wallet
-- Execute self-calls - Call the wallet's own functions directly
-- Modify owner settings and permissions
-
-**Non-Admin Restrictions:**
-
-**Non-admin owners cannot:**
-- Execute any self-calls to the wallet contract
-- Modify owner settings or permissions
-- Add, update, or remove other owners
-- Access admin-only functions
-
-**Initial Owner Admin Status:**
-
-**Default admin permissions:**
-- All `initialOwners` automatically receive admin privileges during wallet initialization
-- Admin settings are packed as: `packSettings(true, 0, address(0))`
-  - `adminFlag = true` - Grants admin privileges
-  - `expiration = 0` - Never expires
-  - `hook = address(0)` - No hook address
-
-**Admin Permission Structure:**
+Both regular and chainless UserOperations require this `callData` layout:
 
 ```solidity
-// Admin settings structure
-uint256 adminSettings = packSettings(
-    true,           // adminFlag: true = admin, false = regular owner
-    0,              // expiration: 0 = never expires, timestamp = expires at time
-    address(0)      // hook: address(0) = no hook, address = hook contract
+// IERC4337Account is defined in src/interfaces/IERC4337Account.sol.
+// calls is a Call[] array.
+userOp.callData = abi.encodePacked(
+    IERC4337Account.executeUserOp.selector,
+    abi.encode(calls)
 );
-
-// Check admin status
-bool isAdmin = isAdmin(ownerSettings[keyHash]);
 ```
 
-**Permission Enforcement:**
+This is a four-byte selector followed by the ABI encoding of `Call[]`. It is **not** the full ABI encoding of `executeUserOp(userOp, userOpHash)`: EntryPoint supplies those arguments when invoking the account.
 
-The system enforces admin permissions through:
-- **`onlyOwner` modifier**: Checks if caller is a registered owner
-- **Admin flag validation**: Verifies admin status for privileged operations
-- **Self-call restrictions**: Non-admin owners cannot execute self-calls
-- **Settings validation**: Admin operations require admin privileges
+`validateUserOp` attempts to pay `missingAccountFunds`, validates the execution selector and signature, and returns `1` for recognized signature-validation failures. On success it encodes the earlier of the owner's expiry and the signature's `validUntil` into bits 160–207 of `validationData`; zero expiry is treated as unlimited. Malformed ABI data can still revert.
 
-### 5. NonceManager
+`executeUserOp` rechecks that the selected owner still exists and has not expired, then uses its current settings. It does not verify the signature again. If execution fails after successful EntryPoint validation, validation-phase nonce and queue changes can remain consumed. See [nonce handling](#nonces-and-chainless-queues).
 
-Handles nonce validation and management for transaction ordering.
+## Owners and Permissions
 
-#### Interface
+Source: [OwnerManager](../src/OwnerManager.sol); interface: [IOwnerManager](../src/interfaces/IOwnerManager.sol).
+
+### Owner Management
+
+| Method                                                                    | Access / result                                | Behavior                                                                                     |
+| ------------------------------------------------------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `addOwner(bytes32 keyHash, address validator, uint256 settings)`          | Wallet self-call; no return value              | Registers a new key                                                                          |
+| `updateOwner(bytes32 keyHash, address newValidator, uint256 newSettings)` | Wallet self-call; no return value              | Replaces an existing key's validator and settings                                            |
+| `removeOwner(bytes32 keyHash)`                                            | Wallet self-call; no return value              | Removes a registered key                                                                     |
+| `getOwnerConfig(bytes32 keyHash)`                                         | `view → (address validator, uint256 settings)` | Returns raw configuration, including expired settings; missing keys return `(address(0), 0)` |
+| `hasOwner(bytes32 keyHash)`                                               | `view → bool`                                  | Tests membership in the stored owner registry                                                |
+| `ownerCount()`                                                            | `view → uint256`                               | Counts stored owners                                                                         |
+| `ownerAt(uint256 index)`                                                  | `view → bytes32`                               | Returns a stored key; an out-of-range index reverts                                          |
+| `getOwnerKeys()`                                                          | `view → bytes32[]`                             | Returns all stored keys                                                                      |
+
+Enumeration includes expired keys and excludes the implicit root key. Ordering can change after removal, so use `keyHash` as the stable identifier.
+
+For the implicit root key, `keccak256(abi.encodePacked(accountAddress))`, `getOwnerConfig` always returns `(address(1), uint256(1) << 200)`. This enables a delegated EOA to authenticate with its own private key. The root is not stored and cannot be added, updated, or removed through the registry.
+
+### Packed Settings
+
+| Bits    | Field               | Meaning                                                |
+| ------- | ------------------- | ------------------------------------------------------ |
+| 0–159   | Hook address        | Zero disables the owner's hook                         |
+| 160–199 | `uint40` expiration | Unix timestamp; zero means no expiry                   |
+| 200–207 | Admin flag          | Grants admin permission only when this byte equals `1` |
+| 208–255 | Reserved            | Leave zero when constructing settings                  |
+
+Construct settings in the client; the contract does not expose a `packSettings` method:
+
 ```solidity
-interface INonceManager {
-    /// @notice Returns the current nonce value for a specific key
-    /// @param key The nonce key to query
-    /// @return The current nonce value for this key
-    function getNonce(uint192 key) external view returns (uint64);
-}
+// admin: bool; expiration: uint40; hook: address.
+uint256 settings =
+    (uint256(admin ? 1 : 0) << 200) |
+    (uint256(expiration) << 160) |
+    uint256(uint160(hook));
 ```
 
-#### Internal Implementation
-The NonceManager also contains an internal function `validateAndUpdateNonce` that is used internally by the wallet to validate and update nonces during transaction execution. This function:
-- Validates that the provided nonce matches the stored value
-- Always increments the nonce (reverts are handled by the calling function if validation fails)
-- Emits a `NonceConsumed` event
-- Returns true if validation passed, false otherwise
+| Settings helper                       | Mutability / result                                                                     |
+| ------------------------------------- | --------------------------------------------------------------------------------------- |
+| `getHook(uint256 settings)`           | `pure → address`                                                                        |
+| `getExpiration(uint256 settings)`     | `pure → uint40`                                                                         |
+| `isAdmin(uint256 settings)`           | `pure → bool`                                                                           |
+| `isSettingsExpired(uint256 settings)` | `view → bool`; true when expiration is nonzero and strictly less than `block.timestamp` |
 
-#### Key Functions
+Non-admin owners can execute external calls subject to their hooks. Admin status permits wallet self-calls. For example, an active admin using direct execution can register another owner with this Solidity fragment:
 
-**Public Interface:**
-- `getNonce(key)`: Get current nonce value for specific key
-
-**Internal Functions:**
-- `validateAndUpdateNonce(packedNonce)`: Internal function to validate and update nonce (not exposed in interface)
-
-#### Nonce Structure
 ```solidity
-// 2-dimensional nonce: uint256 nonce = uint192 key + uint64 value
-mapping(uint192 key => uint64 seq) public _nonces;
+// wallet: ISmartWallet; keyHash, validator, and settings describe the new owner.
+Call[] memory calls = new Call[](1);
+calls[0] = Call({
+    target: address(wallet),
+    value: 0,
+    data: abi.encodeCall(IOwnerManager.addOwner, (keyHash, validator, settings))
+});
+wallet.execute(calls);
 ```
 
-#### Special Nonce Keys
-- **Chainless operations**: `nonce key = 196` - Enables cross-chain signature reuse for specific methods
-- **Concurrent execution**: Different nonce keys allow parallel transaction processing without conflicts
-- **Key usage**: Only allows two methods `addOwner` and `upgradeToAndCall`
+Calling `addOwner` directly from an external admin address fails `onlySelf`. A delegated EOA can also originate a transaction directly to its own address, satisfying the self-call requirement.
 
-#### Chainless Nonce Validation
-The chainless nonce key (`196`) allows cross-chain signature reuse for specific operations. When used:
-- **Allowed functions**: Only `addOwner()` and `upgradeToAndCall()` are permitted
-- **Security**: All calls must be self-calls, chain ID excluded from signature validation
-- **Use case**: Add same owner or deploy same upgrade across multiple chains with one signature
-- **Validation**: `ChainlessLib.validateChainlessNonceCallData()` ensures only whitelisted operations
+## Nonces and Chainless Queues
 
-### 6. ValidationManager
+Sources: [NonceManager](../src/NonceManager.sol), [ChainlessLib](../src/libraries/ChainlessLib.sol).
 
-Interface for different authentication methods.
+| Request type           | State / query                                                         | Encoding                                                                                    |
+| ---------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Relayer batch          | Wallet `getNonce(uint192 key) → uint64` (`view`)                      | High 192 bits: key; low 64 bits: sequence                                                   |
+| UserOperation          | EntryPoint's `getNonce(account, key)`                                 | EntryPoint returns the packed key and sequence; wallet `getNonce` does not query this state |
+| Transfer authorization | Wallet `transferAuthorizationState(ownerKeyHash, authorizationNonce)` | Independent `bytes32` nonce per owner; no sequence                                          |
 
-#### Interface
-```solidity
-interface IValidator {
-    /// @notice Validate a signature for a given message hash
-    /// @param keyHash The hash of the public key/address to validate against
-    /// @param messageHash The hash of the message being validated
-    /// @param validatorData The signature and validation data (format depends on validator type)
-    /// @return True if the signature is valid, false otherwise
-    function validateSignature(
-        bytes32 keyHash,
-        bytes32 messageHash,
-        bytes calldata validatorData
-    ) external view returns (bool);
-}
+Relayer sequences start at zero and increment after successful execution. A reverting relayer call rolls back nonce consumption. Different keys have independent sequences. Pack a regular relayer nonce as `(uint256(key) << 64) | uint256(sequence)`.
+
+Chainless mode is selected when `nonce >> 96 == 196`:
+
+```text
+[255..96: prefix 196][95..80: operation type][79..64: queue id][63..0: sequence]
 ```
 
-#### Key Functions
-
-**Signature Validation:**
-- `validateSignature(keyHash, messageHash, validatorData)`: Validate signature for given message hash (interface method)
-
-#### Validator Types
-
-##### Built-in Validators
-1. **ECDSA and Recovery Signer Validator** (`address(1)`): Traditional ECDSA signature validation
-   - Built-in validator at address `0x0000000000000000000000000000000000000001`
-   
-2. **Passkey Validator** (`address(2)`): WebAuthn/P256 authentication
-   - Built-in validator at address `0x0000000000000000000000000000000000000002`
-   - Supports passkey and WebAuthn signatures
-
-3. **Passkey / ECDSA  + Merkel Tree Validator**
-
-##### External Validators
-3. **Custom Validators**: Pluggable validation contracts
-   - Any contract implementing the IValidator interface
-   - Allows for custom authentication methods
-
-#### Validator data structure
-
 ```solidity
-bytes validatorData = pubkeyHash (32 bytes) + validUntil (6 bytes) + signature + merkle proofs (optional)
+uint256 nonce =
+    (uint256(196) << 96) |
+    (uint256(operationType) << 80) |
+    (uint256(queueId) << 64) |
+    uint256(sequence);
 ```
 
-#### Validator Data Variations
+Here `operationType` and `queueId` are `uint16`, and `sequence` is `uint64`. `getChainlessQueueState(uint16 operationType) → uint16` is a view method returning the smallest queue ID that may be used next, initially zero.
 
-**1. ECDSA without Merkle Proof:**
-```solidity
-| Field     | Size     | Description        |
-|-----------|----------|--------------------|
-| keyHash   | 32 bytes | Owner key hash     |
-| until     | 6 bytes  | Valid until        |
-| signature | 65 bytes | ECDSA signature    |
+Chainless requests require an admin owner. Every included call must target the account and use either `addOwner` or `upgradeToAndCall`. The convention `operationType = 0` for owner additions and `1` for upgrades is not enforced on-chain.
+
+Accepting queue `N` advances its operation type's floor to `N + 1`, invalidating every queue ID up to and including `N`. IDs below the floor and ID `65535` are rejected; accepting `65534` exhausts that operation type's queues. Relayer requests and UserOperations share this wallet queue floor, while their sequence counters remain separate. Each chain maintains its own state.
+
+## Signatures and Hashing
+
+Sources: [ERC712](../src/ERC712.sol), [ValidationManager](../src/ValidationManager.sol), [BatchedCallLib](../src/libraries/BatchedCallLib.sol), [MessageSignLib](../src/libraries/MessageSignLib.sol).
+
+### Domain and Envelopes
+
+The standard domain uses `name = "SmartWallet"`, `version = "2.0.0"`, the current `chainId`, and the account address as `verifyingContract`.
+
+| Helper                                                    | Result                                                                                                                                                                                                    |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `hashTypedData(bytes32 structHash)`                       | `view → bytes32`; EIP-712 digest using the standard domain                                                                                                                                                |
+| `hashTypedDataSansChainId(bytes32 structHash)`            | `view → bytes32`; digest using a domain that omits the `chainId` field, rather than setting it to zero                                                                                                    |
+| `eip712Domain()`                                          | `view → (bytes1 fields, string name, string version, uint256 chainId, address verifyingContract, bytes32 salt, uint256[] extensions)`; standard domain with `fields = 0x0f`, zero salt, and no extensions |
+| `getUserOpHashWithoutChainId(PackedUserOperation userOp)` | `view → bytes32`; `keccak256(abi.encode(userOp.hash(), entryPoint()))` using the v0.7 `UserOperationLib` hash                                                                                             |
+
+Signature envelopes use packed concatenation (`+` in the table below). `validatorSignature` is the validator-specific payload described later.
+
+| Entry point                                   | Signature bytes                                                                                             |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `executeWithRelayer`                          | `keyHash (32)` + `validUntil (6)` + `validatorSignature`                                                    |
+| `validateUserOp`, through `userOp.signature`  | `keyHash (32)` + `validUntil (6)` + `validatorSignature`                                                    |
+| Validator-based `isValidSignature`            | `keyHash (32)` + `validUntil (6)` + `validatorSignature`; total length must exceed 38 and must not equal 65 |
+| Signed transfer authorization or cancellation | `keyHash (32)` + `validatorSignature`; no six-byte expiry prefix                                            |
+
+Use `abi.encodePacked(keyHash, uint48(validUntil), validatorSignature)` for the first format. `validUntil = 0` means no signature expiry for batches, UserOperations, and ERC-1271. Transfer authorizations use their own explicit time window.
+
+### Relayer Digest
+
+The relayer's signed type is:
+
+```text
+BatchedCall(Call[] calls,uint256 nonce,uint48 validUntil,address walletImpl)Call(address target,uint256 value,bytes data)
 ```
 
-**2. ECDSA with Merkle Proof:**
+Each `Call` hashes its `data` bytes; the array hashes the concatenation of its element hashes. [CallLib](../src/libraries/CallLib.sol) implements this encoding. `walletImpl` is the current wallet's `IMPLEMENTATION()` value.
+
 ```solidity
-| Field         | Size       | Description                    |
-|---------------|------------|--------------------------------|
-| keyHash       | 32 bytes   | Owner key hash                 |
-| until         | 6 bytes    | Valid until timestamp          |
-| signature     | 65 bytes   | ECDSA signature                |
-| merkle proofs | variable   | abi.encode(proofs)             |
+// wallet: SmartWallet; validUntil: uint48.
+bytes32 structHash = BatchedCallLib.hash(batchedCall, validUntil, wallet.IMPLEMENTATION());
+bytes32 digest = wallet.hashTypedData(structHash);
 ```
 
-**3. Passkey without Merkle Proof:**
+For a chainless nonce, use `hashTypedDataSansChainId(structHash)` instead. The account address and implementation remain bound. ECDSA signs this digest directly; adding an Ethereum signed-message prefix would produce a different digest.
+
+### UserOperation Digest
+
+For a regular UserOperation, begin with EntryPoint v0.7's `getUserOpHash(userOp)`. For chainless mode, use the wallet's `getUserOpHashWithoutChainId(userOp)`. The wallet then expects:
+
 ```solidity
-| Field         | Size       | Description                    |
-|---------------|------------|--------------------------------|
-| keyHash       | 32 bytes   | Owner key hash                 |
-| until         | 6 bytes    | Valid until timestamp          |
-| PassKey[X,Y]  | 64 bytes   | Passkey public key coordinates |
-| webAuth       | variable   | abi.encode(webAuth)            |
+bytes32 digest = MessageHashUtils.toEthSignedMessageHash(
+    keccak256(abi.encode(userOpHash, validUntil, wallet.IMPLEMENTATION()))
+);
 ```
 
-**4. Passkey with Merkle Proof:**
-```solidity
-| Field                   | Size       | Description                    |
-|-------------------------|------------|--------------------------------|
-| keyHash                 | 32 bytes   | Owner key hash                 |
-| until                   | 6 bytes    | Valid until timestamp          |
-| PassKey[X,Y]            | 64 bytes   | Passkey public key coordinates |
-| webAuth + merkle proofs | variable   | abi.encode(webAuth,proofs)     |
-```
+This signed-message prefix is part of the UserOperation path. It is not the relayer EIP-712 digest. Sign once over the resulting digest, or use a signing API that applies the prefix once to the inner 32-byte hash.
 
+### ERC-1271 Validation
 
-#### Signature validation types
+`isValidSignature(bytes32 hash, bytes signature)` is a view method returning `0x1626ba7e` for acceptance and `0xffffffff` for rejection.
+
+- **Exactly 65 bytes:** recovers an ECDSA signer directly from the supplied `hash` and requires it to equal the account address. This delegated-EOA compatibility path adds no domain, expiry, implementation binding, or hook check.
+- **Validator envelope:** validates the active owner and expiry, verifies a signature over `hashTypedData(MessageSignLib.hash(hash, validUntil, IMPLEMENTATION))`, then requires the configured hook to approve. The signed type is `SmartWalletMessage(bytes32 hash,uint48 validUntil,address walletImpl)`.
+
+Malformed validator payloads can revert during decoding; callers should handle both an invalid return value and a reverted call.
+
+### Built-In Validator Payloads
+
+Addresses `1` and `2` are internal routing identifiers, not deployed validator contracts. Any other validator address must contain code when registered and implement [IValidator](../src/interfaces/IValidator.sol).
+
+| Validator             | Owner key hash                                                    | `validatorSignature` encoding                                                  |
+| --------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| ECDSA, `address(1)`   | `keccak256(abi.encodePacked(signerAddress))`                      | 65-byte ECDSA signature, optionally followed by `abi.encode(bytes32[] proofs)` |
+| Passkey, `address(2)` | `keccak256(abi.encodePacked(uint256(pubKeyX), uint256(pubKeyY)))` | `abi.encode(pubKeyX, pubKeyY)` followed by `abi.encode(webAuthnAuth, proofs)`  |
+| External validator    | Defined by that validator                                         | Defined by that validator                                                      |
+
+[ECDSAValidatorLib](../src/libraries/ECDSAValidatorLib.sol) accepts the standard 65-byte `r || s || v` signature with `v` equal to 27 or 28. If trailing bytes are present, they must ABI-decode as a proof array.
+
+[PasskeyValidatorLib](../src/libraries/PasskeyValidatorLib.sol) always decodes both the WebAuthn structure and a `bytes32[]` proof array. Supply an empty array when no proof is needed; `abi.encode(webAuthnAuth)` alone is insufficient. The [WebAuthnAuth](../lib/webauthn-sol/src/WebAuthn.sol) tuple is:
+
 ```solidity
-// Passkey validation (WebAuthn)
-/// @notice Passkey authentication data structure
 struct WebAuthnAuth {
-    /// @dev The WebAuthn authenticator data.
-    ///      See https://www.w3.org/TR/webauthn-2/#dom-authenticatorassertionresponse-authenticatordata.
     bytes authenticatorData;
-    /// @dev The WebAuthn client data JSON.
-    ///      See https://www.w3.org/TR/webauthn-2/#dom-authenticatorresponse-clientdatajson.
     string clientDataJSON;
-    /// @dev The index at which "challenge":"..." occurs in `clientDataJSON`.
-    /// 23
-    uint256 challengeIndex; /// 23
-    /// @dev The index at which "type":"..." occurs in `clientDataJSON`.
-    /// 1
-    uint256 typeIndex;      /// 1
-    /// @dev The r value of secp256r1 signature
+    uint256 challengeIndex;
+    uint256 typeIndex;
     uint256 r;
-    /// @dev The s value of secp256r1 signature
     uint256 s;
 }
-
-// Merkle Proof
-bytes32[] memory proofs
 ```
 
-### 7. AllowanceManager
+The JSON indices depend on the actual client data. The challenge is `abi.encode(MerkleProof.processProof(proofs, digest))`, and the implementation calls `WebAuthn.verify` with `requireUV: false`.
 
-Manages token allowances and spending limits.
+For both built-in validators, proofs transform the operation digest into a Merkle root before signature verification. An empty proof preserves the original digest. This proves membership in a signed set of digests; it does not implement a multi-owner signature threshold.
 
-#### Interface
-```solidity
-interface IAllowanceManager {
-    /// @notice Batch approve multiple spenders for multiple tokens (native ETH and ERC20)
-    /// @param approvals Array of ApprovalInfo structs
-    /// @return success True if all approvals succeeded
-    function batchApproveToken(
-        ApprovalInfo[] calldata approvals
-    ) external returns (bool success);
+## Transfer Authorizations
 
-    /// @notice Transfer native ETH from this contract using persistent allowance
-    /// @param recipient The address to receive ETH
-    /// @param amount The amount to transfer
-    /// @return success True if transfer succeeded
-    function transferFromNative(
-        address recipient,
-        uint256 amount
-    ) external returns (bool success);
+Source: [TransferWithAuthorization](../src/TransferWithAuthorization.sol); interface: [ITransferWithAuthorization](../src/interfaces/ITransferWithAuthorization.sol).
 
-    /// @notice Transfer tokens from this contract using persistent allowance
-    /// @param token The ERC20 token address
-    /// @param recipient The address to receive tokens
-    /// @param amount The amount to transfer
-    /// @return success True if transfer succeeded
-    function transferFromToken(
-        address token,
-        address recipient,
-        uint256 amount
-    ) external returns (bool success);
-
-    /// @notice Get the current persistent native ETH allowance
-    /// @param spender The spender address
-    /// @return allowance The current allowance
-    function nativeAllowance(
-        address spender
-    ) external view returns (uint256 allowance);
-
-    /// @notice Get the current persistent token allowance
-    /// @param token The ERC20 token address
-    /// @param spender The spender address
-    /// @return allowance The current allowance
-    function tokenAllowance(
-        address token,
-        address spender
-    ) external view returns (uint256 allowance);
-}
-```
-
-#### Key Functions
-
-**Token Approvals:**
-- `batchApproveToken(approvals[])`: Batch approve multiple spenders for multiple tokens (native ETH and ERC20)
-
-**Token Transfers:**
-- `transferFromNative(recipient, amount)`: Transfer native ETH using persistent allowance
-- `transferFromToken(token, recipient, amount)`: Transfer ERC20 tokens using persistent allowance
-
-**Allowance Queries:**
-- `nativeAllowance(spender)`: Get current persistent native ETH allowance
-- `tokenAllowance(token, spender)`: Get current persistent token allowance
-
-### 8. FallbackHandler
-
-Handles token receiving functionality and standard interface support.
-
-#### Overview
-The FallbackHandler is an abstract contract that enables the wallet to receive various types of tokens and implements standard interface detection.
-
-#### Key Features
-- **ETH Receiving**: Implements `receive()` function to accept native ETH transfers
-- **ERC721 Support**: Handles `onERC721Received` callbacks for NFT transfers
-- **ERC1155 Support**: Handles both single and batch ERC1155 token transfers
-- **Interface Detection**: Implements ERC165 `supportsInterface` for standard compliance
-
-#### Supported Interfaces
-- `IERC721Receiver` (0x150b7a02)
-- `IERC1155Receiver` (0x4e2312e0)
-- `IERC1271` (0x1626ba7e)
-- `IERC165` (0x01ffc9a7)
-
-## Contract Relationships
-
-```
-SmartWalletFactory
-  ↓ creates (via proxy)
-SmartWalletEntry
-  ↓ extends
-SmartWallet (abstract)
-  ↓ inherits
-├── OwnerManager (manages owners and permissions)
-├── NonceManager (handles transaction ordering)  
-├── ValidationManager (authenticates operations)
-├── AllowanceManager (manages token allowances)
-├── ERC4337Account (EIP-4337 support)
-├── FallbackHandler (token receiving)
-└── Other managers...
-```
-
-## Utility Tools
-
-### SmartWalletSimulator
-
-**Location**: `scripts/utils/SmartWalletSimulator.s.sol` (not a core contract)
-
-**Purpose**: A utility contract for gas estimation and simulation that reverts with detailed gas metrics without executing transactions.
-
-**Note**: This is not a core contract but a development/testing utility. The interface is defined in `src/interfaces/ISmartWalletSimulator.sol`.
-
-#### Interface
-```solidity
-interface ISmartWalletSimulator {
-    /// @notice Simulate a sponsored transaction, measuring gas costs for validation and execution
-    /// @dev Always reverts with `Errors.SimulateExecution` containing execution gas, intrinsic gas, and total gas metrics
-    /// @param batchedCall BatchedCall struct containing calls, nonce, and expiry
-    /// @param validator Validator address intended to be used for validation during execution
-    /// @param validatorData Encoded data containing keyHash and signature: abi.encodePacked(keyHash, signature)
-    function simulateExecuteWithRelayer(
-        BatchedCall calldata batchedCall,
-        address validator,
-        bytes calldata validatorData
-    ) external;
-}
-```
-
-**Gas Simulation:**
-- `simulateExecuteWithRelayer(batchedCall, validator, validatorData)`: Simulate sponsored transaction and measure gas costs (always reverts with `Errors.SimulateExecution(executionGas, intrinsicGas, totalGas)`)
-
-## Recovery System
-
-The recovery system is implemented through external contracts:
-
-1. **RecoverySigner**: Handles account recovery through multiple mechanisms
-2. **RecoverySignerFactory**: Creates and manages recovery signers
-3. **Recovery Verifiers**: Validate recovery credentials (Passkey, ZKEmail, SocialID)
-
-### Recovery Integration
-```solidity
-// Recovery signer can be added as owner
-bytes32 recoveryKeyHash = keccak256(abi.encodePacked(recoverySigner));
-uint256 recoverySettings = packSettings(true, 0, address(0));
-
-addOwner(recoveryKeyHash, eoaValidator, recoverySettings);
-```
-
-## ERC-4337 Compatibility
-
-### EntryPoint Integration
-```solidity
-function validateUserOp(
-    PackedUserOperation calldata userOp,
-    bytes32 userOpHash,
-    uint256 missingAccountFunds
-) external onlyEntryPoint returns (uint256 validationData)
-
-function executeUserOp(
-    PackedUserOperation calldata userOp,
-    bytes32 userOpHash
-) external onlyEntryPoint
-```
-
-### UserOperation Processing
-- **Signature Validation**: Extract and validate keyHash from signature
-- **Call Decoding**: Parse calls from userOp.callData
-- **Batch Execution**: Execute multiple calls in sequence
-- **Event Emission**: Emit execution success events
-
-## Events
-
-The Smart Wallet system emits various events to track important state changes and operations.
-
-### OwnerManager Events
+These account methods transfer native ETH or ERC-20 tokens from the account balance using an owner signature. Both settlement methods are nonpayable and return no value:
 
 ```solidity
-/// @notice Emitted when an owner is added
-/// @param keyHash The public key hash of the new owner
-/// @param validator The validator address for the owner
-event OwnerAdded(bytes32 keyHash, address validator);
+function executeTransferWithAuthorization(
+    address token,
+    address to,
+    uint256 value,
+    uint256 validAfter,
+    uint256 validBefore,
+    bytes32 authorizationNonce,
+    bytes calldata signature
+) external;
 
-/// @notice Emitted when an owner is updated
-/// @param keyHash The public key hash of the owner
-/// @param newValidator The new validator address
-event OwnerUpdated(bytes32 keyHash, address newValidator);
-
-/// @notice Emitted when an owner is removed
-/// @param keyHash The public key hash of the removed owner
-/// @param validator The validator address that was removed
-event OwnerRemoved(bytes32 keyHash, address validator);
+function receiveWithAuthorization(
+    address token,
+    address to,
+    uint256 value,
+    uint256 validAfter,
+    uint256 validBefore,
+    bytes32 authorizationNonce,
+    bytes calldata signature
+) external;
 ```
 
-### NonceManager Events
+Anyone may submit `executeTransferWithAuthorization`. `receiveWithAuthorization` requires `msg.sender == to`. They use distinct signed types, so a signature for one cannot authorize the other.
+
+Settlement requires an active signing owner and the strict time window `validAfter < block.timestamp < validBefore`. A zero `validBefore` does **not** mean unlimited validity. The native-asset path sends empty calldata; the ERC-20 path uses `SafeERC20.safeTransfer`.
+
+### Signing an Authorization
+
+Use the exact type string for the selected method:
+
+```text
+ExecuteTransferWithAuthorization(address token,address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 authorizationNonce)
+ReceiveWithAuthorization(address token,address from,address to,uint256 value,uint256 validAfter,uint256 validBefore,bytes32 authorizationNonce)
+CancelTransferAuthorization(bytes32 targetKeyHash,bytes32 authorizationNonce)
+```
+
+For settlement, hash the selected type string into `typeHash`, then construct:
 
 ```solidity
-/// @notice Emitted when a nonce is consumed/validated
-/// @param key The nonce key
-/// @param nonce The nonce value that was consumed
-event NonceConsumed(uint192 key, uint64 nonce);
+bytes32 structHash = keccak256(abi.encode(
+    typeHash, token, address(wallet), to, value,
+    validAfter, validBefore, authorizationNonce
+));
+bytes32 boundHash = keccak256(abi.encode(
+    structHash, signerKeyHash, wallet.IMPLEMENTATION()
+));
+bytes32 digest = wallet.hashTypedData(boundHash);
+// Sign digest with the selected validator to obtain validatorSignature.
+bytes memory signature = abi.encodePacked(signerKeyHash, validatorSignature);
 ```
 
-### SmartWalletFactory Events
+`from` is always the account address. The implementation and signing key are bound **outside** the transfer struct hash. Signing only the listed transfer fields through a standard typed-data encoder is insufficient: the final digest must include the extra binding shown above. Do not add a personal-sign prefix or the ERC-1271 `SmartWalletMessage` wrapper.
+
+### State and Cancellation
+
+| Method                                                                                            | Access / result             | Behavior                                                                               |
+| ------------------------------------------------------------------------------------------------- | --------------------------- | -------------------------------------------------------------------------------------- |
+| `transferAuthorizationState(bytes32 ownerKeyHash, bytes32 authorizationNonce)`                    | `view → bool`               | True after either settlement or cancellation                                           |
+| `cancelTransferAuthorization(bytes32 targetKeyHash, bytes32 authorizationNonce, bytes signature)` | Nonpayable; no return value | Cancels an unused nonce for the target owner                                           |
+| `SIGNATURE_ENVELOPE_MIN_LENGTH()`                                                                 | `view → uint256`            | Returns `32`, the key-hash prefix length; this alone is not a valid built-in signature |
+
+A signed cancellation uses `keccak256(abi.encode(cancelTypeHash, targetKeyHash, authorizationNonce))` as `structHash`, then applies the same signer/implementation binding and signature envelope as settlement. The signer must be the target owner or a currently active admin. An empty signature instead requires a wallet self-call.
+
+Nonce state is scoped to `(ownerKeyHash, authorizationNonce)`, shared by execute, receive, and cancel, and independent of relayer and EntryPoint nonces. Used and canceled states are both terminal; removing and re-adding an owner does not reset them.
+
+Settlement marks the nonce used before invoking the hook and transferring assets. A revert rolls this state back. The two settlement methods use a transient-storage reentrancy guard; this guard does not cover every wallet entry point. Configured hooks must support the dedicated transfer-authorization interface described [below](#external-validators-and-hooks).
+
+## Persistent Allowances
+
+Source: [AllowanceManager](../src/AllowanceManager.sol); interface: [IAllowanceManager](../src/interfaces/IAllowanceManager.sol).
+
+| Method                                                                | Access / result                  | Behavior                                                                           |
+| --------------------------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------- |
+| `batchApproveToken(ApprovalInfo[] approvals)`                         | Wallet self-call; returns `bool` | Sets each token/spender allowance to the supplied amount; zero spender is rejected |
+| `transferFromNative(address recipient, uint256 amount)`               | Approved spender; returns `bool` | Spends the caller's native ETH allowance                                           |
+| `transferFromToken(address token, address recipient, uint256 amount)` | Approved spender; returns `bool` | Spends the caller's ERC-20 allowance                                               |
+| `getTokenAllowance(address token, address spender)`                   | `view → uint256`                 | Returns the stored allowance                                                       |
+
+All write methods are nonpayable. These are **wallet-managed allowances**, separate from allowances created by calling an ERC-20 token's `approve` method. Transfers draw from the account's assets.
+
+Finite allowances decrease by the transferred amount; `type(uint256).max` remains unchanged. Both transfer methods return `true` immediately for zero amounts, without checks or events. A positive transfer through `transferFromToken` rejects the native ETH sentinel.
+
+Spending does not recheck owner membership or execute owner hooks. An existing allowance remains usable after an owner is removed. Set the allowance to zero through an authorized `batchApproveToken` self-call to revoke it.
+
+## External Validators and Hooks
+
+[ValidationManager](../src/ValidationManager.sol) provides internal dispatch logic; the wallet itself does not expose `validateSignature`. External validators implement:
 
 ```solidity
-/// @notice Emitted when a new smart wallet account is created
-/// @param account The address of the created wallet
-/// @param implementation The implementation address
-/// @param initialOwners Array of initial owners
-/// @param salt The salt used for deterministic address generation
-event AccountCreated(
-    address indexed account,
-    address indexed implementation,
-    InitialOwner[] initialOwners,
-    uint256 salt
-);
+function validateSignature(
+    bytes32 keyHash,
+    bytes32 messageHash,
+    bytes calldata validatorData
+) external view returns (bool);
 ```
 
-### ExecutionManager Events
+The wallet catches a reverting external validator and treats it as signature failure. Validator-specific payload encoding and key identity are defined by the validator.
 
-```solidity
-/// @notice Emitted when execution is successful
-/// @param intentHash The hash of the intent that was executed
-/// @param sender The address that initiated the execution
-/// @param nonce The nonce used for execution
-event ExecuteSuccessEvent(
-    bytes32 indexed intentHash,
-    address sender,
-    uint256 nonce
-);
-```
+Hooks are selected from the signing owner's settings. [HookLib](../src/libraries/HookLib.sol) dispatches three distinct paths:
 
-### AllowanceManager Events
+| Path                     | Hook callbacks                                                                                                                                                                                                   | Compatibility / failure behavior                                                                                         |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Batch execution          | `IHook.preCheck(Call[] calls, address executor) → bytes`, then `postCheck(bytes preCheckRet, address executor)`                                                                                                  | A configured hook is called directly; a revert aborts the batch                                                          |
+| Validator-based ERC-1271 | `IHook.isValidSignatureCheck(address caller, bytes32 hash, bytes signature) → bool`                                                                                                                              | Hook must advertise `IHook` through ERC-165 and approve via a view call                                                  |
+| Transfer settlement      | `IHookTransferAuthorization.preTransferWithAuthorization(bytes32 keyHash, address token, address to, uint256 value, address caller) → bytes`, then `postTransferWithAuthorization(bytes preRet, address caller)` | Hook must advertise `IHookTransferAuthorization` through ERC-165; incompatibility or callback failure reverts settlement |
 
-```solidity
-/// @notice Emitted when token allowance is approved (both native ETH and ERC20 tokens)
-/// @param owner The owner of the tokens
-/// @param token The token address (use Static.NATIVE_ETH for native ETH)
-/// @param spender The spender address
-/// @param amount The approved amount
-event ApproveToken(
-    address indexed owner,
-    address indexed token,
-    address indexed spender,
-    uint256 amount
-);
+Full interfaces: [IHook](../src/interfaces/IHook.sol), [IHookTransferAuthorization](../src/interfaces/IHookTransferAuthorization.sol). Pre/post callbacks are declared payable, but the wallet forwards no ETH to them. The pre-check's return bytes are passed to its corresponding post-check.
 
-/// @notice Emitted when native ETH is transferred using allowance
-/// @param owner The owner of the ETH
-/// @param spender The spender address
-/// @param recipient The recipient address
-/// @param amount The amount transferred
-event TransferFromNative(
-    address indexed owner,
-    address indexed spender,
-    address indexed recipient,
-    uint256 amount
-);
+The hook's `msg.sender` is the account. The explicit `executor` or `caller` argument is the caller of the wallet entry point: an owner, relayer, EntryPoint, or signature verifier. In particular, a transfer relayer is not the authorizing owner; use the supplied `keyHash` for that identity. A zero hook address skips callbacks. Transfer cancellation does not invoke settlement hooks.
 
-/// @notice Emitted when ERC20 tokens are transferred using allowance
-/// @param owner The owner of the tokens
-/// @param spender The spender address
-/// @param token The token contract address
-/// @param recipient The recipient address
-/// @param amount The amount transferred
-event TransferFromToken(
-    address indexed owner,
-    address indexed spender,
-    address indexed token,
-    address recipient,
-    uint256 amount
-);
+## Upgrades, Introspection, and Simulation
 
-/// @notice Emitted when a native ETH allowance is updated
-/// @param spender The spender address
-/// @param newAllowance The new allowance amount
-event NativeAllowanceUpdated(address indexed spender, uint256 newAllowance);
+| Wallet method                                             | Mutability / result              | Usage                                                                                                                                     |
+| --------------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `IMPLEMENTATION()`                                        | `view → address`                 | Immutable address of the implementation whose code is currently running                                                                   |
+| `upgradeToAndCall(address newImplementation, bytes data)` | Payable; no return value         | UUPS upgrade with self-call authorization and a compatible proxy context; optionally delegatecalls the new implementation with `data`     |
+| `proxiableUUID()`                                         | `view → bytes32`                 | Returns the ERC-1967 implementation slot when called directly on the implementation; reverts in delegated context                         |
+| `getImmutableFactory()`                                   | `view → address`                 | Reads the factory embedded in the factory-created proxy format; not a general-purpose getter for delegated EOAs or direct implementations |
+| `namespace()`                                             | `pure → string`                  | Returns `SmartWallet.ERC7201.CustomStorage`                                                                                               |
+| `CUSTOM_STORAGE_ROOT()`                                   | `view → bytes32`                 | Returns `0x653ff6dcbda533c3c7d8ffb646da3e510d0de40f237170c4da3f874472aecb00`                                                              |
+| `supportsInterface(bytes4 interfaceId)`                   | `view → bool`                    | Reports the interface IDs listed below                                                                                                    |
+| `delegateAndRevert(address target, bytes data)`           | Nonpayable; no successful return | Permissionless simulation helper; delegatecalls the target, then reverts with `DelegateAndRevert(bool success, bytes ret)`                |
 
-/// @notice Emitted when a token allowance is updated
-/// @param token The token contract address
-/// @param spender The spender address
-/// @param newAllowance The new allowance amount
-event TokenAllowanceUpdated(
-    address indexed token,
-    address indexed spender,
-    uint256 newAllowance
-);
-```
+A factory's `IMPLEMENTATION()` stays fixed even if an individual proxy upgrades. The account's getter reflects the implementation currently executing. EIP-7702 delegation changes use a new EOA authorization; updating an ERC-1967 slot does not change the EOA's delegation target. See [implementation changes](./architecture.md#storage-and-implementation-changes).
+
+`SmartWalletEntry` applies Solidity's custom storage layout at the root shown above. The [ERC7201](../src/ERC7201.sol) getters expose its namespace and root; they do not enumerate all separately namespaced storage used by inherited modules.
+
+For simulation, use `eth_call` and decode the deliberate `DelegateAndRevert` error. The outer revert rolls back changes even if the inner delegatecall succeeds. The repository does not include a separate `SmartWalletSimulator` implementation.
+
+### Asset Reception and Interface Detection
+
+[FallbackHandler](../src/FallbackHandler.sol) accepts plain ETH through `receive()`. Its payable fallback returns the appropriate selector for ERC-721 and ERC-1155 receiver callbacks and reverts for unknown selectors.
+
+| Interface         | `supportsInterface` ID |
+| ----------------- | ---------------------- |
+| ERC-165           | `0x01ffc9a7`           |
+| ERC-1271          | `0x1626ba7e`           |
+| ERC-721 receiver  | `0x150b7a02`           |
+| ERC-1155 receiver | `0x4e2312e0`           |
+
+The ERC-1155 single and batch callback selectors are `0xf23a6e61` and `0xbc197c81`. Receiver callbacks are handled by fallback rather than explicit methods in the wallet ABI. The current `supportsInterface` implementation reports only the four IDs above, including no transfer-authorization interface ID.
+
+## Events and Errors
+
+### Events
+
+The table uses full parameter types and marks indexed fields. Account events are emitted at the account address; `AccountCreated` is emitted by the factory.
+
+| Event                                                                                                                                                         | When emitted                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `AccountCreated(address indexed account, address indexed implementation, InitialOwner[] initialOwners, uint256 salt)`                                         | A new account is deployed and initialized; not emitted when returning an existing account            |
+| `WalletInitialized()`                                                                                                                                         | Initial owner setup completes                                                                        |
+| `OwnerAdded(bytes32 keyHash, address validator, uint256 settings)`                                                                                            | A key is registered                                                                                  |
+| `OwnerUpdated(bytes32 keyHash, address newValidator, uint256 settings)`                                                                                       | A key's configuration is replaced                                                                    |
+| `OwnerRemoved(bytes32 keyHash, address validator)`                                                                                                            | A registered key is removed                                                                          |
+| `ExecuteSuccessEvent(bytes32 indexed intentHash, address caller)`                                                                                             | Direct `execute` completes; `intentHash` is `CallLib.hash(calls)`                                    |
+| `RelayerExecuteSuccessEvent(bytes32 indexed intentHash, address sender, uint256 nonce)`                                                                       | Relayer execution completes; `intentHash` is the signed digest and `sender` is the submitting caller |
+| `NonceConsumed(uint192 key, uint64 nonce)`                                                                                                                    | A relayer sequence is consumed                                                                       |
+| `ChainlessQueueInvalidated(uint16 indexed operationType, uint16 indexed queueId)`                                                                             | The queue floor advances past the accepted queue ID                                                  |
+| `TransferAuthorizationUsed(address indexed token, address indexed from, address indexed to, uint256 value, bytes32 authorizationNonce, bytes32 ownerKeyHash)` | A signed transfer settles                                                                            |
+| `TransferAuthorizationCanceled(bytes32 indexed ownerKeyHash, bytes32 indexed authorizationNonce)`                                                             | A transfer nonce is canceled                                                                         |
+| `ApproveToken(address indexed owner, address indexed token, address indexed spender, uint256 amount)`                                                         | A wallet allowance is set                                                                            |
+| `TransferFromNative(address indexed owner, address indexed spender, address indexed recipient, uint256 amount)`                                               | A positive native transfer uses an allowance                                                         |
+| `TransferFromToken(address indexed owner, address indexed spender, address indexed token, address recipient, uint256 amount)`                                 | A positive ERC-20 transfer uses an allowance                                                         |
+| `NativeAllowanceUpdated(address indexed spender, uint256 newAllowance)`                                                                                       | A finite native allowance is spent                                                                   |
+| `TokenAllowanceUpdated(address indexed token, address indexed spender, uint256 newAllowance)`                                                                 | A finite ERC-20 allowance is spent                                                                   |
+
+Inherited lifecycle events include `Initialized(uint64 version)` and `Upgraded(address indexed implementation)`. `executeUserOp` does not emit either wallet batch-success event; track the EntryPoint's `UserOperationEvent` and application-specific target events for that path. Reverted calls do not retain their logs.
+
+### Common Errors
+
+| Error                                                                   | Meaning                                                                |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `NotFromSelf()`                                                         | An operation restricted to wallet self-calls was called externally     |
+| `NotEntryPoint()`                                                       | An ERC-4337 entry point was called by another address                  |
+| `UnauthorizedInitialization()` / `InvalidInitialization()`              | Initialization caller or lifecycle is invalid                          |
+| `InitialOwnersLengthIsZero()`                                           | New-account initialization has no owners                               |
+| `InvalidCaller(address)` / `InvalidKeyHash(bytes32)`                    | Caller/key is not permitted in that context, is missing, or is expired |
+| `NonAdminSelfCall()`                                                    | A non-admin batch attempted a wallet self-call                         |
+| `ValidatorAlreadyExists()` / `ValidatorNotFound()`                      | Owner registration state does not match the operation                  |
+| `InvalidValidatorImpl(address)`                                         | A non-built-in validator has no code                                   |
+| `InvalidNonce(uint256)`                                                 | Relayer sequence does not match                                        |
+| `InvalidNonceKey(uint256)`                                              | Relayer chainless permissions, calls, or queue state are invalid       |
+| `ExpiryPassed(uint48)`                                                  | Relayer signature expiry has passed                                    |
+| `InvalidValidatorDataLength(uint256 actual, uint256 required)`          | Relayer signature envelope is too short                                |
+| `InvalidSignature()`                                                    | Signature authorization failed                                         |
+| `AuthorizationAlreadyUsed(bytes32)`                                     | Transfer nonce was already settled or canceled                         |
+| `AuthorizationNotYetValid(uint256)` / `AuthorizationExpired(uint256)`   | Transfer time window is not open                                       |
+| `CallerNotPayee(address caller, address to)`                            | Receive authorization was submitted by someone other than the payee    |
+| `UnauthorizedCancellation(bytes32 signerKeyHash, bytes32 ownerKeyHash)` | A non-admin signer tried to cancel another key's nonce                 |
+| `HookNotTransferAuthorizationCompatible(bytes32 keyHash, address hook)` | Configured hook does not advertise the required transfer interface     |
+| `NativeAllowanceExceeded()` / `TokenAllowanceExceeded()`                | Caller has insufficient wallet allowance                               |
+| `InvalidSpender()` / `InvalidTokenForTransfer()`                        | Zero spender, or native sentinel used for a positive ERC-20 transfer   |
+| `TransferNativeFailed()` / `SafeERC20FailedOperation(address token)`    | Asset transfer failed                                                  |
+| `UnauthorizedCallContext()` / `UpgradeFailed()`                         | UUPS call context or replacement implementation is invalid             |
+| `ReentrancyGuardReentrantCall()`                                        | Guarded transfer settlement was re-entered                             |
+
+Use the generated ABI for the complete error set and parameter names. Calls can also bubble errors from targets, tokens, hooks, or ABI decoding. ERC-4337 validation failures may be returned as validation data, and ERC-1271 failures may be returned as the invalid magic value, rather than reverting with `InvalidSignature`.
