@@ -170,6 +170,8 @@ yarn install
 
 ### Build
 
+`foundry.toml` is the source of truth for release builds. Use Foundry artifacts for deployment and source verification. The optional Hardhat configuration reads the compiler version, EVM target, optimizer, IR, and metadata settings from `forge config --json`, including the active `FOUNDRY_PROFILE`.
+
 ```bash
 yarn build
 # or: forge build src script
