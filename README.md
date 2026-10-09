@@ -149,8 +149,8 @@ The addresses below are the documented deterministic deployments. Verify the dep
 
 | Contract             | Address                                      |
 | -------------------- | -------------------------------------------- |
-| `SmartWalletFactory` | `0x51d0dD2f3c9ea58dF9F2A0b35B6C6F6795c120b9` |
-| `SmartWalletEntry`   | `0xe99Ce84F07B12CA718A47d0878E7d8292803BCE0` |
+| `SmartWalletFactory` | `0x25318c90A1565e9A3C46369D9e38B9E2658C7A2A` |
+| `SmartWalletEntry`   | `0xcEF0AAC642f0f9B9Cd575cc08Faa511aFDF54743` |
 
 - [Audits](./docs/audits/)
 
