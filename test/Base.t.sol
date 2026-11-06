@@ -11,7 +11,7 @@ import {ECDSAValidator} from "./validators/ECDSAValidator.sol";
 import {PasskeyValidator} from "./validators/PasskeyValidator.sol";
 import {Call, BatchedCall, InitialOwner} from "src/Types.sol";
 import {DeployInitHelper} from "./utils/DeployInitHelper.s.sol";
-import {IDeployFactory} from "script/IDeployFactory.s.sol";
+import {IDeployFactory} from "./utils/IDeployFactory.sol";
 import {EIP2470} from "./utils/EIP2470.s.sol";
 import {IERC20, ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {BatchedCallLib} from "src/libraries/BatchedCallLib.sol";
